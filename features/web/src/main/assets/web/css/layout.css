@@ -26,6 +26,10 @@ body {
 }
 button, select, input { font: inherit; color: inherit; }
 a { color: var(--accent-hover); }
+a.btn {
+  color: inherit;
+  text-decoration: none;
+}
 
 /* —— Status bar —— */
 .status-bar {
@@ -167,10 +171,12 @@ pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-s
   box-shadow: var(--shadow);
 }
 .btn, .seg button, .stepper button {
+  display: inline-flex; align-items: center; justify-content: center;
   border: 0; border-radius: var(--radius-sm);
   min-height: var(--touch); padding: 0 1.1rem;
   cursor: pointer; background: var(--surface-2); color: var(--text);
   font-weight: 550; transition: background 0.15s ease, transform 0.1s ease;
+  text-decoration: none; line-height: 1.2; vertical-align: middle;
 }
 .btn:hover, .seg button:hover, .stepper button:hover { background: var(--surface-3); }
 .btn:active, .seg button:active { transform: scale(0.98); }

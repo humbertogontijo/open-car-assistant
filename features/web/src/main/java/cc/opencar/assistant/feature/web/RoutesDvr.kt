@@ -56,10 +56,13 @@ internal fun Routing.registerDvrRoutes(deps: OcaWebDeps) {
             call.respond(HttpStatusCode.NotFound, mapOf("ok" to false, "error" to "not found"))
             return@get
         }
-        call.response.header(
-            HttpHeaders.ContentDisposition,
-            "attachment; filename=\"${file.name}\"",
-        )
+        val inline = call.request.queryParameters["inline"] == "1"
+        if (!inline) {
+            call.response.header(
+                HttpHeaders.ContentDisposition,
+                "attachment; filename=\"${file.name}\"",
+            )
+        }
         call.respondFile(file)
     }
     delete("/api/dvr/recordings/{name}") {

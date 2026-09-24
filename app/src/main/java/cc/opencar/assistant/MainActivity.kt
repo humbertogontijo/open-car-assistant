@@ -137,10 +137,8 @@ class MainActivity : ComponentActivity() {
 
     private fun navigateToSection(intent: Intent?) {
         val section = intent?.getStringExtra(QuickEntryMenu.EXTRA_SECTION)?.trim().orEmpty()
-        if (section.isEmpty()) {
-            webView.loadUrl("http://127.0.0.1:8787/")
-            return
-        }
+        // Re-entry without a section must not reload "/" — that wiped in-memory UI place.
+        if (section.isEmpty()) return
         // Prefer in-page navigation if UI already loaded.
         webView.evaluateJavascript(
             "(function(){try{if(window.__ocaGoSection){window.__ocaGoSection(" +

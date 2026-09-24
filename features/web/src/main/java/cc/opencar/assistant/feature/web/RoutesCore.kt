@@ -283,6 +283,7 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
                 "theme" to (prefs.getString("theme", "dark") ?: "dark"),
                 "locale" to I18nBundle.normalize(prefs.getString(I18nBundle.PREF_LOCALE, null)),
                 "locales" to I18nBundle.SUPPORTED,
+                "units" to normalizeUnits(prefs.getString("units", null)),
             ),
         )
     }
@@ -297,12 +298,17 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
         if (locale != null) {
             edit.putString(I18nBundle.PREF_LOCALE, I18nBundle.normalize(locale))
         }
+        val units = params["units"]
+        if (units != null) {
+            edit.putString("units", unitsToStorage(units))
+        }
         edit.apply()
         call.respond(
             mapOf(
                 "ok" to true,
                 "theme" to (prefs.getString("theme", "dark") ?: "dark"),
                 "locale" to I18nBundle.normalize(prefs.getString(I18nBundle.PREF_LOCALE, null)),
+                "units" to normalizeUnits(prefs.getString("units", null)),
             ),
         )
     }
@@ -336,5 +342,52 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
         call.respond(
             WirelessAdbController(context, debug).setEnabled(enabled, adbPort),
         )
+    }
+}
+
+private fun normalizeUnits(raw: String?): Any {
+    if (raw.isNullOrBlank()) return defaultUnitPrefs()
+    val trimmed = raw.trim()
+    if (trimmed.equals("imperial", ignoreCase = true)) {
+        return mapOf(
+            "temperature" to "fahrenheit",
+            "distance" to "mi",
+            "speed" to "mph",
+            "fuel_economy" to "mpg",
+            "energy_economy" to "kwh_100km",
+        )
+    }
+    if (trimmed.equals("metric", ignoreCase = true)) {
+        return defaultUnitPrefs()
+    }
+    if (trimmed.startsWith("{")) {
+        return try {
+            org.json.JSONObject(trimmed).let { json ->
+                val out = defaultUnitPrefs().toMutableMap()
+                for (key in listOf("temperature", "distance", "speed", "fuel_economy", "energy_economy")) {
+                    if (json.has(key)) out[key] = json.getString(key)
+                }
+                out
+            }
+        } catch (_: Exception) {
+            defaultUnitPrefs()
+        }
+    }
+    return defaultUnitPrefs()
+}
+
+private fun defaultUnitPrefs(): Map<String, String> = mapOf(
+    "temperature" to "celsius",
+    "distance" to "km",
+    "speed" to "km_h",
+    "fuel_economy" to "l_100km",
+    "energy_economy" to "kwh_100km",
+)
+
+private fun unitsToStorage(unitsParam: String): String {
+    val normalized = normalizeUnits(unitsParam)
+    return when (normalized) {
+        is Map<*, *> -> org.json.JSONObject(normalized).toString()
+        else -> org.json.JSONObject(defaultUnitPrefs()).toString()
     }
 }

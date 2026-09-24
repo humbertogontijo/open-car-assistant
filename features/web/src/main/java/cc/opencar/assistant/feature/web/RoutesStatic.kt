@@ -35,7 +35,7 @@ internal fun Routing.registerStaticRoutes(deps: OcaWebDeps) {
             call.respond(HttpStatusCode.NotFound)
             return@get
         }
-        call.response.headers.append(HttpHeaders.CacheControl, "no-cache, max-age=0, must-revalidate")
+        call.response.headers.append(HttpHeaders.CacheControl, "no-store")
         call.respondBytes(bytes, type)
     }
 }

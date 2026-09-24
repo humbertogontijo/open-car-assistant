@@ -83,9 +83,11 @@ Detects via fingerprint match for `ihu629` / `geometry`. Uses **CarPropertyManag
 
 The product UI in `:feature-web` assets uses a shared **Alive Design** token set (`themes.css`) applied app-wide: frosted surfaces, ice-blue accent, Dock sidebar with linear SVG icons (`icons/sprite.svg`), slim status chips, and glass setup overlay. Spacing/radius/touch (≥48px) are theme-agnostic across `dark` / `light` / `contrast`.
 
-Control cards are typed by `ControlDef.input` (`bool`, `choice`, `int`, `float`, `text`, `sensor`). Choice with ≤3 options renders as pills; more than three uses `<select>`. Each writable card can **pin** a boot value (flip face); live writes go to VHAL, persist writes go to DataStore only.
+Rendering is **lit-html** (vendored ESM under `web/js/vendor/`) driven by a small reactive store (`store.js` `patch` / `subscribe`). Section templates live under `web/js/sections/`; control widgets under `web/js/ui/`. Soft polls update state and lit diffs `#main` (no full `innerHTML` remount). In-session scroll is remembered per section in memory only (not `localStorage`); process kill still starts at Home. Theme/locale/units prefs remain in `localStorage` (and `/api/prefs`). Static assets are served with `Cache-Control: no-store` (no `?v=` query busting).
 
-Numeric entities carry HA-style `deviceClass` + `unitOfMeasurement` (canonical ids from `:integration-api`) and localized `unitLabel` (from `unit.*` i18n keys).
+Control cards are typed by `ControlDef.input` (`bool`, `choice`, `int`, `float`, `text`, `sensor`). Choice with ≤3 options renders as pills; more than three uses a styled dropdown. Each writable card can **pin** a boot value; live writes go to VHAL, persist writes go to DataStore only.
+
+Numeric entities carry HA-style `deviceClass` + `unitOfMeasurement` (canonical platform ids from `:integration-api`). Cards convert to the user’s preferred unit per dimension (temperature, distance, speed, fuel economy, energy economy) via `web/js/units.js`, including L/100km ↔ km/L / mpg and kWh/100km ↔ km/kWh.
 
 ## Settings memory (boot / gear reapply)
 

@@ -1,110 +1,173 @@
 import { api, $ } from "./api.js";
-import { state } from "./state.js";
+import { state, patch, subscribe, notify } from "./store.js";
+import { render as litRender } from "./lit.js";
+import { sectionView } from "./sections/index.js";
 import {
-  sectionHome,
-  sectionGroup,
-  sectionCabin,
-  sectionCameras,
-  sectionHistory,
-  sectionStore,
-  sectionSystem,
-  sectionAndroid,
-  sectionLab,
-  sectionAbout,
-  bindSection,
-  fillProbeTable,
   loadHistoryPoints,
   loadRecordings,
   loadSounds,
   startCameraLive,
   stopCameraLive,
-} from "./sections.js";
-import { sectionShortcuts, bindShortcuts, loadShortcuts } from "./shortcuts.js";
-import { sectionPlugins, bindPlugins } from "./plugins.js";
-import {
-  shouldShowSetup,
-  renderSetupOverlay,
-  renderStatusBar,
-} from "./setup.js";
+  applyCameraPlayerSrc,
+  ensureStoreLoaded,
+} from "./sections/index.js";
+import { loadShortcuts } from "./sections/shortcuts.js";
+import { shouldShowSetup, renderSetupOverlay, renderStatusBar } from "./ui/setup.js";
 import { setTheme } from "./theme.js";
-import { loadI18n, t } from "./i18n.js";
-import { loadIcons } from "./icons.js";
+import { loadI18n } from "./i18n.js";
+import { loadIcons, mountNavIcons } from "./icons.js";
+import { stashCurrentScroll, restoreSectionScroll, rememberScroll } from "./nav.js";
 
-function render() {
-  const map = {
-    home: sectionHome,
-    history: sectionHistory,
-    drive: function () {
-      return sectionGroup(t("section.drive.title", "Condução"), "", "drive");
-    },
-    climate: function () {
-      return sectionGroup(t("section.climate.title", "Clima"), "", "climate");
-    },
-    energy: function () {
-      return sectionGroup(t("section.energy.title", "Energia"), "", "energy");
-    },
-    safety: function () {
-      return sectionGroup(t("section.safety.title", "Segurança"), "", "safety");
-    },
-    cabin: sectionCabin,
-    cameras: sectionCameras,
-    dvr: sectionCameras,
-    store: sectionStore,
-    shortcuts: sectionShortcuts,
-    plugins: sectionPlugins,
-    android: sectionAndroid,
-    system: sectionSystem,
-    lab: sectionLab,
-    about: sectionAbout,
-  };
-  const main = $("main");
-  const prevMainScroll = main ? main.scrollTop : 0;
-  const probeScrollEl = document.getElementById("probeScroll");
-  const prevProbeScroll = probeScrollEl ? probeScrollEl.scrollTop : 0;
-  // Abort in-flight MJPEG before destroying the <img>, or requests pile up.
-  const prevPreview = $("preview");
-  if (prevPreview) {
-    prevPreview.removeAttribute("src");
-    prevPreview.dataset.ocaLive = "";
-  }
-  main.innerHTML = (map[state.section] || sectionHome)();
-  bindSection(refresh);
-  if (state.section === "shortcuts") bindShortcuts(refresh);
-  if (state.section === "plugins") bindPlugins(refresh);
-  if (state.section === "lab") fillProbeTable();
-  if (state.section === "store" && !state.storeDetail && !state._storeLoaded) {
-    state._storeLoaded = true;
-    api("/api/store/search?q=")
-      .then(function (res) {
-        state.storeResults = (res && res.apps) || [];
-        render();
-      })
-      .catch(function () {});
-  }
-  if (state.section === "cameras" || state.section === "dvr") {
-    startCameraLive();
-  } else if (state.cameraPreviewActive) {
-    stopCameraLive();
-  }
-  if (main) main.scrollTop = prevMainScroll;
-  const probeAfter = document.getElementById("probeScroll");
-  if (probeAfter) probeAfter.scrollTop = prevProbeScroll;
-  renderSetupOverlay();
+function updateNavActive(sec) {
+  document.querySelectorAll(".nav-item").forEach(function (n) {
+    n.classList.toggle("active", n.getAttribute("data-sec") === sec);
+  });
 }
 
-async function refresh() {
+function shouldSkipSoftRender() {
+  if (document.querySelector(".choice-select.open") || state.openChoiceId) return true;
+  if (state.shortcutEdit) return true;
+  if (state.pluginEditId) return true;
+  const ae = document.activeElement;
+  if (
+    ae &&
+    (ae.matches("input, textarea, select") || ae.closest(".choice-select, .choice-menu"))
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function paint() {
+  const main = $("main");
+  if (!main) return;
+  const probeScrollEl = document.getElementById("probeScroll");
+  const prevProbeScroll = probeScrollEl ? probeScrollEl.scrollTop : 0;
+
+  litRender(sectionView(state.section), main);
+  renderStatusBar();
+  renderSetupOverlay();
+  mountNavIcons();
+  updateNavActive(state.section);
+
+  if (state.section === "store") ensureStoreLoaded();
+
+  if (state.section === "cameras" || state.section === "dvr") {
+    if (state.cameraPlayerMode !== "recording") {
+      startCameraLive();
+    }
+    applyCameraPlayerSrc();
+  } else if (state.cameraPreviewActive || state.cameraPlayerMode === "recording") {
+    stopCameraLive();
+  }
+
+  restoreSectionScroll(state.section);
+  const probeAfter = document.getElementById("probeScroll");
+  if (probeAfter) probeAfter.scrollTop = prevProbeScroll;
+}
+
+subscribe(paint);
+
+export async function refresh() {
   await loadIcons();
   await loadI18n();
-  state.status = await api("/api/status");
-  state.setup = state.status.setup || (await api("/api/setup"));
-  state.entities = await api("/api/entities");
-  state.controls = await api("/api/controls");
+  const status = await api("/api/status");
+  const setup = status.setup || (await api("/api/setup"));
+  const entities = await api("/api/entities");
+  const controls = await api("/api/controls");
+  let historyEntities = [];
   try {
     const hist = await api("/api/history");
-    state.historyEntities = (hist && hist.entities) || [];
-  } catch (e) {
-    state.historyEntities = [];
+    historyEntities = (hist && hist.entities) || [];
+  } catch (e) {}
+  let hiddenEntities = [];
+  try {
+    const hidden = await api("/api/entities/hidden");
+    hiddenEntities = (hidden && hidden.entities) || [];
+  } catch (e) {}
+  let adb = null;
+  try {
+    adb = (status && status.adb) || (await api("/api/adb"));
+  } catch (e) {}
+  let lab = null;
+  let token = state.token;
+  try {
+    lab = await api("/api/lab");
+    if (lab && lab.token) token = lab.token;
+    else if (lab && !lab.contributor) token = "";
+  } catch (e) {}
+  try {
+    const hint = await api("/debug/adb-hint");
+    if (!token && hint.contributor && hint.tokenHint) token = hint.tokenHint;
+  } catch (e) {}
+  let updatesPrefs = {
+    units: {
+      temperature: "celsius",
+      distance: "km",
+      speed: "km_h",
+      fuel_economy: "l_100km",
+      energy_economy: "kwh_100km",
+    },
+  };
+  try {
+    const prefs = await api("/api/prefs");
+    if (prefs.theme) setTheme(prefs.theme);
+    let units = prefs.units;
+    if (typeof units === "string") {
+      try {
+        units = JSON.parse(units);
+      } catch (e) {
+        units = units === "imperial"
+          ? {
+              temperature: "fahrenheit",
+              distance: "mi",
+              speed: "mph",
+              fuel_economy: "mpg",
+              energy_economy: "kwh_100km",
+            }
+          : updatesPrefs.units;
+      }
+    }
+    try {
+      const local = localStorage.getItem("oca_units");
+      if (local) {
+        if (local.charAt(0) === "{") units = JSON.parse(local);
+        else if (local === "imperial" || local === "metric") {
+          units = local === "imperial"
+            ? {
+                temperature: "fahrenheit",
+                distance: "mi",
+                speed: "mph",
+                fuel_economy: "mpg",
+                energy_economy: "kwh_100km",
+              }
+            : updatesPrefs.units;
+        }
+      }
+    } catch (e) {}
+    if (units && typeof units === "object") {
+      updatesPrefs = { units: units };
+    }
+  } catch (e) {}
+
+  const updates = {
+    status: status,
+    setup: setup,
+    entities: entities,
+    controls: controls,
+    historyEntities: historyEntities,
+    hiddenEntities: hiddenEntities,
+    adb: adb,
+    lab: lab,
+    token: token,
+    prefs: updatesPrefs,
+  };
+  if (state._setupInit == null) {
+    updates._setupInit = true;
+    updates.showSetup = shouldShowSetup(setup);
   }
+  Object.assign(state, updates);
+
   if (state.section === "history" && state.historySelected) {
     await loadHistoryPoints();
   }
@@ -115,61 +178,19 @@ async function refresh() {
   if (state.section === "cameras" || state.section === "dvr") {
     await loadRecordings();
   }
-  try {
-    const hidden = await api("/api/entities/hidden");
-    state.hiddenEntities = (hidden && hidden.entities) || [];
-  } catch (e) {
-    state.hiddenEntities = [];
-  }
-  try {
-    state.adb = (state.status && state.status.adb) || (await api("/api/adb"));
-  } catch (e) {
-    state.adb = null;
-  }
-  try {
-    state.lab = await api("/api/lab");
-    if (state.lab && state.lab.token) state.token = state.lab.token;
-    else if (state.lab && !state.lab.contributor) state.token = "";
-  } catch (e) {
-    state.lab = null;
-  }
-  try {
-    const hint = await api("/debug/adb-hint");
-    if (!state.token && hint.contributor && hint.tokenHint) state.token = hint.tokenHint;
-  } catch (e) {}
-  try {
-    const prefs = await api("/api/prefs");
-    if (prefs.theme) setTheme(prefs.theme);
-  } catch (e) {}
-  if (state.section === "shortcuts" || state.section === "system" || !state._shortcutsLoaded) {
+  if (state.section === "shortcuts" || state.section === "settings" || state.section === "system" || !state._shortcutsLoaded) {
     state._shortcutsLoaded = true;
     await loadShortcuts();
   }
-  if (state.showSetup === false && shouldShowSetup(state.setup)) {
-    // only auto-open once per load when incomplete
-  }
-  if (state._setupInit == null) {
-    state._setupInit = true;
-    state.showSetup = shouldShowSetup(state.setup);
-  }
-  renderStatusBar();
-  render();
+  notify();
 }
-
-document.querySelectorAll(".nav-item").forEach(function (el) {
-  el.onclick = function () {
-    goSection(el.getAttribute("data-sec"));
-  };
-});
 
 function goSection(sec) {
   if (!sec) return;
   const prev = state.section;
-  document.querySelectorAll(".nav-item").forEach(function (n) {
-    n.classList.remove("active");
-    if (n.getAttribute("data-sec") === sec) n.classList.add("active");
-  });
-  state.section = sec;
+  stashCurrentScroll();
+  updateNavActive(sec);
+
   if (
     (prev === "cameras" || prev === "dvr") &&
     sec !== "cameras" &&
@@ -177,38 +198,40 @@ function goSection(sec) {
   ) {
     stopCameraLive();
   }
-  if (state.section === "store") state._storeLoaded = false;
-  if (state.section === "shortcuts" || state.section === "system") {
+
+  const updates = { section: sec, openChoiceId: null };
+  if (sec === "store") updates._storeLoaded = false;
+  patch(updates);
+
+  if (sec === "shortcuts" || sec === "settings" || sec === "system") {
     loadShortcuts().then(function () {
-      render();
+      notify();
     });
-    return;
-  }
-  if (state.section === "history") {
+  } else if (sec === "history") {
     if (!state.historySelected && state.historyEntities && state.historyEntities.length) {
       state.historySelected = state.historyEntities[0];
     }
     state.historyView = null;
     loadHistoryPoints().then(function () {
-      render();
+      notify();
     });
-    return;
-  }
-  if (state.section === "cameras" || state.section === "dvr") {
-    state.cameraPreviewActive = false;
+  } else if (sec === "cameras" || sec === "dvr") {
+    patch({
+      cameraPreviewActive: false,
+      cameraPreviewSrc: "",
+      cameraPlayerMode: "live",
+      cameraPlayingName: "",
+      cameraPlaybackPaused: false,
+      cameraPlaybackLoading: false,
+    });
     loadRecordings().then(function () {
-      render();
+      notify();
     });
-    return;
-  }
-  if (state.section === "cabin") {
+  } else if (sec === "cabin") {
     loadSounds().then(function () {
-      render();
+      notify();
     });
-    return;
-  }
-  render();
-  if (state.section === "lab") {
+  } else if (sec === "lab") {
     api("/api/lab")
       .then(function (lab) {
         state.lab = lab;
@@ -221,35 +244,36 @@ function goSection(sec) {
         return api("/debug/probe?token=" + encodeURIComponent(state.token));
       })
       .then(function (p) {
-        if (!p) {
-          render();
-          return;
+        if (p) {
+          if (state.labTab === "obd2") state.obd2 = p;
+          else state.probe = p;
         }
-        if (state.labTab === "obd2") state.obd2 = p;
-        else state.probe = p;
-        render();
+        notify();
       })
-      .catch(function () {});
+      .catch(function () {
+        notify();
+      });
   }
 }
 
 window.__ocaGoSection = goSection;
 
+document.querySelectorAll(".nav-item").forEach(function (el) {
+  el.onclick = function () {
+    goSection(el.getAttribute("data-sec"));
+  };
+});
+
 (function applySectionQuery() {
   try {
     var params = new URLSearchParams(window.location.search || "");
     var sec = params.get("section");
-    if (sec) goSection(sec);
+    if (sec) {
+      state.section = sec;
+      updateNavActive(sec);
+    }
   } catch (e) {}
 })();
-
-refresh();
-setInterval(function () {
-  softRefresh();
-}, 3000);
-document.addEventListener("visibilitychange", function () {
-  if (document.visibilityState === "visible") softRefresh();
-});
 
 async function softRefresh() {
   try {
@@ -263,32 +287,27 @@ async function softRefresh() {
     state.entities = pair[0];
     state.controls = pair[1];
     renderStatusBar();
-    // Don't remount main while a dropdown is open or a shortcut/plugin is being edited —
-    // soft refresh was closing choice menus ~every 3s and wiping the editor form.
-    if (document.querySelector(".choice-select.open")) return;
-    if (state.shortcutEdit) return;
-    if (state.pluginEditId) return;
-    const ae = document.activeElement;
-    if (
-      ae &&
-      (ae.matches("input, textarea, select") || ae.closest(".choice-select, .choice-menu"))
-    ) {
-      return;
-    }
-    // Lab: keep scroll + filter; update table in place for product-entities tab only.
-    if (state.section === "lab") {
-      if (state.labTab === "entities") fillProbeTable();
-      return;
-    }
-    // History / Cabin / Cameras: never remount on soft refresh (MJPEG pile-up / form wipe).
-    if (
-      state.section === "history" ||
-      state.section === "cabin" ||
-      state.section === "cameras" ||
-      state.section === "dvr"
-    ) {
-      return;
-    }
-    render();
+    if (shouldSkipSoftRender()) return;
+    // Remember scroll before notify so paint can restore within-section position.
+    const main = $("main");
+    if (main) rememberScroll(state.section, main.scrollTop);
+    notify();
   } catch (e) {}
 }
+
+refresh();
+setInterval(softRefresh, 3000);
+document.addEventListener("visibilitychange", function () {
+  if (document.visibilityState === "visible") softRefresh();
+});
+
+// Persist in-session scroll while scrolling.
+document.addEventListener(
+  "scroll",
+  function (ev) {
+    if (ev.target && ev.target.id === "main") {
+      rememberScroll(state.section, ev.target.scrollTop);
+    }
+  },
+  true,
+);
