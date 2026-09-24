@@ -3,6 +3,7 @@ package cc.opencar.assistant.feature.web
 import cc.opencar.assistant.feature.debug.CatalogProbe
 import cc.opencar.assistant.feature.debug.ContributorDebugState
 import cc.opencar.assistant.feature.debug.LogRingBuffer
+import cc.opencar.assistant.feature.debug.Obd2Probe
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -28,6 +29,7 @@ internal fun Routing.registerDebugRoutes(deps: OcaWebDeps) {
     val session = deps.session
     val debug = deps.debug
     val probe = deps.probe
+    val obd2 = deps.obd2
     val capabilities = deps.capabilities
     val variantId = deps.variantId
 
@@ -50,6 +52,7 @@ internal fun Routing.registerDebugRoutes(deps: OcaWebDeps) {
         call.respond(
             mapOf(
                 "summary" to report.summary(),
+                "source" to "VHAL catalog (CarPropertyManager / gRPC)",
                 "results" to report.results.map {
                     mapOf(
                         "name" to it.name,
@@ -62,6 +65,44 @@ internal fun Routing.registerDebugRoutes(deps: OcaWebDeps) {
                         "areaId" to it.areaId,
                         "value" to it.value,
                         "message" to it.message,
+                    )
+                },
+            ),
+        )
+    }
+    get("/debug/obd2") {
+        if (debug.contributorMode && !debug.checkToken(call.request.queryParameters["token"])) {
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "token required"))
+            return@get
+        }
+        val force = call.request.queryParameters["force"] == "1"
+        val o = obd2
+        if (o == null) {
+            call.respond(
+                mapOf(
+                    "summary" to mapOf("available" to false, "tip" to "OBD2 probe not wired"),
+                    "source" to "OBD2_LIVE_FRAME / OBD2_FREEZE_FRAME (VHAL)",
+                    "results" to emptyList<Any>(),
+                ),
+            )
+            return@get
+        }
+        val report = withContext(Dispatchers.IO) { o.run(force) }
+        call.respond(
+            mapOf(
+                "summary" to report.summary(),
+                "source" to "OBD2_LIVE_FRAME / OBD2_FREEZE_FRAME (VHAL)",
+                "results" to report.results.map {
+                    mapOf(
+                        "name" to it.name,
+                        "key" to it.key,
+                        "id" to it.nativeIdHex,
+                        "family" to it.family,
+                        "status" to it.status,
+                        "permission" to it.permission,
+                        "value" to it.value,
+                        "message" to it.message,
+                        "byteLength" to it.byteLength,
                     )
                 },
             ),

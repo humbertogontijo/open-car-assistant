@@ -1,13 +1,17 @@
 package cc.opencar.assistant.feature.web
 
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.request.receiveParameters
+import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
+import io.ktor.server.response.respondFile
 import io.ktor.server.response.respondOutputStream
 import io.ktor.server.routing.Routing
+import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import kotlinx.coroutines.Dispatchers
@@ -42,8 +46,32 @@ internal fun Routing.registerDvrRoutes(deps: OcaWebDeps) {
     get("/api/dvr/status") {
         call.respond(dvr.status())
     }
+    get("/api/dvr/recordings") {
+        call.respond(mapOf("ok" to true, "recordings" to dvr.listRecordings()))
+    }
+    get("/api/dvr/recordings/{name}") {
+        val name = call.parameters["name"] ?: return@get
+        val file = dvr.recordingFile(name)
+        if (file == null) {
+            call.respond(HttpStatusCode.NotFound, mapOf("ok" to false, "error" to "not found"))
+            return@get
+        }
+        call.response.header(
+            HttpHeaders.ContentDisposition,
+            "attachment; filename=\"${file.name}\"",
+        )
+        call.respondFile(file)
+    }
+    delete("/api/dvr/recordings/{name}") {
+        val name = call.parameters["name"] ?: return@delete
+        val ok = dvr.deleteRecording(name)
+        if (!ok) {
+            call.respond(HttpStatusCode.NotFound, mapOf("ok" to false, "error" to "not found"))
+        } else {
+            call.respond(mapOf("ok" to true))
+        }
+    }
     post("/api/dvr/preview/start") {
-        // null camera → merged mosaic
         val cam = call.request.queryParameters["camera"]
         val ok = withContext(Dispatchers.IO) {
             dvr.startPreview(if (cam.isNullOrBlank() || cam == "merged") null else cam)
@@ -80,25 +108,29 @@ internal fun Routing.registerDvrRoutes(deps: OcaWebDeps) {
             )
             return@get
         }
-        call.respondOutputStream(
-            contentType = ContentType.parse("multipart/x-mixed-replace; boundary=frame"),
-        ) {
-            var idle = 0
-            while (idle < 100) {
-                val jpeg = dvr.latestPreviewJpeg()
-                if (jpeg != null) {
-                    idle = 0
-                    write("--frame\r\n".toByteArray())
-                    write("Content-Type: image/jpeg\r\n".toByteArray())
-                    write("Content-Length: ${jpeg.size}\r\n\r\n".toByteArray())
-                    write(jpeg)
-                    write("\r\n".toByteArray())
-                    flush()
-                } else {
-                    idle++
+        try {
+            call.respondOutputStream(
+                contentType = ContentType.parse("multipart/x-mixed-replace; boundary=frame"),
+            ) {
+                var idle = 0
+                while (idle < 100) {
+                    val jpeg = dvr.latestPreviewJpeg()
+                    if (jpeg != null) {
+                        idle = 0
+                        write("--frame\r\n".toByteArray())
+                        write("Content-Type: image/jpeg\r\n".toByteArray())
+                        write("Content-Length: ${jpeg.size}\r\n\r\n".toByteArray())
+                        write(jpeg)
+                        write("\r\n".toByteArray())
+                        flush()
+                    } else {
+                        idle++
+                    }
+                    delay(100)
                 }
-                delay(100)
             }
+        } catch (_: Throwable) {
+            // Client cancelled / browser replaced img.src — end stream quietly.
         }
     }
 }

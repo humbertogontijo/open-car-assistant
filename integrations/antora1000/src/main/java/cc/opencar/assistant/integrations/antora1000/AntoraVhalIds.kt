@@ -109,6 +109,19 @@ object AntoraVhalIds {
     const val SUNROOF_TILT = 0x23207156
 
     const val BCM_FUNC_CUSTOM_KEY = 0x21407171
+    /**
+     * Catalog of known custom-key *capabilities* (separate VHAL props).
+     * [BCM_FUNC_CUSTOM_KEY] stores small ints = (TYPE_id - [CUSTOM_KEY_TYPE_NONE]),
+     * plus at least one firmware-specific outlier (e.g. driving settings = 0x21111418).
+     */
+    const val CUSTOM_KEY_TYPE_NONE = 0x2140752d
+    const val CUSTOM_KEY_TYPE_360_PANORAMA = 0x2140752e // → enum 1
+    const val CUSTOM_KEY_TYPE_UNLOCK_TRUNK = 0x21407531 // → enum 4
+    const val CUSTOM_KEY_TYPE_CHANGE_DVRMOD = 0x21407532 // → enum 5
+    const val CUSTOM_KEY_TYPE_SOUND_SWITCH = 0x21407534 // → enum 7 (OEM: media source)
+    const val CUSTOM_KEY_TYPE_REAR_MIRROR_ADJUST = 0x21407535 // → enum 8
+    /** Observed on Antora: OEM “driving settings” selection (not in CUSTOM_KEY_TYPE_*). */
+    const val CUSTOM_KEY_DRIVING_SETTINGS = 0x21111418
     const val WHEEL_HARD_KEY_TOP = 0x21407432
     const val WHEEL_HARD_KEY_LEFT = 0x21407433
     const val WHEEL_HARD_KEY_RIGHT = 0x21407434

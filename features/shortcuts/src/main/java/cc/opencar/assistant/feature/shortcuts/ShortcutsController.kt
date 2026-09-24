@@ -27,11 +27,36 @@ class ShortcutsController(
     quickEntry: QuickEntry? = null,
     actionHandlers: Map<String, ShortcutActionHandler> = emptyMap(),
     triggerSources: List<ShortcutTriggerSource> = emptyList(),
+    readEntity: (suspend (String) -> String?)? = null,
+    readGear: (suspend () -> Int?)? = null,
 ) {
     val store = ShortcutStore.get(context)
     val launcher = AppLauncher(context)
     val runner = ShortcutRunner(context, setControl, launcher, actionHandlers)
-    val engine = ShortcutTriggerEngine(session, store, runner, triggerSources)
+    private lateinit var wifiMonitor: WifiSsidMonitor
+    private var entityWatcher: EntityValueWatcher? = null
+    val engine: ShortcutTriggerEngine
+
+    init {
+        val monitor = WifiSsidMonitor(context, onChanged = { ssid -> engine.onWifiSsid(ssid) })
+        wifiMonitor = monitor
+        engine = ShortcutTriggerEngine(
+            session = session,
+            store = store,
+            runner = runner,
+            triggerSources = triggerSources,
+            readEntity = readEntity,
+            readWifiSsid = { monitor.currentSsid() },
+            readGear = readGear,
+        )
+        if (readEntity != null) {
+            entityWatcher = EntityValueWatcher(
+                store = store,
+                readEntity = readEntity,
+                onChanged = { id, value -> engine.onEntityChanged(id, value) },
+            )
+        }
+    }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val entry: QuickEntry = quickEntry ?: FloatChipQuickEntry()
@@ -41,9 +66,13 @@ class ShortcutsController(
 
     fun start() {
         engine.start()
+        wifiMonitor.start()
+        entityWatcher?.start()
     }
 
     fun stop() {
+        entityWatcher?.stop()
+        wifiMonitor.stop()
         engine.stop()
         detachOverlay()
     }

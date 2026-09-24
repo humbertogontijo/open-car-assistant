@@ -13,6 +13,7 @@ import cc.opencar.assistant.api.plugin.PluginHost
 import cc.opencar.assistant.api.plugin.PluginRegistry
 import cc.opencar.assistant.api.plugin.ServiceLoaderPluginRegistry
 import cc.opencar.assistant.feature.debug.CatalogProbe
+import cc.opencar.assistant.feature.debug.Obd2Probe
 import cc.opencar.assistant.feature.debug.ContributorDebugState
 import cc.opencar.assistant.feature.debug.LogRingBuffer
 import cc.opencar.assistant.feature.dvr.DvrController
@@ -30,6 +31,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -63,6 +65,8 @@ class AssistantRuntime(private val app: OcaApp) {
     var dvr: DvrController? = null
         private set
     var probe: CatalogProbe? = null
+        private set
+    var obd2: Obd2Probe? = null
         private set
     var androidSettings: AndroidSettingsController? = null
         private set
@@ -119,6 +123,7 @@ class AssistantRuntime(private val app: OcaApp) {
         installer = ApkInstaller(app)
         dvr = DvrController(app, sess)
         probe = CatalogProbe(app, sess)
+        obd2 = Obd2Probe(sess)
         androidSettings = AndroidSettingsController(app)
         history = EntityHistoryRecorder(app, sess).also { it.start() }
 
@@ -149,6 +154,10 @@ class AssistantRuntime(private val app: OcaApp) {
             quickEntry = matched.createQuickEntry(),
             actionHandlers = actionHandlers,
             triggerSources = triggerSources,
+            readEntity = { id -> ControlCatalog.currentValue(sess, id) },
+            readGear = {
+                sess.telemetry().first().gear
+            },
         ).also { it.start() }
         // Session Boot may already have been consumed by memory — deliver explicitly.
         shortcuts?.onBoot()
@@ -164,6 +173,7 @@ class AssistantRuntime(private val app: OcaApp) {
             installer = installer!!,
             dvr = dvr!!,
             probe = probe!!,
+            obd2 = obd2,
             capabilities = capabilities.map { it.name }.toSet(),
             variantId = variant.id,
             androidSettings = androidSettings,
@@ -178,6 +188,7 @@ class AssistantRuntime(private val app: OcaApp) {
         // Warm probe in background (non-blocking for UI)
         scope.launch(Dispatchers.IO) {
             runCatching { probe?.run(force = false) }
+            runCatching { obd2?.run(force = false) }
         }
 
         ensureService()

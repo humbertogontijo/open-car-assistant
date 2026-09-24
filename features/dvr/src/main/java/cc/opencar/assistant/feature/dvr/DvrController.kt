@@ -28,6 +28,8 @@ class DvrController(
     private var activeFile: File? = null
     private var segmentJobStartedAt: Long = 0L
     private var storageId: String = STORAGE_APP
+    @Volatile private var cachedTargets: List<Map<String, Any?>>? = null
+    @Volatile private var cachedTargetsAt: Long = 0L
     private val singlePreview = CameraPreviewSession(context)
     /** Round-robin grab fills per-camera JPEGs; mosaic owns the unified frame. */
     private val mosaic = MosaicPreviewSession { id ->
@@ -54,7 +56,12 @@ class DvrController(
 
     fun isRecording(): Boolean = recording.get()
 
-    fun storageTargets(): List<Map<String, Any?>> {
+    fun storageTargets(forceRefresh: Boolean = false): List<Map<String, Any?>> {
+        val now = System.currentTimeMillis()
+        val cached = cachedTargets
+        if (!forceRefresh && cached != null && now - cachedTargetsAt < STORAGE_CACHE_MS) {
+            return cached
+        }
         val out = mutableListOf<Map<String, Any?>>()
         val app = File(context.getExternalFilesDir(null), "dvr").also { it.mkdirs() }
         out += mapOf(
@@ -103,6 +110,8 @@ class DvrController(
         } catch (t: Throwable) {
             Log.w(TAG, "storageVolumes: ${t.message}")
         }
+        cachedTargets = out
+        cachedTargetsAt = now
         return out
     }
 
@@ -243,6 +252,41 @@ class DvrController(
         }
     }
 
+    fun listRecordings(): List<Map<String, Any?>> {
+        val dir = outputDir()
+        val files = dir.listFiles { f ->
+            f.isFile && (
+                f.name.startsWith("oca_merged_") &&
+                    (f.name.endsWith(".mjpeg") || f.name.endsWith(".seg"))
+                )
+        } ?: emptyArray()
+        return files
+            .sortedByDescending { it.lastModified() }
+            .map { f ->
+                mapOf(
+                    "name" to f.name,
+                    "size" to f.length(),
+                    "mtime" to f.lastModified(),
+                    "path" to f.absolutePath,
+                )
+            }
+    }
+
+    fun recordingFile(name: String): File? {
+        if (name.isBlank() || name.contains("..") || name.contains('/') || name.contains('\\')) {
+            return null
+        }
+        val f = File(outputDir(), name)
+        if (!f.isFile || !f.canonicalPath.startsWith(outputDir().canonicalPath)) return null
+        if (!f.name.startsWith("oca_merged_")) return null
+        return f
+    }
+
+    fun deleteRecording(name: String): Boolean {
+        val f = recordingFile(name) ?: return false
+        return f.delete()
+    }
+
     fun status(): Map<String, Any?> = mapOf(
         "recording" to recording.get(),
         "cameraId" to (activeCameraId ?: "merged"),
@@ -265,5 +309,6 @@ class DvrController(
         private const val TAG = "OcaDvr"
         const val STORAGE_APP = "app"
         const val STORAGE_PRIMARY = "primary"
+        private const val STORAGE_CACHE_MS = 30_000L
     }
 }

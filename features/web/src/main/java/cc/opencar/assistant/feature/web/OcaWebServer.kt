@@ -5,6 +5,7 @@ import android.util.Log
 import cc.opencar.assistant.api.VehicleSession
 import cc.opencar.assistant.api.plugin.PluginRegistry
 import cc.opencar.assistant.feature.debug.CatalogProbe
+import cc.opencar.assistant.feature.debug.Obd2Probe
 import cc.opencar.assistant.feature.debug.ContributorDebugState
 import cc.opencar.assistant.feature.debug.LogRingBuffer
 import cc.opencar.assistant.feature.dvr.DvrController
@@ -30,6 +31,7 @@ class OcaWebServer(
     private val installer: ApkInstaller,
     private val dvr: DvrController,
     private val probe: CatalogProbe,
+    private val obd2: Obd2Probe? = null,
     private val capabilities: Set<String>,
     private val variantId: String,
     private val port: Int = 8787,
@@ -37,6 +39,7 @@ class OcaWebServer(
     private val history: EntityHistoryRecorder? = null,
     private val shortcuts: ShortcutsController? = null,
     private val plugins: PluginRegistry? = null,
+    private val sounds: SoundsController? = null,
     private val integrationIds: List<String> = emptyList(),
     private val getIntegrationOverride: () -> String? = { null },
     private val setIntegrationOverride: (String?) -> Unit = {},
@@ -54,6 +57,7 @@ class OcaWebServer(
             installer = installer,
             dvr = dvr,
             probe = probe,
+            obd2 = obd2,
             capabilities = capabilities,
             variantId = variantId,
             port = port,
@@ -62,6 +66,7 @@ class OcaWebServer(
             history = history,
             shortcuts = shortcuts,
             plugins = plugins,
+            sounds = sounds ?: SoundsController(context),
             integrationIds = integrationIds,
             getIntegrationOverride = getIntegrationOverride,
             setIntegrationOverride = setIntegrationOverride,
@@ -74,6 +79,7 @@ class OcaWebServer(
                 registerCoreRoutes(deps)
                 registerStoreRoutes(deps)
                 registerDvrRoutes(deps)
+                registerSoundRoutes(deps)
                 registerDebugRoutes(deps)
                 registerShortcutRoutes(deps)
                 registerPluginRoutes(deps)

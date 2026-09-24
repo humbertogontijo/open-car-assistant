@@ -17,20 +17,18 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Home Assistant–style local entity history: sample on change + periodic heartbeat.
- * Retention keyed loosely by [family] (group / EntityType id).
+ * Local entity history: store a sample only when the value changes.
+ * No periodic heartbeat duplicates.
  */
 class EntityHistoryRecorder(
     context: Context,
     private val session: VehicleSession,
     private val retentionMs: Long = DEFAULT_RETENTION_MS,
-    private val heartbeatMs: Long = DEFAULT_HEARTBEAT_MS,
 ) {
     private val db = HistoryDb(context)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var job: Job? = null
     private val lastValues = ConcurrentHashMap<String, String>()
-    private val lastForce = ConcurrentHashMap<String, Long>()
 
     fun start() {
         if (job != null) return
@@ -76,7 +74,7 @@ class EntityHistoryRecorder(
                 )
                 record(
                     "sensor_battery_temp", "energy", "energy",
-                    snap.batteryTempC?.let { "%.1f".format(it) },
+                    snap.batteryTempC?.let { "%.0f".format(it) },
                     now,
                 )
                 record(
@@ -107,7 +105,6 @@ class EntityHistoryRecorder(
                 record("hvac_temp", "climate", "climate", snap.hvacTempC?.let { "%.1f".format(it) }, now)
                 record("charge_current", "energy", "charging", snap.chargeCurrentA?.let { "%.1f".format(it) }, now)
                 record("drive_mode", "drive", "drive_mode", snap.driveMode, now)
-                delay(heartbeatMs)
             }
         }
     }
@@ -161,14 +158,20 @@ class EntityHistoryRecorder(
         return out
     }
 
+    /** Drop all rows (e.g. after switching to change-only recording). */
+    fun clearAll(): Int = try {
+        db.writableDatabase.delete(TABLE, null, null)
+    } catch (t: Throwable) {
+        Log.w(TAG, "clear failed: ${t.message}")
+        0
+    }
+
     private fun record(entityId: String, group: String, family: String, value: String?, now: Long) {
         if (value.isNullOrBlank()) return
         val shouldWrite = synchronized(this) {
             val prev = lastValues[entityId]
-            val force = prev == null || (now - (lastForce[entityId] ?: 0L) >= heartbeatMs)
-            if (value == prev && !force) return@synchronized false
+            if (value == prev) return@synchronized false
             lastValues[entityId] = value
-            if (force) lastForce[entityId] = now
             true
         }
         if (!shouldWrite) return
@@ -190,7 +193,6 @@ class EntityHistoryRecorder(
         private const val TAG = "EntityHistory"
         private const val TABLE = "entity_history"
         const val DEFAULT_RETENTION_MS = 7L * 24 * 60 * 60 * 1000
-        const val DEFAULT_HEARTBEAT_MS = 60_000L
         private const val PURGE_EVERY_MS = 60 * 60 * 1000L
     }
 
@@ -198,7 +200,7 @@ class EntityHistoryRecorder(
         context,
         "oca_entity_history.db",
         null,
-        1,
+        2,
     ) {
         override fun onCreate(db: SQLiteDatabase) {
             db.execSQL(
@@ -217,6 +219,11 @@ class EntityHistoryRecorder(
             db.execSQL("CREATE INDEX idx_hist_family_ts ON $TABLE(family, ts)")
         }
 
-        override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+        override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+            // v2: drop heartbeat-era duplicates; change-only recording going forward.
+            if (oldVersion < 2) {
+                db.execSQL("DELETE FROM $TABLE")
+            }
+        }
     }
 }

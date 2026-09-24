@@ -77,6 +77,7 @@ object ControlCatalog {
         ControlDef("steer_soft", "drive", EntityType.STEERING, WellKnownProperties.STEER_SOFT, "bool", lastKnown = true, icon = "steer"),
         ControlDef("steer_medium", "drive", EntityType.STEERING, WellKnownProperties.STEER_MEDIUM, "bool", lastKnown = true, icon = "steer"),
         ControlDef("steer_heavy", "drive", EntityType.STEERING, WellKnownProperties.STEER_HEAVY, "bool", lastKnown = true, icon = "steer"),
+        ControlDef("intelligent_steer", "drive", EntityType.STEERING, WellKnownProperties.INTELLIGENT_STEER, "bool", lastKnown = true, icon = "steer"),
         ControlDef(
             "brake_pedal", "drive", EntityType.BRAKE,
             WellKnownProperties.BRAKE_PEDAL_MODE, "choice",
@@ -94,6 +95,9 @@ object ControlCatalog {
         ControlDef("hvac_max_defrost", "climate", EntityType.CLIMATE, WellKnownProperties.HVAC_MAX_DEFROST, "bool", icon = "climate"),
         ControlDef("hvac_max_ac", "climate", EntityType.CLIMATE, WellKnownProperties.HVAC_MAX_AC, "bool", icon = "climate"),
         ControlDef("hvac_eco", "climate", EntityType.CLIMATE, WellKnownProperties.HVAC_ECO, "bool", lastKnown = true, icon = "climate"),
+        ControlDef("hvac_auto_dry", "climate", EntityType.CLIMATE, WellKnownProperties.HVAC_AUTO_DRY, "bool", lastKnown = true, icon = "climate"),
+        ControlDef("hvac_rapid_cool", "climate", EntityType.CLIMATE, WellKnownProperties.HVAC_RAPID_COOL, "bool", icon = "climate"),
+        ControlDef("hvac_rapid_heat", "climate", EntityType.CLIMATE, WellKnownProperties.HVAC_RAPID_HEAT, "bool", icon = "climate"),
         ControlDef(
             "hvac_temp", "climate", EntityType.CLIMATE, WellKnownProperties.HVAC_TEMP_C, "float",
             deviceClass = DeviceClass.TEMPERATURE,
@@ -152,6 +156,7 @@ object ControlCatalog {
             ),
             icon = "charge",
         ),
+        ControlDef("charge_pre_now", "energy", EntityType.CHARGING, WellKnownProperties.CHARGE_PRE_NOW, "bool", icon = "charge"),
         ControlDef(
             "charge_soc_max", "energy", EntityType.CHARGING, WellKnownProperties.CHARGE_SOC_MAX, "float",
             deviceClass = DeviceClass.BATTERY,
@@ -173,13 +178,22 @@ object ControlCatalog {
         ControlDef("charge_v2l", "energy", EntityType.CHARGING, WellKnownProperties.CHARGE_V2L, "bool", acronym = "V2L", icon = "charge"),
         ControlDef("charge_v2v", "energy", EntityType.CHARGING, WellKnownProperties.CHARGE_V2V, "bool", acronym = "V2V", icon = "charge"),
         ControlDef("charge_parking", "energy", EntityType.CHARGING, WellKnownProperties.CHARGE_PARKING, "bool", icon = "charge"),
-        ControlDef("parking_comfort", "energy", EntityType.ENERGY, WellKnownProperties.PARKING_COMFORT, "bool", lastKnown = true, icon = "climate"),
+        ControlDef("parking_comfort", "cabin", EntityType.CLIMATE, WellKnownProperties.PARKING_COMFORT, "bool", lastKnown = true, icon = "climate"),
+        ControlDef("nap_mode", "cabin", EntityType.CLIMATE, WellKnownProperties.NAP_MODE, "bool", lastKnown = true, icon = "climate"),
+        ControlDef("space_capsule", "cabin", EntityType.CLIMATE, WellKnownProperties.SPACE_CAPSULE, "bool", lastKnown = true, icon = "climate"),
         ControlDef("lka", "safety", EntityType.ADAS, WellKnownProperties.LANE_KEEPING, "bool", acronym = "LKA", lastKnown = true, icon = "adas"),
+        ControlDef("ldw", "safety", EntityType.ADAS, WellKnownProperties.LDW, "bool", acronym = "LDW", lastKnown = true, icon = "adas"),
         ControlDef("elka", "safety", EntityType.ADAS, WellKnownProperties.ELKA, "bool", acronym = "ELKA", lastKnown = true, icon = "adas"),
         ControlDef("aeb", "safety", EntityType.ADAS, WellKnownProperties.AEB, "bool", acronym = "AEB", lastKnown = true, icon = "adas"),
         ControlDef("fcw", "safety", EntityType.ADAS, WellKnownProperties.FCW, "int", acronym = "FCW", icon = "adas", min = 0f, max = 3f, step = 1f),
         ControlDef("rcta", "safety", EntityType.ADAS, WellKnownProperties.RCTA, "bool", acronym = "RCTA", lastKnown = true, icon = "adas"),
         ControlDef("rcw", "safety", EntityType.ADAS, WellKnownProperties.RCW, "bool", acronym = "RCW", lastKnown = true, icon = "adas"),
+        ControlDef("fcda", "safety", EntityType.ADAS, WellKnownProperties.FCDA, "bool", acronym = "FCDA", lastKnown = true, icon = "adas"),
+        ControlDef("dow", "safety", EntityType.ADAS, WellKnownProperties.DOW, "bool", acronym = "DOW", lastKnown = true, icon = "adas"),
+        ControlDef(
+            "idas_mode", "safety", EntityType.ADAS, WellKnownProperties.IDAS_MODE, "int",
+            acronym = "IDAS", icon = "adas", min = 0f, max = 5f, step = 1f, lastKnown = true,
+        ),
         ControlDef("speed_limit_warn", "safety", EntityType.ADAS, WellKnownProperties.SPEED_LIMIT_WARN, "bool", lastKnown = true, icon = "adas"),
         ControlDef(
             "speed_limit_max", "safety", EntityType.ADAS, WellKnownProperties.SPEED_LIMIT_MAX, "sensor",
@@ -195,10 +209,28 @@ object ControlCatalog {
         ControlDef("away_lock", "cabin", EntityType.LOCK, WellKnownProperties.AWAY_LOCK, "bool", lastKnown = true, icon = "lock"),
         ControlDef("central_lock", "cabin", EntityType.LOCK, WellKnownProperties.CENTRAL_LOCK, "bool", icon = "lock"),
         ControlDef("audible_lock", "cabin", EntityType.LOCK, WellKnownProperties.AUDIBLE_LOCK, "bool", icon = "lock"),
+        ControlDef("keyless_unlock", "cabin", EntityType.LOCK, WellKnownProperties.KEYLESS_UNLOCK, "bool", lastKnown = true, icon = "lock"),
+        ControlDef("twostep_unlock", "cabin", EntityType.LOCK, WellKnownProperties.TWOSTEP_UNLOCK, "bool", lastKnown = true, icon = "lock"),
+        ControlDef("p_gear_unlock", "cabin", EntityType.LOCK, WellKnownProperties.P_GEAR_UNLOCK, "bool", lastKnown = true, icon = "lock"),
+        ControlDef("mirror_auto_fold", "cabin", EntityType.EXTRA, WellKnownProperties.MIRROR_AUTO_FOLD, "bool", lastKnown = true, icon = "cabin"),
         ControlDef("auto_close_window", "cabin", EntityType.WINDOW, WellKnownProperties.AUTO_CLOSE_WINDOW, "bool", icon = "window"),
         ControlDef("sunroof_tilt", "cabin", EntityType.WINDOW, WellKnownProperties.SUNROOF_TILT, "bool", icon = "window"),
         ControlDef("courtesy_light", "cabin", EntityType.LIGHT, WellKnownProperties.COURTESY_LIGHT, "bool", icon = "light"),
         ControlDef("approach_light", "cabin", EntityType.LIGHT, WellKnownProperties.APPROACH_LIGHT, "bool", icon = "light"),
+        ControlDef(
+            "exterior_light", "cabin", EntityType.LIGHT, WellKnownProperties.EXTERIOR_LIGHT, "choice",
+            optionKeys = listOf(
+                "opt.exterior_light.0" to 0,
+                "opt.exterior_light.1" to 1,
+                "opt.exterior_light.2" to 2,
+                "opt.exterior_light.3" to 3,
+            ),
+            lastKnown = true, icon = "light",
+        ),
+        ControlDef(
+            "home_safe_light", "cabin", EntityType.LIGHT, WellKnownProperties.HOME_SAFE_LIGHT, "int",
+            icon = "light", min = 0f, max = 4f, step = 1f, lastKnown = true,
+        ),
         ControlDef(
             "day_mode", "cabin", EntityType.LIGHT, WellKnownProperties.DAY_MODE, "choice",
             optionKeys = listOf(
@@ -226,6 +258,10 @@ object ControlCatalog {
             acronym = "AVAS", icon = "system", min = 0f, max = 10f, step = 1f, lastKnown = true,
         ),
         ControlDef(
+            "media_volume", "cabin", EntityType.EXTRA, WellKnownProperties.MEDIA_VOLUME, "int",
+            icon = "system", min = 0f, max = 39f, step = 1f, lastKnown = true,
+        ),
+        ControlDef(
             "usb_mode", "cabin", EntityType.EXTRA, WellKnownProperties.USB_MODE, "choice",
             optionKeys = listOf(
                 "opt.usb_mode.0" to 0,
@@ -239,15 +275,19 @@ object ControlCatalog {
         ControlDef("hud_ar", "cabin", EntityType.HUD, WellKnownProperties.HUD_AR, "bool", icon = "hud"),
         ControlDef(
             "wheel_custom_key", "cabin", EntityType.EXTRA, WellKnownProperties.WHEEL_CUSTOM_KEY, "choice",
+            // BCM_FUNC_CUSTOM_KEY stores small ints = CUSTOM_KEY_TYPE_* − NONE (1/4/5/7/8),
+            // plus firmware extras like driving settings (0x21111418 / AntoraVhalIds.CUSTOM_KEY_DRIVING_SETTINGS).
             optionKeys = listOf(
                 "opt.wheel_custom_key.0" to 0,
+                "opt.wheel_custom_key.drive" to 0x21111418,
                 "opt.wheel_custom_key.1" to 1,
-                "opt.wheel_custom_key.2" to 2,
-                "opt.wheel_custom_key.3" to 3,
-                "opt.wheel_custom_key.4" to 4,
-                "opt.wheel_custom_key.5" to 5,
+                "opt.wheel_custom_key.2" to 4,
+                "opt.wheel_custom_key.3" to 5,
+                "opt.wheel_custom_key.4" to 7,
+                "opt.wheel_custom_key.5" to 8,
             ),
             lastKnown = true, icon = "drive",
+            deviceClass = DeviceClass.ENUM,
         ),
     )
 
@@ -491,6 +531,15 @@ object ControlCatalog {
         return sensors + controls + androidEntities
     }
 
+    /** Current display value for shortcut conditions / entity_state watching. */
+    suspend fun currentValue(session: VehicleSession, id: String): String? {
+        val def = ALL.firstOrNull { it.id == id } ?: return null
+        return when (val out = session.diagnose(def.property)) {
+            is ReadOutcome.Ok -> out.value?.display()
+            else -> null
+        }
+    }
+
     suspend fun set(session: VehicleSession, id: String, raw: String, context: Context? = null): Result<Unit> {
         val store = context?.let { LastKnownStore(it) }
         if (id == "drive_mode") {
@@ -669,7 +718,15 @@ object ControlCatalog {
             return i18n?.t(if (on) "common.on" else "common.off", if (on) "On" else "Off")
                 ?: if (on) "On" else "Off"
         }
-        return i18n?.valueLabel(def.resolvedValueMapId(), value)
+        i18n?.valueLabel(def.resolvedValueMapId(), value)?.let { return it }
+        val asInt = value.toIntOrNull()
+        if (asInt != null && def.optionKeys != null) {
+            def.optionKeys.firstOrNull { it.second == asInt }?.let { (key, _) ->
+                return i18n?.t(key, key) ?: key
+            }
+            if (asInt > 0xff) return "0x" + asInt.toString(16)
+        }
+        return null
     }
 
     private fun resolveUnitLabel(unit: UnitOfMeasurement?, i18n: I18nBundle?): String? {

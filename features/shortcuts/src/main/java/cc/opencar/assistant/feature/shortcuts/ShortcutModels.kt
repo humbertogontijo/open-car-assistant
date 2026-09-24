@@ -7,6 +7,8 @@ data class Shortcut(
     val enabled: Boolean = true,
     val actions: List<ShortcutAction> = emptyList(),
     val triggers: List<ShortcutTrigger> = emptyList(),
+    /** AND conditions evaluated after any trigger matches. Empty = always pass. */
+    val conditions: List<ShortcutCondition> = emptyList(),
 ) {
     fun toMap(): Map<String, Any?> = mapOf(
         "id" to id,
@@ -15,6 +17,7 @@ data class Shortcut(
         "enabled" to enabled,
         "actions" to actions.map { it.toMap() },
         "triggers" to triggers.map { it.toMap() },
+        "conditions" to conditions.map { it.toMap() },
     )
 
     companion object {
@@ -27,6 +30,8 @@ data class Shortcut(
             val actionsRaw = m["actions"] as? List<Map<*, *>> ?: emptyList()
             @Suppress("UNCHECKED_CAST")
             val triggersRaw = m["triggers"] as? List<Map<*, *>> ?: emptyList()
+            @Suppress("UNCHECKED_CAST")
+            val conditionsRaw = m["conditions"] as? List<Map<*, *>> ?: emptyList()
             return Shortcut(
                 id = id,
                 name = name,
@@ -34,7 +39,63 @@ data class Shortcut(
                 enabled = enabled,
                 actions = actionsRaw.mapNotNull { ShortcutAction.fromMap(it) },
                 triggers = triggersRaw.mapNotNull { ShortcutTrigger.fromMap(it) },
+                conditions = conditionsRaw.mapNotNull { ShortcutCondition.fromMap(it) },
             )
+        }
+    }
+}
+
+sealed class ShortcutCondition {
+    abstract fun toMap(): Map<String, Any?>
+
+    data class EntityEquals(val entityId: String, val value: String) : ShortcutCondition() {
+        override fun toMap() = mapOf(
+            "type" to "entity_equals",
+            "entityId" to entityId,
+            "value" to value,
+        )
+    }
+
+    data class GearEquals(val gear: Int) : ShortcutCondition() {
+        override fun toMap() = mapOf("type" to "gear_equals", "gear" to gear)
+    }
+
+    data class WifiSsid(val ssid: String, val contains: Boolean = false) : ShortcutCondition() {
+        override fun toMap() = mapOf(
+            "type" to "wifi_ssid",
+            "ssid" to ssid,
+            "contains" to contains,
+        )
+    }
+
+    companion object {
+        fun fromMap(m: Map<*, *>): ShortcutCondition? {
+            return when (m["type"] as? String) {
+                "entity_equals" -> {
+                    val id = m["entityId"] as? String ?: return null
+                    val value = m["value"]?.toString() ?: return null
+                    EntityEquals(id, value)
+                }
+                "gear_equals" -> {
+                    val gear = when (val v = m["gear"]) {
+                        is Number -> v.toInt()
+                        is String -> v.toIntOrNull() ?: return null
+                        else -> return null
+                    }
+                    GearEquals(gear)
+                }
+                "wifi_ssid" -> {
+                    val ssid = m["ssid"] as? String ?: return null
+                    val contains = when (val v = m["contains"]) {
+                        is Boolean -> v
+                        is Number -> v.toInt() != 0
+                        is String -> v.equals("true", true) || v == "1"
+                        else -> false
+                    }
+                    WifiSsid(ssid, contains)
+                }
+                else -> null
+            }
         }
     }
 }
@@ -79,7 +140,7 @@ sealed class ShortcutAction {
     }
 
     companion object {
-        const val MAX_DELAY_MS = 5_000L
+        const val MAX_DELAY_MS = 60_000L
         const val MAX_ACTIONS = 10
 
         fun fromMap(m: Map<*, *>): ShortcutAction? {
@@ -128,8 +189,26 @@ sealed class ShortcutTrigger {
         override fun toMap() = mapOf("type" to "gear", "gear" to gear)
     }
 
-    data class WheelKey(val key: String) : ShortcutTrigger() {
-        override fun toMap() = mapOf("type" to "wheel_key", "key" to key)
+    data class WheelKey(val key: String, val longPress: Boolean = false) : ShortcutTrigger() {
+        override fun toMap() = mapOf(
+            "type" to "wheel_key",
+            "key" to key,
+            "longPress" to longPress,
+        )
+    }
+
+    /** Fires when Wi‑Fi connects to [ssid] (null/blank = any SSID connect). */
+    data class WifiSsid(val ssid: String? = null) : ShortcutTrigger() {
+        override fun toMap() = mapOf("type" to "wifi_ssid", "ssid" to ssid)
+    }
+
+    /** Fires when a bound entity value changes; optional [value] match. */
+    data class EntityState(val entityId: String, val value: String? = null) : ShortcutTrigger() {
+        override fun toMap() = mapOf(
+            "type" to "entity_state",
+            "entityId" to entityId,
+            "value" to value,
+        )
     }
 
     /** Plugin-backed trigger (`pluginId` + contribution `trigger` + `params`). */
@@ -162,7 +241,22 @@ sealed class ShortcutTrigger {
                 }
                 "wheel_key" -> {
                     val key = m["key"] as? String ?: return null
-                    WheelKey(key)
+                    val longPress = when (val v = m["longPress"]) {
+                        is Boolean -> v
+                        is Number -> v.toInt() != 0
+                        is String -> v.equals("true", true) || v == "1"
+                        else -> false
+                    }
+                    WheelKey(key, longPress)
+                }
+                "wifi_ssid" -> {
+                    val ssid = (m["ssid"] as? String)?.takeIf { it.isNotBlank() }
+                    WifiSsid(ssid)
+                }
+                "entity_state" -> {
+                    val id = m["entityId"] as? String ?: return null
+                    val value = m["value"]?.toString()?.takeIf { it.isNotBlank() }
+                    EntityState(id, value)
                 }
                 "plugin" -> {
                     val pluginId = m["pluginId"] as? String ?: return null

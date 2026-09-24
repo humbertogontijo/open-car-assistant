@@ -19,7 +19,16 @@ export const state = {
   historyEntities: [],
   historyPoints: null,
   historySelected: null,
+  historyRangeHours: 24,
+  historyView: null,
+  recordings: [],
+  cameraPreviewActive: false,
+  sounds: null,
   hiddenEntities: [],
+  /** Lab data-source tab: vhal | obd2 | entities */
+  labTab: "vhal",
+  obd2: null,
+  probeFilter: "",
 };
 
 export function entitiesByGroup(group) {

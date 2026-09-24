@@ -52,6 +52,12 @@ sealed class VehicleEvent {
     data class IgnitionChanged(val state: Int) : VehicleEvent()
     /** Steering-wheel hard key press edge (platform-specific key id, e.g. "custom"). */
     data class WheelKeyPressed(val key: String) : VehicleEvent()
+    /** Steering-wheel hard key held past the long-press threshold. */
+    data class WheelKeyLongPressed(val key: String) : VehicleEvent()
+    /** Connected Wi‑Fi SSID changed (null = disconnected / unknown). */
+    data class WifiSsidChanged(val ssid: String?) : VehicleEvent()
+    /** Bound control/sensor value changed (entity id + new display value). */
+    data class EntityValueChanged(val entityId: String, val value: String?) : VehicleEvent()
 }
 
 data class CameraSource(

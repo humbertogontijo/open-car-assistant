@@ -14,7 +14,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * Matches vehicle / wheel / plugin events to shortcut triggers and runs them.
+ * Matches vehicle / wheel / wifi / entity / plugin events to shortcut triggers and runs them.
  * Pin-slot taps run via [runById] from the quick-entry menu.
  * Screen on/off is driven by [onScreenOn] / [onScreenOff]; session
  * [VehicleEvent.ScreenOn] is ignored so Antora does not double-fire.
@@ -24,6 +24,9 @@ class ShortcutTriggerEngine(
     private val store: ShortcutStore,
     private val runner: ShortcutRunner,
     private val triggerSources: List<ShortcutTriggerSource> = emptyList(),
+    private val readEntity: (suspend (String) -> String?)? = null,
+    private val readWifiSsid: (() -> String?)? = null,
+    private val readGear: (suspend () -> Int?)? = null,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var job: Job? = null
@@ -46,30 +49,44 @@ class ShortcutTriggerEngine(
         job = scope.launch {
             session.events().collect { event ->
                 when (event) {
-                    // Boot is delivered from AssistantRuntime after memory+shortcuts start
-                    // (session Boot may already have been consumed by memory).
                     is VehicleEvent.Boot -> Unit
-                    is VehicleEvent.ScreenOn -> Unit // runtime-only via onScreenOn
+                    is VehicleEvent.ScreenOn -> Unit
                     is VehicleEvent.GearChanged -> {
                         val gear = event.gear
                         matchAndRun { t ->
                             t is ShortcutTrigger.Gear && (t.gear == null || t.gear == gear)
                         }
                     }
-                    is VehicleEvent.WheelKeyPressed -> {
-                        val key = event.key
-                        val now = System.currentTimeMillis()
-                        val last = lastWheelMs[key] ?: 0L
-                        if (now - last < WHEEL_DEBOUNCE_MS) return@collect
-                        lastWheelMs[key] = now
-                        matchAndRun { t -> t is ShortcutTrigger.WheelKey && t.key.equals(key, true) }
-                    }
+                    is VehicleEvent.WheelKeyPressed -> handleWheel(event.key, longPress = false)
+                    is VehicleEvent.WheelKeyLongPressed -> handleWheel(event.key, longPress = true)
                     else -> Unit
                 }
             }
         }
         for (source in triggerSources) {
             source.start(pluginListener)
+        }
+    }
+
+    fun onWifiSsid(ssid: String?) {
+        if (ssid.isNullOrBlank()) return
+        scope.launch {
+            matchAndRun { t ->
+                t is ShortcutTrigger.WifiSsid &&
+                    (t.ssid.isNullOrBlank() ||
+                        ssid.equals(t.ssid, ignoreCase = true) ||
+                        ssid.contains(t.ssid!!, ignoreCase = true))
+            }
+        }
+    }
+
+    fun onEntityChanged(entityId: String, value: String?) {
+        scope.launch {
+            matchAndRun { t ->
+                t is ShortcutTrigger.EntityState &&
+                    t.entityId.equals(entityId, true) &&
+                    (t.value == null || t.value == value)
+            }
         }
     }
 
@@ -81,7 +98,6 @@ class ShortcutTriggerEngine(
         job = null
     }
 
-    /** Call once after runtime wires shortcuts (session Boot may already be consumed). */
     fun onBoot() {
         scope.launch {
             val matched = matchAndRun { it is ShortcutTrigger.Boot }
@@ -89,14 +105,25 @@ class ShortcutTriggerEngine(
         }
     }
 
-    /** HU display wake — call from SCREEN_ON / USER_PRESENT / DisplayListener / interactive poll. */
     fun onScreenOn(source: String = "direct") {
         scope.launch { handleScreenOn(source) }
     }
 
-    /** HU display sleep — fires `screen`/`on=false` triggers and arms the next wake. */
     fun onScreenOff(source: String = "direct") {
         scope.launch { handleScreenOff(source) }
+    }
+
+    private suspend fun handleWheel(key: String, longPress: Boolean) {
+        val debounceKey = if (longPress) "$key:long" else key
+        val now = System.currentTimeMillis()
+        val last = lastWheelMs[debounceKey] ?: 0L
+        if (now - last < WHEEL_DEBOUNCE_MS) return
+        lastWheelMs[debounceKey] = now
+        matchAndRun { t ->
+            t is ShortcutTrigger.WheelKey &&
+                t.key.equals(key, true) &&
+                t.longPress == longPress
+        }
     }
 
     private suspend fun handleScreenOn(source: String) = screenMutex.withLock {
@@ -129,7 +156,6 @@ class ShortcutTriggerEngine(
                 Log.d(TAG, "screen off ignored ($source) debounce ${now - offAt}ms")
                 return
             }
-            // Still off — refresh timestamp, do not re-fire.
             lastScreenOffMs = now
             Log.d(TAG, "screen off ignored ($source) already off")
             return
@@ -172,7 +198,7 @@ class ShortcutTriggerEngine(
         val list = store.list().filter { it.enabled }
         var count = 0
         for (s in list) {
-            if (s.triggers.any(predicate)) {
+            if (s.triggers.any(predicate) && conditionsPass(s)) {
                 count++
                 Log.i(TAG, "trigger fired shortcut=${s.id} name=${s.name}")
                 runner.run(s)
@@ -181,20 +207,39 @@ class ShortcutTriggerEngine(
         return count
     }
 
+    private suspend fun conditionsPass(s: Shortcut): Boolean {
+        if (s.conditions.isEmpty()) return true
+        for (c in s.conditions) {
+            when (c) {
+                is ShortcutCondition.EntityEquals -> {
+                    val actual = readEntity?.invoke(c.entityId)
+                    if (actual == null || actual != c.value) return false
+                }
+                is ShortcutCondition.GearEquals -> {
+                    val gear = readGear?.invoke()
+                    if (gear == null || gear != c.gear) return false
+                }
+                is ShortcutCondition.WifiSsid -> {
+                    val ssid = readWifiSsid?.invoke() ?: return false
+                    val ok = if (c.contains) {
+                        ssid.contains(c.ssid, ignoreCase = true)
+                    } else {
+                        ssid.equals(c.ssid, ignoreCase = true)
+                    }
+                    if (!ok) return false
+                }
+            }
+        }
+        return true
+    }
+
     companion object {
         private const val TAG = "ShortcutTriggers"
-        /** Collapse duplicate wake/sleep signals (SCREEN_ON + USER_PRESENT + vendor). */
         const val SCREEN_DEBOUNCE_MS = 5_000L
-        /** Minimum off duration before the next wake is treated as a fresh screen on. */
         const val MIN_SLEEP_MS = 1_500L
         const val WHEEL_DEBOUNCE_MS = 400L
         const val PLUGIN_DEBOUNCE_MS = 400L
 
-        /**
-         * Stored trigger params must be satisfied by the event.
-         * Keys present in the trigger (non-null / non-blank) must equal the event.
-         * Extra event keys are ignored.
-         */
         fun pluginParamsMatch(triggerParams: Map<String, Any?>, eventParams: Map<String, Any?>): Boolean {
             for ((key, expected) in triggerParams) {
                 if (expected == null) continue

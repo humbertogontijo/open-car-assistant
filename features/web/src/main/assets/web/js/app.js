@@ -3,7 +3,9 @@ import { state } from "./state.js";
 import {
   sectionHome,
   sectionGroup,
+  sectionCabin,
   sectionCameras,
+  sectionHistory,
   sectionStore,
   sectionSystem,
   sectionAndroid,
@@ -11,6 +13,11 @@ import {
   sectionAbout,
   bindSection,
   fillProbeTable,
+  loadHistoryPoints,
+  loadRecordings,
+  loadSounds,
+  startCameraLive,
+  stopCameraLive,
 } from "./sections.js";
 import { sectionShortcuts, bindShortcuts, loadShortcuts } from "./shortcuts.js";
 import { sectionPlugins, bindPlugins } from "./plugins.js";
@@ -26,6 +33,7 @@ import { loadIcons } from "./icons.js";
 function render() {
   const map = {
     home: sectionHome,
+    history: sectionHistory,
     drive: function () {
       return sectionGroup(t("section.drive.title", "Condução"), "", "drive");
     },
@@ -38,9 +46,7 @@ function render() {
     safety: function () {
       return sectionGroup(t("section.safety.title", "Segurança"), "", "safety");
     },
-    cabin: function () {
-      return sectionGroup(t("section.cabin.title", "Cabine"), "", "cabin");
-    },
+    cabin: sectionCabin,
     cameras: sectionCameras,
     dvr: sectionCameras,
     store: sectionStore,
@@ -51,7 +57,17 @@ function render() {
     lab: sectionLab,
     about: sectionAbout,
   };
-  $("main").innerHTML = (map[state.section] || sectionHome)();
+  const main = $("main");
+  const prevMainScroll = main ? main.scrollTop : 0;
+  const probeScrollEl = document.getElementById("probeScroll");
+  const prevProbeScroll = probeScrollEl ? probeScrollEl.scrollTop : 0;
+  // Abort in-flight MJPEG before destroying the <img>, or requests pile up.
+  const prevPreview = $("preview");
+  if (prevPreview) {
+    prevPreview.removeAttribute("src");
+    prevPreview.dataset.ocaLive = "";
+  }
+  main.innerHTML = (map[state.section] || sectionHome)();
   bindSection(refresh);
   if (state.section === "shortcuts") bindShortcuts(refresh);
   if (state.section === "plugins") bindPlugins(refresh);
@@ -66,10 +82,13 @@ function render() {
       .catch(function () {});
   }
   if (state.section === "cameras" || state.section === "dvr") {
-    import("./sections.js").then(function (m) {
-      if (m.startCameraLive) m.startCameraLive();
-    });
+    startCameraLive();
+  } else if (state.cameraPreviewActive) {
+    stopCameraLive();
   }
+  if (main) main.scrollTop = prevMainScroll;
+  const probeAfter = document.getElementById("probeScroll");
+  if (probeAfter) probeAfter.scrollTop = prevProbeScroll;
   renderSetupOverlay();
 }
 
@@ -85,6 +104,16 @@ async function refresh() {
     state.historyEntities = (hist && hist.entities) || [];
   } catch (e) {
     state.historyEntities = [];
+  }
+  if (state.section === "history" && state.historySelected) {
+    await loadHistoryPoints();
+  }
+  if (state.section === "cabin" || !state._soundsLoaded) {
+    state._soundsLoaded = true;
+    await loadSounds();
+  }
+  if (state.section === "cameras" || state.section === "dvr") {
+    await loadRecordings();
   }
   try {
     const hidden = await api("/api/entities/hidden");
@@ -135,14 +164,45 @@ document.querySelectorAll(".nav-item").forEach(function (el) {
 
 function goSection(sec) {
   if (!sec) return;
+  const prev = state.section;
   document.querySelectorAll(".nav-item").forEach(function (n) {
     n.classList.remove("active");
     if (n.getAttribute("data-sec") === sec) n.classList.add("active");
   });
   state.section = sec;
+  if (
+    (prev === "cameras" || prev === "dvr") &&
+    sec !== "cameras" &&
+    sec !== "dvr"
+  ) {
+    stopCameraLive();
+  }
   if (state.section === "store") state._storeLoaded = false;
   if (state.section === "shortcuts" || state.section === "system") {
     loadShortcuts().then(function () {
+      render();
+    });
+    return;
+  }
+  if (state.section === "history") {
+    if (!state.historySelected && state.historyEntities && state.historyEntities.length) {
+      state.historySelected = state.historyEntities[0];
+    }
+    state.historyView = null;
+    loadHistoryPoints().then(function () {
+      render();
+    });
+    return;
+  }
+  if (state.section === "cameras" || state.section === "dvr") {
+    state.cameraPreviewActive = false;
+    loadRecordings().then(function () {
+      render();
+    });
+    return;
+  }
+  if (state.section === "cabin") {
+    loadSounds().then(function () {
       render();
     });
     return;
@@ -153,10 +213,20 @@ function goSection(sec) {
       .then(function (lab) {
         state.lab = lab;
         if (lab && lab.token) state.token = lab.token;
+        const tab = state.labTab || "vhal";
+        if (tab === "obd2") {
+          return api("/debug/obd2?token=" + encodeURIComponent(state.token));
+        }
+        if (tab === "entities") return null;
         return api("/debug/probe?token=" + encodeURIComponent(state.token));
       })
       .then(function (p) {
-        if (p) state.probe = p;
+        if (!p) {
+          render();
+          return;
+        }
+        if (state.labTab === "obd2") state.obd2 = p;
+        else state.probe = p;
         render();
       })
       .catch(function () {});
@@ -202,6 +272,20 @@ async function softRefresh() {
     if (
       ae &&
       (ae.matches("input, textarea, select") || ae.closest(".choice-select, .choice-menu"))
+    ) {
+      return;
+    }
+    // Lab: keep scroll + filter; update table in place for product-entities tab only.
+    if (state.section === "lab") {
+      if (state.labTab === "entities") fillProbeTable();
+      return;
+    }
+    // History / Cabin / Cameras: never remount on soft refresh (MJPEG pile-up / form wipe).
+    if (
+      state.section === "history" ||
+      state.section === "cabin" ||
+      state.section === "cameras" ||
+      state.section === "dvr"
     ) {
       return;
     }

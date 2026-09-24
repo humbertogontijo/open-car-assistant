@@ -167,12 +167,15 @@ class AntoraVehicleSession(
     }
 
     /**
-     * Poll SWC hard-key VHAL props for press edges (value becomes non-zero or changes).
-     * Fallback until CarPropertyManager callbacks are proven on-device.
+     * Poll SWC hard-key VHAL props for press / long-press edges.
+     * Short press fires on release before [WHEEL_LONG_PRESS_MS]; long-press fires once while held.
      */
     private suspend fun pollWheelKeys() {
         val last = mutableMapOf<String, Int?>()
+        val downAt = mutableMapOf<String, Long>()
+        val longFired = mutableSetOf<String>()
         while (coroutineContext.isActive) {
+            val now = System.currentTimeMillis()
             for ((key, propId) in AntoraVhalIds.WHEEL_HARD_KEYS) {
                 val raw = backend.read(propId, AntoraVhalIds.AREA_GLOBAL)
                 val value = when (raw) {
@@ -181,10 +184,23 @@ class AntoraVehicleSession(
                     else -> null
                 }
                 val prev = last[key]
-                if (prev != null && value != null && value != prev) {
-                    if (value != 0 || prev != 0) {
+                if (value != null && value != 0) {
+                    if (prev == null || prev == 0) {
+                        downAt[key] = now
+                        longFired.remove(key)
+                    } else if (key !in longFired) {
+                        val started = downAt[key] ?: now
+                        if (now - started >= WHEEL_LONG_PRESS_MS) {
+                            longFired.add(key)
+                            _events.emit(VehicleEvent.WheelKeyLongPressed(key))
+                        }
+                    }
+                } else if (prev != null && prev != 0 && (value == null || value == 0)) {
+                    if (key !in longFired) {
                         _events.emit(VehicleEvent.WheelKeyPressed(key))
                     }
+                    downAt.remove(key)
+                    longFired.remove(key)
                 }
                 if (value != null) last[key] = value
             }
@@ -336,6 +352,7 @@ class AntoraVehicleSession(
         private const val TAG = "AntoraSession"
         private const val POLL_MS = 1000L
         private const val WHEEL_POLL_MS = 100L
+        private const val WHEEL_LONG_PRESS_MS = 700L
 
         fun redactVin(vin: String): String =
             if (vin.length < 8) "[redacted]" else vin.take(3) + "****" + vin.takeLast(4)

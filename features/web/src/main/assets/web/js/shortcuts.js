@@ -172,7 +172,27 @@ function triggerLabel(tr) {
     return t("shortcuts.trigger.gear", "Gear") + ": " + name;
   }
   if (tr.type === "wheel_key") {
-    return t("shortcuts.trigger.wheel", "Wheel key") + ": " + (tr.key || "");
+    const keyLabel = wheelKeyLabel(tr.key || "");
+    return (
+      t("shortcuts.trigger.wheel", "Wheel key") +
+      ": " +
+      keyLabel +
+      (tr.longPress ? " (" + t("shortcuts.trigger.long_press", "long press") + ")" : "")
+    );
+  }
+  if (tr.type === "wifi_ssid") {
+    return (
+      t("shortcuts.trigger.wifi", "Wi‑Fi SSID") +
+      (tr.ssid ? ": " + tr.ssid : "")
+    );
+  }
+  if (tr.type === "entity_state") {
+    return (
+      t("shortcuts.trigger.entity_state", "Entity") +
+      ": " +
+      (tr.entityId || "?") +
+      (tr.value != null && tr.value !== "" ? "=" + tr.value : "")
+    );
   }
   if (tr.type === "plugin") {
     const p = tr.params || {};
@@ -219,6 +239,8 @@ function triggerTypeOptions() {
     { value: "screen", label: t("shortcuts.trigger.screen", "Screen") },
     { value: "gear", label: t("shortcuts.trigger.gear", "Gear") },
     { value: "wheel_key", label: t("shortcuts.trigger.wheel", "Wheel key") },
+    { value: "wifi_ssid", label: t("shortcuts.trigger.wifi", "Wi‑Fi SSID") },
+    { value: "entity_state", label: t("shortcuts.trigger.entity_state", "Entity") },
   ];
   if (configuredPlugins().length) {
     opts.push({ value: "plugin", label: t("shortcuts.trigger.plugin", "Plugin") });
@@ -233,9 +255,24 @@ function screenStateOptions() {
   ];
 }
 
+function wheelKeyLabel(k) {
+  const map = {
+    custom: t("wheel.key.custom", "Star / custom"),
+    mute: t("wheel.key.mute", "Mute"),
+    top: t("wheel.key.top", "D-pad up"),
+    left: t("wheel.key.left", "D-pad left"),
+    right: t("wheel.key.right", "D-pad right"),
+    bottom: t("wheel.key.bottom", "D-pad down"),
+    vr: t("wheel.key.vr", "Voice"),
+    menu: t("wheel.key.menu", "Menu"),
+    confirm: t("wheel.key.confirm", "OK / confirm"),
+  };
+  return map[k] || k;
+}
+
 function wheelKeyOptions() {
   return (state.shortcutWheelKeys || []).map(function (k) {
-    return { value: k, label: k };
+    return { value: k, label: wheelKeyLabel(k) };
   });
 }
 
@@ -401,7 +438,40 @@ function editorHtml(edit) {
             tr.key || "custom",
             'data-sc="wkey" data-ti="' + i + '"',
           ) +
-          "</div>";
+          '</div><label style="display:flex;align-items:center;gap:8px;margin-top:8px">' +
+          '<input type="checkbox" class="sc-longpress" data-ti="' +
+          i +
+          '"' +
+          (tr.longPress ? " checked" : "") +
+          "> " +
+          t("shortcuts.trigger.long_press", "Long press") +
+          "</label>";
+      } else if (tr.type === "wifi_ssid") {
+        extra =
+          '<div style="margin-top:8px"><input class="field sc-wifi-ssid" data-ti="' +
+          i +
+          '" placeholder="' +
+          esc(t("shortcuts.trigger.wifi.hint", "SSID (blank = any)")) +
+          '" value="' +
+          esc(tr.ssid || "") +
+          '" style="width:100%"></div>';
+      } else if (tr.type === "entity_state") {
+        extra =
+          '<div style="margin-top:8px">' +
+          choiceSelectHtml(
+            controls.map(function (c) {
+              return { value: c.id, label: c.label || c.id };
+            }),
+            tr.entityId || "",
+            'data-sc="entity-trig" data-ti="' + i + '"',
+          ) +
+          '</div><div style="margin-top:8px"><input class="field sc-entity-val" data-ti="' +
+          i +
+          '" placeholder="' +
+          esc(t("shortcuts.trigger.entity_value", "Value (optional)")) +
+          '" value="' +
+          esc(tr.value || "") +
+          '" style="width:100%"></div>';
       } else if (tr.type === "gear") {
         const gearVal = tr.gear != null ? String(tr.gear) : "4";
         extra =
@@ -668,9 +738,20 @@ function readEditorFromDom(base) {
   document.querySelectorAll(".shortcut-trigger").forEach(function (row) {
     const type = activeChoiceVal(row, "ttype") || "boot";
     if (type === "wheel_key") {
+      const longEl = row.querySelector(".sc-longpress");
       triggers.push({
         type: "wheel_key",
         key: activeChoiceVal(row, "wkey") || "custom",
+        longPress: !!(longEl && longEl.checked),
+      });
+    } else if (type === "wifi_ssid") {
+      const ssid = ((row.querySelector(".sc-wifi-ssid") || {}).value || "").trim();
+      triggers.push({ type: "wifi_ssid", ssid: ssid || null });
+    } else if (type === "entity_state") {
+      triggers.push({
+        type: "entity_state",
+        entityId: activeChoiceVal(row, "entity-trig") || "",
+        value: ((row.querySelector(".sc-entity-val") || {}).value || "").trim() || null,
       });
     } else if (type === "gear") {
       const g = parseInt(activeChoiceVal(row, "gear") || "4", 10);
@@ -705,6 +786,7 @@ function readEditorFromDom(base) {
     enabled: enabled,
     actions: actions.slice(0, 10),
     triggers: triggers,
+    conditions: base.conditions || [],
   };
 }
 
@@ -844,7 +926,11 @@ export function bindShortcuts(refresh) {
         if (isNaN(i) || !edit.triggers[i]) return;
         if (edit.triggers[i].type === next) return;
         if (next === "wheel_key") {
-          edit.triggers[i] = { type: "wheel_key", key: "custom" };
+          edit.triggers[i] = { type: "wheel_key", key: "custom", longPress: false };
+        } else if (next === "wifi_ssid") {
+          edit.triggers[i] = { type: "wifi_ssid", ssid: "" };
+        } else if (next === "entity_state") {
+          edit.triggers[i] = { type: "entity_state", entityId: "", value: "" };
         } else if (next === "gear") {
           edit.triggers[i] = { type: "gear", gear: 4 };
         } else if (next === "screen") {
@@ -870,7 +956,7 @@ export function bindShortcuts(refresh) {
 
   document
     .querySelectorAll(
-      '[data-sc="entity"], [data-sc="pkg"], [data-sc="wkey"], [data-sc="gear"], [data-sc="screen"], [data-sc="plugin-id"], [data-sc="plugin-action"], [data-sc="plugin-trigger"]',
+      '[data-sc="entity"], [data-sc="entity-trig"], [data-sc="pkg"], [data-sc="wkey"], [data-sc="gear"], [data-sc="screen"], [data-sc="plugin-id"], [data-sc="plugin-action"], [data-sc="plugin-trigger"]',
     )
     .forEach(function (el) {
     el.onclick = function (ev) {
@@ -889,6 +975,9 @@ export function bindShortcuts(refresh) {
         edit.actions[ai].type = "set_control";
         edit.actions[ai].entityId = next;
         if (edit.actions[ai].value == null) edit.actions[ai].value = "";
+      } else if (sc === "entity-trig" && edit.triggers[ti]) {
+        edit.triggers[ti].type = "entity_state";
+        edit.triggers[ti].entityId = next;
       } else if (sc === "plugin-id" && !isNaN(ai) && edit.actions[ai]) {
         edit.actions[ai].type = "plugin";
         edit.actions[ai].pluginId = next;

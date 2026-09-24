@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import cc.opencar.assistant.api.VehicleSession
 import cc.opencar.assistant.api.plugin.PluginRegistry
 import cc.opencar.assistant.feature.debug.CatalogProbe
+import cc.opencar.assistant.feature.debug.Obd2Probe
 import cc.opencar.assistant.feature.debug.ContributorDebugState
 import cc.opencar.assistant.feature.dvr.DvrController
 import cc.opencar.assistant.feature.history.EntityHistoryRecorder
@@ -21,6 +22,7 @@ internal data class OcaWebDeps(
     val installer: ApkInstaller,
     val dvr: DvrController,
     val probe: CatalogProbe,
+    val obd2: Obd2Probe? = null,
     val capabilities: Set<String>,
     val variantId: String,
     val port: Int,
@@ -29,6 +31,7 @@ internal data class OcaWebDeps(
     val history: EntityHistoryRecorder? = null,
     val shortcuts: ShortcutsController? = null,
     val plugins: PluginRegistry? = null,
+    val sounds: SoundsController? = null,
     /** Known ServiceLoader integration ids for Lab override dropdown. */
     val integrationIds: List<String> = emptyList(),
     val getIntegrationOverride: () -> String? = { null },

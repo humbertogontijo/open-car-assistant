@@ -200,22 +200,30 @@ class CatalogProbe(
         fun familyOf(name: String): String {
             val n = name.uppercase()
             return when {
-                n.startsWith("SETTING_FUNC_") || n.startsWith("SETTING_") -> "setting"
-                n.startsWith("HYBRID_") -> "hybrid"
-                n.startsWith("CHARGE_") -> "charge"
-                n.startsWith("HVAC_") -> "hvac"
-                n.startsWith("DM_") || n.contains("DRIVE_MODE") -> "drive"
-                n.contains("LANE") || n.contains("AEB") || n.contains("COLLISION") ||
-                    n.contains("CROSS_TRAFFIC") || n.contains("FCW") -> "adas"
+                n.contains("OBD2") || n.startsWith("OBD_") -> "obd2"
+                n.startsWith("SCENE_") || n.contains("NAP_MODE") || n.contains("SPACE_CAPSULE") ||
+                    n.contains("PARKING_COMFORT") -> "scene"
+                n.startsWith("LAMP_") || n.contains("LIGHT_CONTROL") ||
+                    (n.contains("LAMP") && !n.contains("FAULT")) -> "light"
+                n.contains("DMS") || n.contains("FCDA") || n.contains("DOOR_OPEN_WARN") ||
+                    n.contains("RCTA") || n.contains("RCW") || n.contains("ELKA") ||
+                    n.contains("IDAS") || n.contains("INTELLIGENT_DRIVING") ||
+                    n.contains("LANE") || n.contains("AEB") || n.contains("COLLISION") ||
+                    n.contains("CROSS_TRAFFIC") || n.contains("FCW") || n.startsWith("PAS_") -> "adas"
+                n.contains("SUNROOF") || n.contains("WINDOW") -> "window"
                 n.contains("LOCK") || n.contains("UNLOCK") -> "lock"
                 n.contains("HUD") -> "hud"
                 n.contains("AMBIENCE") -> "ambience"
                 n.contains("BRIGHTNESS") || n.contains("BACKLIGHT") -> "brightness"
-                n.contains("WINDOW") -> "window"
                 n.contains("SEAT") -> "seat"
                 n.contains("MIRROR") -> "mirror"
+                n.startsWith("HYBRID_") -> "hybrid"
+                n.startsWith("CHARGE_") -> "charge"
+                n.startsWith("HVAC_") -> "hvac"
+                n.startsWith("DM_") || n.contains("DRIVE_MODE") -> "drive"
                 n.startsWith("INFO_") || n.startsWith("PERF_") || n.contains("GEAR") ||
                     n.contains("IGNITION") || n.contains("RANGE") || n.contains("BATTERY") -> "telemetry"
+                n.startsWith("SETTING_FUNC_") || n.startsWith("SETTING_") -> "setting"
                 else -> "other"
             }
         }

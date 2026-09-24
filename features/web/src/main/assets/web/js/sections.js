@@ -1,8 +1,9 @@
 import { api, $, fmt } from "./api.js";
-import { state, entitiesByGroup } from "./state.js";
+import { state, entitiesByGroup, groupByEntity } from "./state.js";
 import { theme, setTheme } from "./theme.js";
 import {
   renderEntityGrid,
+  entityLabel,
   segmentToggleHtml,
   boolToggleHtml,
   prefCard,
@@ -24,17 +25,7 @@ export function sectionHome() {
     if (e.group === "home" && e.entity === "sensor") return e.status === "ok";
     return e.entity === "drive_mode" || e.entity === "regen";
   });
-  const histEntities = (state.historyEntities || []).slice(0, 8);
-  const histBody =
-    histEntities.length === 0
-      ? '<p class="persist-note">' + t("history.empty", "No history yet") + "</p>"
-      : '<ul style="margin:0;padding-left:18px">' +
-        histEntities
-          .map(function (id) {
-            return "<li>" + escAttr(id) + "</li>";
-          })
-          .join("") +
-        "</ul>";
+  const histN = (state.historyEntities || []).length;
   return (
     "<h1>" +
     t("section.home.title", "Início") +
@@ -44,8 +35,14 @@ export function sectionHome() {
     "<h2>" +
     t("section.history.title", "History") +
     "</h2>" +
-    histBody +
-    "</div>"
+    '<p class="sub" style="margin:0 0 12px">' +
+    (histN
+      ? t("history.home.summary", "{n} entities tracked").replace("{n}", String(histN))
+      : t("history.empty", "No history yet")) +
+    "</p>" +
+    '<button class="btn primary" type="button" id="goHistory">' +
+    t("history.open", "Open history") +
+    "</button></div>"
   );
 }
 
@@ -68,14 +65,476 @@ export function sectionAndroid() {
   );
 }
 
+/** Stable family order for subsection headers within a nav tab. */
+var FAMILY_ORDER = [
+  "drive_mode",
+  "regen",
+  "steering",
+  "brake",
+  "climate",
+  "seat",
+  "energy",
+  "charging",
+  "adas",
+  "lock",
+  "light",
+  "window",
+  "hud",
+  "sensor",
+  "android",
+  "extra",
+];
+
+function renderFamilySections(items) {
+  if (!items || !items.length) {
+    return renderEntityGrid(items);
+  }
+  var buckets = groupByEntity(items);
+  var keys = Object.keys(buckets);
+  keys.sort(function (a, b) {
+    var ia = FAMILY_ORDER.indexOf(a);
+    var ib = FAMILY_ORDER.indexOf(b);
+    if (ia < 0) ia = FAMILY_ORDER.length;
+    if (ib < 0) ib = FAMILY_ORDER.length;
+    if (ia !== ib) return ia - ib;
+    return a < b ? -1 : a > b ? 1 : 0;
+  });
+  return keys
+    .map(function (fam) {
+      return (
+        '<h2 class="section-label" style="margin:20px 0 10px">' +
+        escAttr(entityLabel(fam)) +
+        "</h2>" +
+        renderEntityGrid(buckets[fam])
+      );
+    })
+    .join("");
+}
+
 export function sectionGroup(title, sub, group) {
   return (
     "<h1>" +
     title +
     "</h1>" +
     subHtml(sub) +
-    renderEntityGrid(entitiesByGroup(group))
+    renderFamilySections(entitiesByGroup(group))
   );
+}
+
+export function sectionCabin() {
+  return (
+    "<h1>" +
+    t("section.cabin.title", "Cabine") +
+    "</h1>" +
+    renderFamilySections(entitiesByGroup("cabin")) +
+    soundsCardsHtml()
+  );
+}
+
+export function sectionHistory() {
+  const entities = state.historyEntities || [];
+  const selected = state.historySelected || (entities[0] || "");
+  const hours = state.historyRangeHours || 24;
+  const points = state.historyPoints || [];
+  const meta = historyEntityMeta(selected);
+  const views = historyViewsFor(meta);
+  const view =
+    state.historyView && views.indexOf(state.historyView) >= 0
+      ? state.historyView
+      : views[0];
+  state.historyView = view;
+  const rangeOpts = [
+    { value: "6", label: t("history.range.6h", "6 h") },
+    { value: "24", label: t("history.range.24h", "24 h") },
+    { value: "72", label: t("history.range.72h", "3 d") },
+    { value: "168", label: t("history.range.7d", "7 d") },
+  ];
+  const viewOpts = views.map(function (v) {
+    return {
+      value: v,
+      label:
+        v === "graph"
+          ? t("history.view.graph", "Graph")
+          : v === "timeline"
+            ? t("history.view.timeline", "Timeline")
+            : t("history.view.list", "List"),
+    };
+  });
+  const opts = entities
+    .map(function (id) {
+      return (
+        '<option value="' +
+        escAttr(id) +
+        '"' +
+        (id === selected ? " selected" : "") +
+        ">" +
+        escAttr(historyEntityLabel(id)) +
+        "</option>"
+      );
+    })
+    .join("");
+  let body;
+  if (!entities.length) {
+    body = '<p class="persist-note">' + t("history.empty", "No history yet") + "</p>";
+  } else {
+    body =
+      '<div class="row" style="gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px">' +
+      "<label style=\"flex:1;min-width:160px\">" +
+      t("history.entity", "Entity") +
+      '<select class="field" id="histEntity" style="width:100%;margin-top:6px">' +
+      opts +
+      "</select></label>" +
+      "<div>" +
+      t("history.range", "Range") +
+      '<div style="margin-top:6px">' +
+      segmentToggleHtml(rangeOpts, String(hours), 'data-pref="hist-range"') +
+      "</div></div>" +
+      "<div>" +
+      t("history.view", "View") +
+      '<div style="margin-top:6px">' +
+      segmentToggleHtml(viewOpts, view, 'data-pref="hist-view"') +
+      "</div></div>" +
+      '<button class="btn primary" type="button" id="histLoad">' +
+      t("history.load", "Load") +
+      "</button></div>" +
+      (view === "graph"
+        ? historyGraphHtml(points)
+        : view === "timeline"
+          ? historyTimelineHtml(points, meta)
+          : historyTableHtml(points, meta));
+  }
+  return (
+    "<h1>" +
+    t("section.history.title", "History") +
+    '</h1><p class="sub">' +
+    t("section.history.sub", "Samples only when a value changes") +
+    "</p>" +
+    '<div class="card">' +
+    body +
+    "</div>"
+  );
+}
+
+function historyEntityMeta(id) {
+  const e = (state.entities || []).find(function (x) {
+    return x.id === id;
+  });
+  const dc = (e && e.deviceClass) || inferHistoryDeviceClass(id);
+  const input = (e && e.input) || (dc === "enum" ? "choice" : "sensor");
+  return {
+    id: id,
+    deviceClass: dc,
+    input: input,
+    options: (e && e.options) || [],
+    unitLabel: (e && e.unitLabel) || "",
+  };
+}
+
+function inferHistoryDeviceClass(id) {
+  const s = String(id || "");
+  if (/soc|battery/i.test(s)) return "battery";
+  if (/fuel/i.test(s)) return "fuel";
+  if (/temp|hvac/i.test(s)) return "temperature";
+  if (/speed/i.test(s)) return "speed";
+  if (/range|odometer|distance/i.test(s)) return "distance";
+  if (/charge_a|current/i.test(s)) return "current";
+  if (/voltage/i.test(s)) return "voltage";
+  if (/power|energy/i.test(s)) return "energy";
+  if (/gear|drive_mode|plug|regen|mode/i.test(s)) return "enum";
+  return null;
+}
+
+/** Views available for an entity: graph for numeric classes; timeline for discrete; list always. */
+function historyViewsFor(meta) {
+  const numeric = {
+    battery: 1,
+    fuel: 1,
+    temperature: 1,
+    speed: 1,
+    distance: 1,
+    current: 1,
+    voltage: 1,
+    power: 1,
+    energy: 1,
+    duration: 1,
+    pressure: 1,
+    humidity: 1,
+  };
+  const dc = meta && meta.deviceClass;
+  const views = [];
+  if (dc && numeric[dc]) views.push("graph");
+  if (!dc || dc === "enum" || (meta && (meta.input === "bool" || meta.input === "choice"))) {
+    views.push("timeline");
+  } else if (views.indexOf("graph") >= 0) {
+    views.push("timeline");
+  }
+  views.push("list");
+  return views;
+}
+
+function historyEntityLabel(id) {
+  const e = (state.entities || []).find(function (x) {
+    return x.id === id;
+  });
+  if (e && (e.label || e.i18n)) return e.label || t(e.i18n, id);
+  if (String(id).indexOf("sensor_") === 0) {
+    const key = "sensor." + String(id).slice("sensor_".length);
+    return t(key, id);
+  }
+  return t("control." + id, id);
+}
+
+function historyFormatValue(value, meta) {
+  if (value == null || value === "") return "—";
+  if (meta && meta.options && meta.options.length) {
+    const hit = meta.options.find(function (o) {
+      return String(o.value) === String(value);
+    });
+    if (hit) return hit.label || String(value);
+  }
+  if (meta && meta.input === "bool") {
+    const on = value === "1" || value === "true" || value === "on";
+    return on ? t("value.on", "On") : t("value.off", "Off");
+  }
+  if (meta && meta.unitLabel) return fmt(value) + " " + meta.unitLabel;
+  return fmt(value);
+}
+
+function historyGraphHtml(points) {
+  if (!points || !points.length) {
+    return (
+      '<p class="persist-note">' +
+      t("history.no_points", "No samples in this range") +
+      "</p>"
+    );
+  }
+  const nums = points
+    .map(function (p) {
+      const n = parseFloat(p.value);
+      return isNaN(n) ? null : { n: n, ts: p.ts, value: p.value };
+    })
+    .filter(function (x) {
+      return x != null;
+    });
+  if (nums.length < 2) {
+    return (
+      '<p class="persist-note">' +
+      t("history.graph.need_numeric", "Need at least two numeric samples for a graph") +
+      "</p>" +
+      historyTableHtml(points)
+    );
+  }
+  let min = nums[0].n;
+  let max = nums[0].n;
+  nums.forEach(function (x) {
+    if (x.n < min) min = x.n;
+    if (x.n > max) max = x.n;
+  });
+  const span = max - min || 1;
+  const w = 640;
+  const h = 180;
+  const pad = 8;
+  const step = (w - pad * 2) / (nums.length - 1);
+  const coords = nums
+    .map(function (x, i) {
+      const px = pad + i * step;
+      const py = h - pad - ((x.n - min) / span) * (h - pad * 2);
+      return px.toFixed(1) + "," + py.toFixed(1);
+    })
+    .join(" ");
+  return (
+    '<svg viewBox="0 0 ' +
+    w +
+    " " +
+    h +
+    '" width="100%" height="180" style="display:block;margin:8px 0 14px;background:var(--surface-2);border-radius:8px">' +
+    '<polyline fill="none" stroke="var(--accent, #3af)" stroke-width="2.5" points="' +
+    coords +
+    '"/></svg>' +
+    '<p class="sub" style="margin:0 0 10px">' +
+    escAttr(String(min)) +
+    " … " +
+    escAttr(String(max)) +
+    " · " +
+    points.length +
+    " " +
+    t("history.samples", "samples") +
+    "</p>"
+  );
+}
+
+function historyTimelineHtml(points, meta) {
+  if (!points || !points.length) {
+    return (
+      '<p class="persist-note">' +
+      t("history.no_points", "No samples in this range") +
+      "</p>"
+    );
+  }
+  const rows = points
+    .slice()
+    .reverse()
+    .slice(0, 300)
+    .map(function (p) {
+      return (
+        '<div style="display:flex;gap:14px;padding:10px 0;border-bottom:1px solid var(--border);align-items:flex-start">' +
+        '<span class="mono sub" style="flex-shrink:0;min-width:9.5rem">' +
+        escAttr(fmtTs(p.ts)) +
+        "</span>" +
+        '<span style="font-weight:600">' +
+        escAttr(historyFormatValue(p.value, meta)) +
+        "</span></div>"
+      );
+    })
+    .join("");
+  return '<div style="max-height:420px;overflow:auto">' + rows + "</div>";
+}
+
+function historyTableHtml(points, meta) {
+  if (!points || !points.length) {
+    return (
+      '<p class="persist-note">' +
+      t("history.no_points", "No samples in this range") +
+      "</p>"
+    );
+  }
+  const rows = points
+    .slice()
+    .reverse()
+    .slice(0, 400)
+    .map(function (p) {
+      return (
+        "<tr><td class=\"mono\">" +
+        escAttr(fmtTs(p.ts)) +
+        '</td><td class="mono">' +
+        escAttr(historyFormatValue(p.value, meta)) +
+        "</td></tr>"
+      );
+    })
+    .join("");
+  return (
+    '<div style="max-height:360px;overflow:auto"><table class="table"><thead><tr><th>' +
+    t("history.col.time", "Time") +
+    "</th><th>" +
+    t("history.col.value", "Value") +
+    "</th></tr></thead><tbody>" +
+    rows +
+    "</tbody></table></div>"
+  );
+}
+
+function fmtTs(ts) {
+  const n = Number(ts);
+  if (!n) return "—";
+  try {
+    return new Date(n).toLocaleString();
+  } catch (e) {
+    return String(ts);
+  }
+}
+
+function fmtBytes(n) {
+  const v = Number(n) || 0;
+  if (v < 1024) return v + " B";
+  if (v < 1024 * 1024) return (v / 1024).toFixed(1) + " KB";
+  return (v / (1024 * 1024)).toFixed(1) + " MB";
+}
+
+function soundsCardsHtml() {
+  const snap = state.sounds || {};
+  const note =
+    snap.note ||
+    t(
+      "sounds.note",
+      "Custom files play via app MediaPlayer; OEM AVAS still uses esm_sound / esm_volume.",
+    );
+  return (
+    '<h2 class="section-label" style="margin:28px 0 10px">' +
+    t("sounds.title", "Custom sounds") +
+    '</h2><p class="sub" style="margin:0 0 12px">' +
+    escAttr(note) +
+    '</p><div class="grid">' +
+    soundKindCard("avas", t("sounds.avas", "AVAS")) +
+    soundKindCard("lock", t("sounds.lock", "Lock")) +
+    "</div>"
+  );
+}
+
+function soundKindCard(kind, title) {
+  const snap = (state.sounds && state.sounds[kind]) || {};
+  const files = snap.files || [];
+  const active = snap.active;
+  const rows = files.length
+    ? '<ul style="list-style:none;margin:0;padding:0;width:100%">' +
+      files
+        .map(function (f) {
+          const on = f.active || f.name === active;
+          return (
+            '<li style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">' +
+            "<div style=\"min-width:0\">" +
+            "<strong" +
+            (on ? ' style="color:var(--accent)"' : "") +
+            ">" +
+            escAttr(f.name) +
+            (on
+              ? ' <span class="chip">' + t("sounds.active", "active") + "</span>"
+              : "") +
+            '</strong><p class="sub" style="margin:2px 0 0">' +
+            escAttr(fmtBytes(f.size)) +
+            "</p></div>" +
+            '<div class="row" style="margin:0;gap:6px;flex-shrink:0">' +
+            '<button type="button" class="btn ghost" data-sound-preview="' +
+            escAttr(kind) +
+            '" data-name="' +
+            escAttr(f.name) +
+            '">' +
+            t("sounds.preview", "Play") +
+            "</button>" +
+            (on
+              ? ""
+              : '<button type="button" class="btn" data-sound-apply="' +
+                escAttr(kind) +
+                '" data-name="' +
+                escAttr(f.name) +
+                '">' +
+                t("sounds.apply", "Use") +
+                "</button>") +
+            '<button type="button" class="btn ghost" data-sound-del="' +
+            escAttr(kind) +
+            '" data-name="' +
+            escAttr(f.name) +
+            '">' +
+            t("sounds.delete", "Delete") +
+            "</button></div></li>"
+          );
+        })
+        .join("") +
+      "</ul>"
+    : '<p class="persist-note" style="margin:0">' +
+      t("sounds.empty", "No custom files yet") +
+      "</p>";
+  return prefCard({
+    icon: kind === "lock" ? "lock" : "system",
+    title: title,
+    bodyHtml:
+      rows +
+      '<div class="row" style="width:100%;margin:12px 0 0;gap:8px">' +
+      '<button type="button" class="btn primary" data-sound-upload="' +
+      escAttr(kind) +
+      '" style="flex:1">' +
+      t("sounds.upload", "Upload") +
+      "</button>" +
+      (active
+        ? '<button type="button" class="btn ghost" data-sound-clear="' +
+          escAttr(kind) +
+          '">' +
+          t("sounds.clear", "Clear active") +
+          "</button>"
+        : "") +
+      '</div><input class="hidden" type="file" accept=".wav,.mp3,.ogg,.m4a,audio/*" data-sound-file="' +
+      escAttr(kind) +
+      '">',
+  });
 }
 
 export function sectionCameras() {
@@ -97,25 +556,68 @@ export function sectionCameras() {
     { value: "0", label: t("cameras.live", "Ao vivo") },
     { value: "1", label: t("cameras.recording", "Gravando…") },
   ];
+  const recordings = state.recordings || [];
+  const recRows = recordings.length
+    ? '<ul style="list-style:none;margin:0;padding:0">' +
+      recordings
+        .map(function (r) {
+          return (
+            '<li style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">' +
+            "<div style=\"min-width:0\">" +
+            '<strong class="mono" style="word-break:break-all">' +
+            escAttr(r.name) +
+            '</strong><p class="sub" style="margin:2px 0 0">' +
+            escAttr(fmtTs(r.mtime)) +
+            " · " +
+            escAttr(fmtBytes(r.size)) +
+            "</p></div>" +
+            '<div class="row" style="margin:0;gap:6px;flex-shrink:0">' +
+            '<a class="btn" href="/api/dvr/recordings/' +
+            encodeURIComponent(r.name) +
+            '" download="' +
+            escAttr(r.name) +
+            '">' +
+            t("cameras.download", "Download") +
+            "</a>" +
+            '<button type="button" class="btn ghost" data-rec-del="' +
+            escAttr(r.name) +
+            '">' +
+            t("cameras.delete", "Delete") +
+            "</button></div></li>"
+          );
+        })
+        .join("") +
+      "</ul>"
+    : '<p class="persist-note">' + t("cameras.recordings.empty", "No recordings yet") + "</p>";
   return (
     "<h1>" +
     t("section.cameras.title", "Câmeras") +
     "</h1>" +
+    '<div class="card" style="margin-bottom:16px">' +
+    "<h2 style=\"margin:0 0 8px\">" +
+    t("cameras.storage", "Salvar em") +
+    '</h2><p class="sub" style="margin:0 0 10px">' +
+    t("cameras.storage.shared", "Used for new recordings and the list below") +
+    "</p>" +
+    segmentToggleHtml(storageOpts, storageId, 'data-pref="cam-storage"') +
+    "</div>" +
     '<div class="grid">' +
-    prefCard({
-      icon: "camera",
-      title: t("cameras.storage", "Salvar em"),
-      bodyHtml: segmentToggleHtml(storageOpts, storageId, 'data-pref="cam-storage"'),
-    }) +
     prefCard({
       icon: "camera",
       title: t("cameras.rec_toggle", "Gravação"),
       bodyHtml: segmentToggleHtml(recOpts, recording ? "1" : "0", 'data-pref="cam-rec"'),
     }) +
     '</div><div class="card" style="margin-top:18px">' +
-    '<img class="preview" id="preview" alt="preview" style="display:block;width:100%;max-height:520px;object-fit:contain;background:#000">' +
+    '<img class="preview" id="preview" alt="" style="display:block;width:100%;max-height:520px;object-fit:contain;background:#000">' +
     '<p class="sub" id="prevHint"></p>' +
     (dvr.lastError ? '<p class="sub" style="color:var(--warn)">' + escAttr(dvr.lastError) + "</p>" : "") +
+    '</div><div class="card" style="margin-top:18px"><div class="row" style="justify-content:space-between;align-items:center;margin:0 0 10px">' +
+    "<h2 style=\"margin:0\">" +
+    t("cameras.recordings", "Recordings") +
+    '</h2><button type="button" class="btn" id="recRefresh">' +
+    t("cameras.recordings.refresh", "Refresh") +
+    "</button></div>" +
+    recRows +
     "</div>"
   );
 }
@@ -131,13 +633,39 @@ export async function startCameraLive() {
   const img = $("preview");
   const hint = $("prevHint");
   if (!img) return;
+  // Already streaming — do not open another MJPEG connection.
+  if (
+    state.cameraPreviewActive &&
+    img.dataset.ocaLive === "1" &&
+    img.src &&
+    img.src.indexOf("preview.mjpeg") >= 0
+  ) {
+    return;
+  }
   try {
+    img.removeAttribute("src");
+    img.dataset.ocaLive = "";
     await api("/api/dvr/preview/start", { method: "POST" });
     img.src = "/api/dvr/preview.mjpeg?t=" + Date.now();
+    img.dataset.ocaLive = "1";
+    state.cameraPreviewActive = true;
     if (hint) hint.textContent = "";
   } catch (e) {
+    state.cameraPreviewActive = false;
     if (hint) hint.textContent = String(e && e.message ? e.message : e);
   }
+}
+
+export async function stopCameraLive() {
+  const img = $("preview");
+  if (img) {
+    img.removeAttribute("src");
+    img.dataset.ocaLive = "";
+  }
+  state.cameraPreviewActive = false;
+  try {
+    await api("/api/dvr/preview/stop", { method: "POST" });
+  } catch (e) {}
 }
 
 export function sectionStore() {
@@ -388,8 +916,24 @@ function hiddenCardsBody() {
 
 export function sectionLab() {
   const lab = state.lab || {};
-  const p = state.probe;
-  const sum = p && p.summary ? p.summary : p;
+  const tab = state.labTab || "vhal";
+  const p =
+    tab === "obd2" ? state.obd2 : tab === "entities" ? null : state.probe;
+  const sum =
+    tab === "entities"
+      ? {
+          source: "ControlCatalog /api/entities",
+          count: (state.entities || []).length,
+        }
+      : p && p.summary
+        ? p.summary
+        : p;
+  const sourceHint =
+    tab === "obd2"
+      ? t("lab.source.obd2", "OBD2_LIVE_FRAME / OBD2_FREEZE_FRAME (VHAL)")
+      : tab === "entities"
+        ? t("lab.source.entities", "Bound product entities (ControlCatalog)")
+        : t("lab.source.vhal", "VHAL catalog (CarPropertyManager / gRPC)");
   const contributorOn = !!lab.contributor;
   const token = (contributorOn && (lab.token || state.token)) || "";
   const override = lab.integrationOverride || "";
@@ -411,11 +955,16 @@ export function sectionLab() {
         );
       })
       .join("");
+  const tabOpts = [
+    { value: "vhal", label: t("lab.tab.vhal", "VHAL catalog") },
+    { value: "obd2", label: t("lab.tab.obd2", "OBD2") },
+    { value: "entities", label: t("lab.tab.entities", "Product entities") },
+  ];
   return (
     "<h1>" +
     t("lab.title", "Lab / Contributor") +
     '</h1><p class="sub">' +
-    t("lab.sub", "Probe VHAL · enable Contributor mode for /debug writes") +
+    t("lab.sub", "Probe data sources · enable Contributor mode for /debug writes") +
     '</p><div class="card" style="margin-bottom:16px"><div class="row" style="align-items:center;gap:12px;flex-wrap:wrap">' +
     "<label style=\"display:flex;align-items:center;gap:8px\">" +
     '<input type="checkbox" id="labContributor"' +
@@ -447,7 +996,12 @@ export function sectionLab() {
         '<code class="mono">' +
         escAttr(lab.integration || "—") +
         "</code></p>") +
-    '</div><div class="card"><div class="row">' +
+    '</div><div class="card" style="margin-bottom:12px">' +
+    segmentToggleHtml(tabOpts, tab, 'data-pref="lab-tab"') +
+    '<p class="sub" style="margin:10px 0 0">' +
+    escAttr(sourceHint) +
+    "</p></div>" +
+    '<div class="card"><div class="row">' +
     '<button class="btn primary" id="probeRun">' +
     t("lab.probe", "Re-probe") +
     "</button>" +
@@ -458,10 +1012,12 @@ export function sectionLab() {
     '</a>' +
     '<input id="probeQ" type="text" placeholder="' +
     escAttr(t("lab.filter", "filter…")) +
+    '" value="' +
+    escAttr(state.probeFilter || "") +
     '" style="flex:1"></div>' +
     '<pre class="mono" id="probeSum">' +
     JSON.stringify(sum || { tip: t("lab.probe.tip", "Click Re-probe") }, null, 2) +
-    '</pre><div style="max-height:420px;overflow:auto"><table class="table" id="probeTable"><thead><tr><th>Nome</th><th>Família</th><th>Status</th><th>Valor</th><th>Perm</th></tr></thead><tbody></tbody></table></div></div>'
+    '</pre><div id="probeScroll" style="max-height:420px;overflow:auto"><table class="table" id="probeTable"><thead><tr><th>Nome</th><th>Família</th><th>Status</th><th>Valor</th><th>Perm</th></tr></thead><tbody></tbody></table></div></div>'
   );
 }
 
@@ -502,31 +1058,53 @@ export function sectionAbout() {
 }
 
 export function fillProbeTable() {
-  const q = (($("probeQ") && $("probeQ").value) || "").toLowerCase();
-  const rows = ((state.probe && state.probe.results) || []).filter(function (r) {
+  const tab = state.labTab || "vhal";
+  const q = (($("probeQ") && $("probeQ").value) || state.probeFilter || "").toLowerCase();
+  if ($("probeQ")) state.probeFilter = $("probeQ").value || "";
+  let rows;
+  if (tab === "entities") {
+    rows = (state.entities || []).map(function (e) {
+      return {
+        name: e.id || e.label || "",
+        family: e.entity || e.group || "",
+        status: e.status || "",
+        value: e.valueLabel || e.value || "",
+        permission: e.group || "",
+      };
+    });
+  } else {
+    const src = tab === "obd2" ? state.obd2 : state.probe;
+    rows = (src && src.results) || [];
+  }
+  rows = rows.filter(function (r) {
     if (!q) return true;
-    return (r.name + r.family + r.status + (r.permission || "")).toLowerCase().indexOf(q) >= 0;
+    return (r.name + r.family + r.status + (r.permission || "") + (r.value || ""))
+      .toLowerCase()
+      .indexOf(q) >= 0;
   });
   const tb = document.querySelector("#probeTable tbody");
   if (!tb) return;
+  const scroller = $("probeScroll");
+  const prevScroll = scroller ? scroller.scrollTop : 0;
   tb.innerHTML = rows
     .slice(0, 400)
     .map(function (r) {
       return (
         '<tr><td class="mono">' +
-        r.name +
+        escAttr(r.name) +
         "</td><td>" +
-        r.family +
+        escAttr(r.family) +
         "</td><td>" +
-        r.status +
+        escAttr(r.status) +
         '</td><td class="mono">' +
-        fmt(r.value) +
+        escAttr(fmt(r.value)) +
         '</td><td class="mono">' +
-        fmt(r.permission) +
+        escAttr(fmt(r.permission)) +
         "</td></tr>"
       );
     })
     .join("");
+  if (scroller) scroller.scrollTop = prevScroll;
 }
 
 export async function setControl(id, val) {
@@ -704,12 +1282,41 @@ export function bindSection(refresh) {
         }
         return;
       }
+      if (pref === "lab-tab") {
+        state.labTab = next;
+        if (next === "obd2" && !state.obd2) {
+          try {
+            state.obd2 = await api("/debug/obd2?token=" + encodeURIComponent(state.token));
+          } catch (e) {
+            state.obd2 = { results: [], summary: { available: false } };
+          }
+        }
+        await refresh();
+        return;
+      }
       if (pref === "cam-storage") {
         await api("/api/dvr/storage", {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: "id=" + encodeURIComponent(next),
         });
+        if (state.status && state.status.dvr) {
+          state.status.dvr.storageId = next;
+        }
+        await loadRecordings();
+        // One intentional remount to refresh the list; preview restarts once.
+        state.cameraPreviewActive = false;
+        await refresh();
+        return;
+      }
+      if (pref === "hist-range") {
+        state.historyRangeHours = parseInt(next, 10) || 24;
+        await loadHistoryPoints();
+        await refresh();
+        return;
+      }
+      if (pref === "hist-view") {
+        state.historyView = next;
         await refresh();
         return;
       }
@@ -921,6 +1528,127 @@ export function bindSection(refresh) {
       await api("/api/system/open-android-settings", { method: "POST" });
     };
   }
+  if ($("goHistory")) {
+    $("goHistory").onclick = function () {
+      if (typeof window.__ocaGoSection === "function") window.__ocaGoSection("history");
+    };
+  }
+  if ($("histLoad") || $("histEntity")) {
+    const runHist = async function () {
+      const id = ($("histEntity") && $("histEntity").value) || state.historySelected;
+      state.historySelected = id || null;
+      await loadHistoryPoints();
+      refresh();
+    };
+    if ($("histLoad")) $("histLoad").onclick = runHist;
+    if ($("histEntity"))
+      $("histEntity").onchange = function () {
+        state.historySelected = $("histEntity").value;
+        runHist();
+      };
+  }
+  if ($("recRefresh")) {
+    $("recRefresh").onclick = async function () {
+      await loadRecordings();
+      refresh();
+    };
+  }
+  document.querySelectorAll("[data-rec-del]").forEach(function (el) {
+    el.onclick = async function () {
+      const name = el.getAttribute("data-rec-del");
+      if (!name || !confirm(t("cameras.delete.confirm", "Delete this recording?"))) return;
+      await api("/api/dvr/recordings/" + encodeURIComponent(name), { method: "DELETE" });
+      await loadRecordings();
+      refresh();
+    };
+  });
+  document.querySelectorAll("[data-sound-upload]").forEach(function (el) {
+    el.onclick = function () {
+      const kind = el.getAttribute("data-sound-upload");
+      const input = document.querySelector('[data-sound-file="' + kind + '"]');
+      if (input) input.click();
+    };
+  });
+  document.querySelectorAll("[data-sound-file]").forEach(function (input) {
+    input.onchange = async function () {
+      const kind = input.getAttribute("data-sound-file");
+      const f = input.files && input.files[0];
+      if (!f || !kind) return;
+      try {
+        const buf = await f.arrayBuffer();
+        const r = await fetch(
+          "/api/sounds/upload?kind=" +
+            encodeURIComponent(kind) +
+            "&name=" +
+            encodeURIComponent(f.name),
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/octet-stream", "X-Filename": f.name },
+            body: buf,
+          },
+        );
+        const json = await r.json();
+        if (json && json.ok === false) {
+          alert(json.error || t("sounds.upload_failed", "Upload failed"));
+        }
+      } catch (e) {
+        alert(String(e && e.message ? e.message : e));
+      }
+      input.value = "";
+      await loadSounds();
+      refresh();
+    };
+  });
+  document.querySelectorAll("[data-sound-apply]").forEach(function (el) {
+    el.onclick = async function () {
+      const kind = el.getAttribute("data-sound-apply");
+      const name = el.getAttribute("data-name");
+      await api("/api/sounds/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body:
+          "kind=" + encodeURIComponent(kind) + "&name=" + encodeURIComponent(name || ""),
+      });
+      await loadSounds();
+      refresh();
+    };
+  });
+  document.querySelectorAll("[data-sound-clear]").forEach(function (el) {
+    el.onclick = async function () {
+      const kind = el.getAttribute("data-sound-clear");
+      await api("/api/sounds/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: "kind=" + encodeURIComponent(kind) + "&name=",
+      });
+      await loadSounds();
+      refresh();
+    };
+  });
+  document.querySelectorAll("[data-sound-preview]").forEach(function (el) {
+    el.onclick = async function () {
+      const kind = el.getAttribute("data-sound-preview");
+      const name = el.getAttribute("data-name");
+      await api("/api/sounds/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body:
+          "kind=" + encodeURIComponent(kind) + "&name=" + encodeURIComponent(name || ""),
+      });
+    };
+  });
+  document.querySelectorAll("[data-sound-del]").forEach(function (el) {
+    el.onclick = async function () {
+      const kind = el.getAttribute("data-sound-del");
+      const name = el.getAttribute("data-name");
+      if (!name || !confirm(t("sounds.delete.confirm", "Delete this sound?"))) return;
+      await api("/api/sounds/" + encodeURIComponent(kind) + "/" + encodeURIComponent(name), {
+        method: "DELETE",
+      });
+      await loadSounds();
+      refresh();
+    };
+  });
   if ($("labContributor")) {
     $("labContributor").onchange = async function () {
       const enabled = $("labContributor").checked ? "1" : "0";
@@ -960,9 +1688,60 @@ export function bindSection(refresh) {
   if ($("probeRun"))
     $("probeRun").onclick = async function () {
       $("probeSum").textContent = t("lab.probe.running", "Running probe…");
-      state.probe = await api("/debug/probe?force=1&token=" + encodeURIComponent(state.token));
+      const tab = state.labTab || "vhal";
+      const tok = encodeURIComponent(state.token);
+      if (tab === "obd2") {
+        state.obd2 = await api("/debug/obd2?force=1&token=" + tok);
+      } else if (tab === "entities") {
+        state.entities = await api("/api/entities");
+      } else {
+        state.probe = await api("/debug/probe?force=1&token=" + tok);
+      }
       refresh();
     };
   if ($("probeQ")) $("probeQ").oninput = fillProbeTable;
   mountNavIcons();
+}
+
+export async function loadHistoryPoints() {
+  const id = state.historySelected || (state.historyEntities && state.historyEntities[0]);
+  if (!id) {
+    state.historyPoints = [];
+    return;
+  }
+  state.historySelected = id;
+  const hours = state.historyRangeHours || 24;
+  const end = Date.now();
+  const start = end - hours * 60 * 60 * 1000;
+  try {
+    const res = await api(
+      "/api/history/" +
+        encodeURIComponent(id) +
+        "?start=" +
+        start +
+        "&end=" +
+        end +
+        "&limit=2000",
+    );
+    state.historyPoints = (res && res.points) || [];
+  } catch (e) {
+    state.historyPoints = [];
+  }
+}
+
+export async function loadRecordings() {
+  try {
+    const res = await api("/api/dvr/recordings");
+    state.recordings = (res && res.recordings) || [];
+  } catch (e) {
+    state.recordings = [];
+  }
+}
+
+export async function loadSounds() {
+  try {
+    state.sounds = await api("/api/sounds");
+  } catch (e) {
+    state.sounds = null;
+  }
 }
