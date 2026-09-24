@@ -192,9 +192,10 @@ export function sectionStore() {
         ? html`<p class="sub" style="margin-top:12px">${msg}</p>`
         : nothing}
       <div style="margin-top:16px">
-        ${busy && !results.length
+        ${busy
           ? html`<p class="sub">${t("store.searching", "Buscando…")}</p>`
-          : results.length
+          : nothing}
+        ${results.length
             ? results.map(function (a) {
                 return html`<button
                   type="button"
@@ -230,7 +231,7 @@ export function sectionStore() {
                   </div>
                 </button>`;
               })
-            : q
+            : !busy
               ? html`<p class="sub">${t("store.empty", "Nenhum resultado")}</p>`
               : nothing}
       </div>
@@ -274,9 +275,35 @@ export function sectionStore() {
 export function ensureStoreLoaded() {
   if (state.storeDetail || state._storeLoaded) return;
   state._storeLoaded = true;
-  api("/api/store/search?q=")
+  patch({ storeBusy: true, storeMessage: null });
+  // Phase 1: curated extras (instant) so the page is never blank.
+  api("/api/store/search?q=&fdroid=0")
     .then(function (res) {
-      patch({ storeResults: (res && res.apps) || [] });
+      const apps = (res && res.apps) || [];
+      if (apps.length) {
+        patch({ storeResults: apps, storeMessage: null });
+      }
     })
-    .catch(function () {});
+    .catch(function () {})
+    .then(function () {
+      // Phase 2: extras + F-Droid browse (search API).
+      return api("/api/store/search?q=");
+    })
+    .then(function (res) {
+      const apps = (res && res.apps) || [];
+      patch({
+        storeResults: apps,
+        storeBusy: false,
+        storeMessage: apps.length ? null : t("store.empty", "Nenhum resultado"),
+      });
+    })
+    .catch(function (e) {
+      patch({
+        storeBusy: false,
+        storeMessage:
+          (state.storeResults && state.storeResults.length)
+            ? null
+            : String(e && e.message ? e.message : e),
+      });
+    });
 }

@@ -8,7 +8,7 @@ import java.net.URL
 import java.security.MessageDigest
 
 /**
- * Unified store: curated extras (featured / proprietary) + F-Droid search.
+ * Unified store: curated extras (featured / proprietary) + F-Droid browse/search.
  */
 class AppStore(
     context: Context,
@@ -26,11 +26,12 @@ class AppStore(
         val installReady: Boolean = true,
     )
 
-    fun search(query: String, limit: Int = 30): List<SearchHit> {
+    fun search(query: String, limit: Int = 30, includeFdroid: Boolean = true): List<SearchHit> {
         val q = query.trim()
         val out = ArrayList<SearchHit>()
         val seen = HashSet<String>()
 
+        // Curated extras always lead the list (featured when browsing, match when searching).
         val extraHits = if (q.isEmpty()) extras.featured() else extras.search(q)
         for (e in extraHits) {
             if (!seen.add(e.packageName)) continue
@@ -38,26 +39,34 @@ class AppStore(
                 packageName = e.packageName,
                 name = e.name,
                 summary = e.summary,
-                iconUrl = e.iconUrl,
+                iconUrl = extras.iconUrl(e),
                 source = "extras",
                 installReady = e.installReady(),
             )
             if (out.size >= limit) return out
         }
 
-        if (q.isNotEmpty()) {
-            for (h in fdroid.search(q, limit)) {
-                if (!seen.add(h.packageName)) continue
-                out += SearchHit(
-                    packageName = h.packageName,
-                    name = h.name,
-                    summary = h.summary,
-                    iconUrl = h.iconUrl,
-                    source = "fdroid",
-                    installReady = true,
-                )
-                if (out.size >= limit) break
-            }
+        if (!includeFdroid) return out
+
+        // F-Droid: browse via search API when empty; search when typing.
+        // Never block extras on F-Droid failures / timeouts.
+        val fdroidHits = runCatching {
+            if (q.isEmpty()) fdroid.browse(limit) else fdroid.search(q, limit)
+        }.getOrElse {
+            Log.w(TAG, "fdroid search failed: ${it.message}")
+            emptyList()
+        }
+        for (h in fdroidHits) {
+            if (!seen.add(h.packageName)) continue
+            out += SearchHit(
+                packageName = h.packageName,
+                name = h.name,
+                summary = h.summary,
+                iconUrl = h.iconUrl,
+                source = "fdroid",
+                installReady = true,
+            )
+            if (out.size >= limit) break
         }
         return out
     }
@@ -86,7 +95,7 @@ class AppStore(
                 "name" to extra.name,
                 "summary" to extra.summary,
                 "description" to extra.summary,
-                "iconUrl" to extra.iconUrl,
+                "iconUrl" to extras.iconUrl(extra),
                 "suggestedVersionCode" to (resolved?.versionCode),
                 "versions" to versions,
                 "source" to "extras",
@@ -132,13 +141,21 @@ class AppStore(
             val dir = installer.installDir()
             val raw = File(dir, "extra-${app.id}-${resolved.versionCode}.apk")
             httpDownload(resolved.url, raw)
-            if (!resolved.hash.isNullOrBlank() &&
-                (resolved.hashType.isNullOrBlank() || resolved.hashType.equals("sha256", true))
-            ) {
-                val actual = sha256(raw)
-                if (!actual.equals(resolved.hash, ignoreCase = true)) {
+            if (!resolved.hash.isNullOrBlank()) {
+                val type = resolved.hashType?.lowercase().orEmpty()
+                val actual = when {
+                    type.isBlank() || type == "sha256" -> sha256(raw)
+                    type == "md5" -> md5(raw)
+                    else -> null
+                }
+                if (actual != null && !actual.equals(resolved.hash, ignoreCase = true)) {
                     raw.delete()
-                    return FdroidStore.InstallOutcome(false, "SHA-256 mismatch", app.packageName, actual)
+                    return FdroidStore.InstallOutcome(
+                        false,
+                        "${type.ifBlank { "sha256" }.uppercase()} mismatch",
+                        app.packageName,
+                        actual,
+                    )
                 }
             }
             val signed = File(dir, "extra-${app.id}-${resolved.versionCode}_signed.apk")
@@ -180,8 +197,12 @@ class AppStore(
         }
     }
 
-    private fun sha256(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
+    private fun sha256(file: File): String = digestHex(file, "SHA-256")
+
+    private fun md5(file: File): String = digestHex(file, "MD5")
+
+    private fun digestHex(file: File, algo: String): String {
+        val digest = MessageDigest.getInstance(algo)
         file.inputStream().use { input ->
             val buf = ByteArray(8192)
             while (true) {

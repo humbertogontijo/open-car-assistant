@@ -2,16 +2,6 @@
   "version": 1,
   "apps": [
     {
-      "id": "fdroid",
-      "name": "F-Droid",
-      "packageName": "org.fdroid.fdroid",
-      "summary": "Open-source app catalog. Install other apps from verified repos.",
-      "keywords": ["fdroid", "store", "foss"],
-      "featured": true,
-      "source": "direct",
-      "apkUrl": "https://f-droid.org/F-Droid.apk"
-    },
-    {
       "id": "morphe-microg",
       "name": "MicroG RE",
       "packageName": "app.revanced.android.gms",
@@ -20,7 +10,8 @@
       "featured": true,
       "source": "github_release",
       "repo": "MorpheApp/MicroG-RE",
-      "assetRegex": "^microg-[0-9.]+-arm64-v8a\\.apk$"
+      "assetRegex": "^microg-[0-9.]+-arm64-v8a\\.apk$",
+      "iconUrl": "https://avatars.githubusercontent.com/u/246280111?s=128&v=4"
     },
     {
       "id": "youtube-morphe",
@@ -31,17 +22,18 @@
       "featured": true,
       "source": "github_release",
       "repo": "NoName-exe/revanced-extended",
-      "assetRegex": "^youtube-morphe-.*\\.apk$"
+      "assetRegex": "^youtube-morphe-.*\\.apk$",
+      "iconUrl": "https://play-lh.googleusercontent.com/QNmuZQc9I6Zbe3mWnSr0hycnENqGFCI5p3yE29Hkxtf22T0IWS6zTrpxULLyyjWpB7ONAXDsDQXnXcVWokl3eg=s128-rw"
     },
     {
       "id": "waze",
       "name": "Waze",
       "packageName": "com.waze",
-      "summary": "Navigation. Set apkUrl to your mirror to enable install (not redistributed here).",
+      "summary": "Navigation & live traffic. Latest APK via Aptoide pool.",
       "keywords": ["waze", "maps", "nav", "navigation"],
       "featured": true,
-      "source": "direct",
-      "apkUrl": ""
+      "source": "aptoide",
+      "iconUrl": "https://pool.img.aptoide.com/22ww22ee/3a84d64738faf282d9aac44e0ec8291e_icon.png"
     }
   ]
 }

@@ -243,7 +243,9 @@ export function sectionCameras() {
   const capBytes = maxTotalMb * 1024 * 1024;
   const recordings = state.recordings || [];
   const activeName = state.cameraPlayingName || "";
-  const elapsedMs = recordingElapsedMs(dvr);
+  // Timer only on one-shot Record; DVR stays on across reloads so a session clock is misleading.
+  if (!segmentActive) stopRecTick();
+  const elapsedMs = segmentActive ? recordingElapsedMs(dvr) : 0;
   const elapsedSec = Math.floor(elapsedMs / 1000);
   const elapsedLabel =
     elapsedSec > 0
@@ -322,7 +324,6 @@ export function sectionCameras() {
                     }}
                   >
                     ${t("cameras.dvr.disable", "Disable DVR")}
-                    ${elapsedLabel ? " · " + elapsedLabel : ""}
                   </button>`
               : html`<button
                     type="button"

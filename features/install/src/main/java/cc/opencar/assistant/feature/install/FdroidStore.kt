@@ -8,6 +8,7 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import java.util.zip.ZipFile
 
@@ -55,8 +56,43 @@ class FdroidStore(
 
     fun search(query: String, limit: Int = 30): List<SearchHit> {
         val q = query.trim()
-        if (q.isEmpty()) return emptyList()
-        val url = "$SEARCH_API?q=${encode(q)}"
+        if (q.isEmpty()) return browse(limit)
+        return searchApi(q, limit)
+    }
+
+    /**
+     * Default browse when the store opens with an empty query.
+     * Uses the public search API in parallel — never downloads index-v1.jar here.
+     */
+    fun browse(limit: Int = 30): List<SearchHit> {
+        val queries = BROWSE_QUERIES
+        val futures = queries.map { q ->
+            CompletableFuture.supplyAsync {
+                runCatching { searchApi(q, limit) }.getOrElse {
+                    Log.w(TAG, "browse query '$q' failed: ${it.message}")
+                    emptyList()
+                }
+            }
+        }
+        val seen = LinkedHashSet<String>()
+        val out = ArrayList<SearchHit>(limit)
+        for (future in futures) {
+            val hits = runCatching { future.get(TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS) }
+                .getOrElse {
+                    Log.w(TAG, "browse future failed: ${it.message}")
+                    emptyList()
+                }
+            for (h in hits) {
+                if (!seen.add(h.packageName)) continue
+                out += h
+                if (out.size >= limit) return out
+            }
+        }
+        return out
+    }
+
+    private fun searchApi(query: String, limit: Int): List<SearchHit> {
+        val url = "$SEARCH_API?q=${encode(query)}"
         val root = JSONObject(httpGet(url))
         val apps = root.optJSONArray("apps") ?: JSONArray()
         val out = ArrayList<SearchHit>(minOf(apps.length(), limit))
@@ -332,5 +368,14 @@ class FdroidStore(
         private const val TIMEOUT_MS = 20_000
         private const val DOWNLOAD_TIMEOUT_MS = 120_000
         private val INDEX_TTL_MS = TimeUnit.HOURS.toMillis(6)
+
+        /** Thematic queries for the empty-store landing page (search API, not full index). */
+        private val BROWSE_QUERIES = listOf(
+            "maps",
+            "navigation",
+            "browser",
+            "music",
+            "offline",
+        )
     }
 }

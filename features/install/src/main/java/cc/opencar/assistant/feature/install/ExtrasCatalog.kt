@@ -12,7 +12,7 @@ import java.util.regex.Pattern
 import java.util.zip.ZipFile
 
 /**
- * Curated extras catalog (assets/store/extras.json): github_release, fdroid_repo, direct.
+ * Curated extras catalog (assets/store/extras.json): github_release, fdroid_repo, aptoide, direct.
  */
 class ExtrasCatalog(private val context: Context) {
     data class ExtraApp(
@@ -43,6 +43,7 @@ class ExtrasCatalog(private val context: Context) {
             "direct" -> !apkUrl.isNullOrBlank()
             "github_release" -> !repo.isNullOrBlank()
             "fdroid_repo" -> !repoUrl.isNullOrBlank()
+            "aptoide" -> packageName.isNotBlank()
             else -> false
         }
     }
@@ -74,6 +75,7 @@ class ExtrasCatalog(private val context: Context) {
             throw IllegalStateException(
                 when (app.source) {
                     "direct" -> "No apkUrl configured for ${app.name}. Host a mirror and set store/extras.json apkUrl."
+                    "fdroid_repo" -> "Set repoUrl to an F-Droid repo that indexes ${app.packageName}."
                     else -> "Incomplete extras entry for ${app.id}"
                 },
             )
@@ -86,8 +88,16 @@ class ExtrasCatalog(private val context: Context) {
             )
             "github_release" -> resolveGithub(app)
             "fdroid_repo" -> resolveFdroidRepo(app)
+            "aptoide" -> resolveAptoide(app)
             else -> throw IllegalStateException("Unknown source: ${app.source}")
         }
+    }
+
+    /** Icon from extras.json, or from the entry's own fdroid repoUrl when set. */
+    fun iconUrl(app: ExtraApp): String? {
+        if (!app.iconUrl.isNullOrBlank()) return app.iconUrl
+        val base = app.repoUrl?.trim()?.trimEnd('/') ?: return null
+        return runCatching { iconFromRepo(base, app.packageName) }.getOrNull()
     }
 
     private fun resolveGithub(app: ExtraApp): ResolvedApk {
@@ -124,11 +134,15 @@ class ExtrasCatalog(private val context: Context) {
 
     private fun resolveFdroidRepo(app: ExtraApp): ResolvedApk {
         val base = app.repoUrl!!.trimEnd('/')
-        val index = loadRepoIndex(base)
-        val packages = index.optJSONObject("packages")
-            ?: throw IllegalStateException("No packages in $base")
-        val apks = packages.optJSONArray(app.packageName)
+        return resolveFdroidPackage(base, app.packageName)
             ?: throw IllegalStateException("${app.packageName} not in $base")
+    }
+
+    private fun resolveFdroidPackage(repoBase: String, packageName: String): ResolvedApk? {
+        val base = repoBase.trimEnd('/')
+        val index = loadRepoIndex(base)
+        val packages = index.optJSONObject("packages") ?: return null
+        val apks = packages.optJSONArray(packageName) ?: return null
         var best: JSONObject? = null
         var bestCode = -1L
         for (i in 0 until apks.length()) {
@@ -139,9 +153,9 @@ class ExtrasCatalog(private val context: Context) {
                 best = apk
             }
         }
-        val apk = best ?: throw IllegalStateException("No APKs for ${app.packageName}")
+        val apk = best ?: return null
         val apkName = apk.optString("apkName")
-        if (apkName.isBlank()) throw IllegalStateException("Missing apkName for ${app.packageName}")
+        if (apkName.isBlank()) return null
         return ResolvedApk(
             url = "$base/$apkName",
             versionName = apk.optString("versionName").ifBlank { bestCode.toString() },
@@ -150,6 +164,45 @@ class ExtrasCatalog(private val context: Context) {
             hashType = apk.optString("hashType").ifBlank { "sha256" },
             apkName = apkName,
             repoBase = base,
+        )
+    }
+
+    private fun iconFromRepo(repoBase: String, packageName: String): String? {
+        val base = repoBase.trimEnd('/')
+        val index = loadRepoIndex(base)
+        val apps = index.optJSONArray("apps") ?: return null
+        for (i in 0 until apps.length()) {
+            val a = apps.optJSONObject(i) ?: continue
+            if (a.optString("packageName") != packageName) continue
+            val icon = a.optString("icon").takeIf { it.isNotBlank() } ?: return null
+            return if (icon.startsWith("http")) icon else "$base/icons-640/$icon"
+        }
+        return null
+    }
+
+    /** Resolve latest APK via Aptoide's public getMeta API (pool.apk.aptoide.com). */
+    private fun resolveAptoide(app: ExtraApp): ResolvedApk {
+        val pkg = app.packageName.trim()
+        if (pkg.isEmpty()) throw IllegalStateException("aptoide source needs packageName")
+        val root = JSONObject(httpGet("$APTOIDE_META?package_name=${java.net.URLEncoder.encode(pkg, "UTF-8")}"))
+        val status = root.optJSONObject("info")?.optString("status").orEmpty()
+        if (!status.equals("OK", ignoreCase = true)) {
+            throw IllegalStateException("Aptoide meta failed for $pkg: $status")
+        }
+        val data = root.optJSONObject("data")
+            ?: throw IllegalStateException("Aptoide: no data for $pkg")
+        val file = data.optJSONObject("file")
+            ?: throw IllegalStateException("Aptoide: no file for $pkg")
+        val path = file.optString("path").ifBlank { file.optString("path_alt") }
+        if (path.isBlank()) throw IllegalStateException("Aptoide: empty path for $pkg")
+        val md5 = file.optString("md5sum").takeIf { it.isNotBlank() }
+        return ResolvedApk(
+            url = path,
+            versionName = file.optString("vername").ifBlank { "latest" },
+            versionCode = file.optLong("vercode", 1L),
+            hash = md5,
+            hashType = if (md5 != null) "md5" else null,
+            apkName = path.substringAfterLast('/'),
         )
     }
 
@@ -214,7 +267,10 @@ class ExtrasCatalog(private val context: Context) {
             readTimeout = TIMEOUT_MS
             requestMethod = "GET"
             setRequestProperty("User-Agent", USER_AGENT)
-            setRequestProperty("Accept", "application/vnd.github+json")
+            setRequestProperty(
+                "Accept",
+                if (url.contains("api.github.com")) "application/vnd.github+json" else "application/json",
+            )
             instanceFollowRedirects = true
         }
         return try {
@@ -254,6 +310,7 @@ class ExtrasCatalog(private val context: Context) {
         private const val TAG = "ExtrasCatalog"
         private const val ASSET = "store/extras.json"
         private const val USER_AGENT = "OpenCarAssistant/0.1"
+        private const val APTOIDE_META = "https://ws75.aptoide.com/api/7/app/getMeta"
         private const val TIMEOUT_MS = 20_000
         private const val DOWNLOAD_TIMEOUT_MS = 120_000
         private val INDEX_TTL_MS = TimeUnit.HOURS.toMillis(6)

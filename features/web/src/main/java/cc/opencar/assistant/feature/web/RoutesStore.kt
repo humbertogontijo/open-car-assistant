@@ -34,7 +34,8 @@ internal fun Routing.registerStoreRoutes(deps: OcaWebDeps) {
     get("/api/store/search") {
         val q = call.request.queryParameters["q"].orEmpty()
         val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 30
-        val hits = withContext(Dispatchers.IO) { deps.store.search(q, limit) }
+        val includeFdroid = call.request.queryParameters["fdroid"] != "0"
+        val hits = withContext(Dispatchers.IO) { deps.store.search(q, limit, includeFdroid) }
         call.respond(
             mapOf(
                 "ok" to true,
