@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Privileged permission whitelist for Open Car Assistant (antora1000).
+  Staged by tools/oca-setup install-privileged / in-app elevate.
+  __OCA_PACKAGE__ is replaced with the real applicationId at install time.
+-->
+<permissions>
+    <privapp-permissions package="__OCA_PACKAGE__">
+        <permission name="android.car.permission.CAR_VENDOR_EXTENSION" />
+        <permission name="android.car.permission.CONTROL_CAR_CLIMATE" />
+        <permission name="android.car.permission.CAR_INFO" />
+        <permission name="android.car.permission.CAR_POWERTRAIN" />
+        <permission name="android.car.permission.CAR_ENERGY" />
+        <permission name="android.car.permission.CAR_SPEED" />
+    </privapp-permissions>
+</permissions>

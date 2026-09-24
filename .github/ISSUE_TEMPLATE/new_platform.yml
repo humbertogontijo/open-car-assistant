@@ -1,0 +1,49 @@
+name: New platform integration
+description: Propose or track a new vehicle / HU platform module
+title: "[platform] "
+labels: ["enhancement", "integration"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Prefer opening a PR under `integrations/<id>/` when you can. See `docs/adding-an-integration.md`.
+        Use **ihu629g** as the simple CarProperty-only reference; Antora is the heavier dual-backend example.
+  - type: input
+    id: platform_id
+    attributes:
+      label: Proposed platform id
+      description: Folder name under integrations/ (chip/SoC family, not market trim)
+      placeholder: myplatform
+    validations:
+      required: true
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Hardware / fingerprint hints
+      description: ro.product.device, ro.hardware, market names (docs only)
+    validations:
+      required: true
+  - type: dropdown
+    id: backend
+    attributes:
+      label: Likely VHAL backend
+      options:
+        - CarPropertyManager only
+        - gRPC / vendor daemon
+        - Unknown / need discovery
+    validations:
+      required: true
+  - type: textarea
+    id: status
+    attributes:
+      label: What you already have
+      description: platform.json draft, catalog dump, oca-setup host.sh, etc.
+  - type: checkboxes
+    id: ownership
+    attributes:
+      label: Confirm
+      options:
+        - label: I own (or have explicit permission to modify) the head unit I will test on
+          required: true
+        - label: I will not commit OEM platform signing keys
+          required: true

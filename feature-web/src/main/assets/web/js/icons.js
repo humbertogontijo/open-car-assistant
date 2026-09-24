@@ -1,0 +1,109 @@
+const ICON_MAP = {
+  home: "i-home",
+  drive: "i-drive",
+  climate: "i-climate",
+  energy: "i-energy",
+  safety: "i-safety",
+  cabin: "i-cabin",
+  camera: "i-camera",
+  cameras: "i-camera",
+  system: "i-system",
+  store: "i-store",
+  lab: "i-lab",
+  about: "i-about",
+  pin: "i-pin",
+  hide: "i-hide",
+  flip: "i-flip",
+  regen: "i-regen",
+  brake: "i-brake",
+  steer: "i-steer",
+  fan: "i-fan",
+  temp: "i-temp",
+  battery: "i-battery",
+  charge: "i-charge",
+  adas: "i-adas",
+  lock: "i-lock",
+  light: "i-light",
+  hud: "i-hud",
+  seat: "i-seat",
+  window: "i-window",
+  usb: "i-usb",
+  sensor: "i-sensor",
+  plugins: "i-plugins",
+  plugin: "i-plugins",
+  drive_mode: "i-drive",
+  esc_sport: "i-drive",
+  auto_hold: "i-brake",
+  hdc: "i-brake",
+  steer_soft: "i-steer",
+  steer_medium: "i-steer",
+  steer_heavy: "i-steer",
+  brake_pedal: "i-brake",
+  hvac_power: "i-climate",
+  hvac_ac: "i-climate",
+  hvac_auto: "i-climate",
+  hvac_recirc: "i-climate",
+  hvac_max_defrost: "i-climate",
+  hvac_max_ac: "i-climate",
+  hvac_temp: "i-temp",
+  hvac_fan: "i-fan",
+  hvac_seat_vent: "i-seat",
+  battery_hold: "i-battery",
+  battery_save: "i-battery",
+  battery_mode: "i-battery",
+  charge_current: "i-charge",
+  charge_v2l: "i-charge",
+  charge_v2v: "i-charge",
+  charge_parking: "i-charge",
+  lka: "i-adas",
+  elka: "i-adas",
+  aeb: "i-adas",
+  fcw: "i-adas",
+  rcta: "i-adas",
+  rcw: "i-adas",
+  approach_unlock: "i-lock",
+  away_lock: "i-lock",
+  central_lock: "i-lock",
+  audible_lock: "i-lock",
+  auto_close_window: "i-window",
+  courtesy_light: "i-light",
+  approach_light: "i-light",
+  usb_mode: "i-usb",
+  hud_active: "i-hud",
+  hud_snow: "i-hud",
+  hud_ar: "i-hud",
+};
+
+let spriteReady = null;
+
+export function loadIcons() {
+  if (spriteReady) return spriteReady;
+  spriteReady = fetch("/static/icons/sprite.svg")
+    .then(function (r) {
+      return r.text();
+    })
+    .then(function (svg) {
+      const host = document.getElementById("iconSprite");
+      if (host) host.innerHTML = svg;
+      mountNavIcons();
+    })
+    .catch(function () {});
+  return spriteReady;
+}
+
+export function iconSvg(name) {
+  const id = ICON_MAP[name] || ICON_MAP[name && name.replace(/-.*/, "")] || "i-sensor";
+  return (
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#' +
+    id +
+    '" xlink:href="#' +
+    id +
+    '"></use></svg>'
+  );
+}
+
+export function mountNavIcons() {
+  document.querySelectorAll("[data-icon]").forEach(function (el) {
+    el.innerHTML = iconSvg(el.getAttribute("data-icon"));
+  });
+}

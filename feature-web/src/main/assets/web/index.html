@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Open Car Assistant</title>
+  <script>
+    (function(){
+      try {
+        var t = localStorage.getItem('oca_theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', t);
+      } catch(e) {}
+      // Lock rem scale to the physical screen so the soft keyboard (shorter
+      // layout viewport) does not rescale the whole UI via vmin.
+      try {
+        var w = Math.max(screen.width || 0, window.availWidth || 0, window.innerWidth || 0);
+        var h = Math.max(screen.height || 0, screen.availHeight || 0, window.innerHeight || 0);
+        var vmin = Math.min(w, h) || 800;
+        document.documentElement.style.setProperty('--oca-vmin', vmin + 'px');
+      } catch(e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="/static/css/themes.css?v=36">
+  <link rel="stylesheet" href="/static/css/layout.css?v=36">
+  <link rel="stylesheet" href="/static/css/cards.css?v=36">
+</head>
+<body>
+  <div id="iconSprite" hidden></div>
+  <header class="status-bar" id="statusBar">
+    <div id="statusLeft">Open Car Assistant</div>
+    <div class="status-chips" id="statusRight">
+      <span class="chip"><span class="dot"></span><span id="connLabel">Conectando…</span></span>
+    </div>
+  </header>
+  <div class="shell">
+    <nav class="sidebar">
+      <div class="brand">OCA</div>
+      <div class="nav-list">
+        <button class="nav-item active" data-sec="home"><span class="ico" data-icon="home"></span><span class="label">Início</span></button>
+        <button class="nav-item" data-sec="drive"><span class="ico" data-icon="drive"></span><span class="label">Condução</span></button>
+        <button class="nav-item" data-sec="climate"><span class="ico" data-icon="climate"></span><span class="label">Clima</span></button>
+        <button class="nav-item" data-sec="energy"><span class="ico" data-icon="energy"></span><span class="label">Energia</span></button>
+        <button class="nav-item" data-sec="safety"><span class="ico" data-icon="safety"></span><span class="label">Segurança</span></button>
+        <button class="nav-item" data-sec="cabin"><span class="ico" data-icon="cabin"></span><span class="label">Cabine</span></button>
+        <button class="nav-item" data-sec="cameras"><span class="ico" data-icon="camera"></span><span class="label">Câmeras</span></button>
+        <button class="nav-item" data-sec="store"><span class="ico" data-icon="store"></span><span class="label">Loja</span></button>
+        <button class="nav-item" data-sec="shortcuts"><span class="ico" data-icon="pin"></span><span class="label">Atalhos</span></button>
+        <button class="nav-item" data-sec="plugins"><span class="ico" data-icon="plugins"></span><span class="label">Plugins</span></button>
+        <button class="nav-item" data-sec="android"><span class="ico" data-icon="usb"></span><span class="label">Android</span></button>
+        <button class="nav-item" data-sec="system"><span class="ico" data-icon="system"></span><span class="label">Sistema</span></button>
+        <button class="nav-item" data-sec="lab"><span class="ico" data-icon="lab"></span><span class="label">Lab</span></button>
+        <button class="nav-item" data-sec="about"><span class="ico" data-icon="about"></span><span class="label">Sobre</span></button>
+      </div>
+      <div class="ver" id="sideVer">v0.1</div>
+    </nav>
+    <main class="main" id="main"></main>
+  </div>
+  <script type="module" src="/static/js/app.js?v=38"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Flyme status-bar glyph: white on transparent. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="52dp"
+    android:height="52dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M24,66c0,-18 14,-30 30,-30s30,12 30,30v6H24zM40,42a8,8 0,1 1,0.1 0zM68,42a8,8 0,1 1,0.1 0z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M34,78h40v6H34z" />
+</vector>

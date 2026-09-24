@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <receiver
+            android:name="cc.opencar.assistant.integrations.platform.flyme.FlymeStatusBarClickReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="cc.opencar.assistant.STATUS_ICON_CLICK" />
+            </intent-filter>
+        </receiver>
+
+        <!--
+          Manifest wake/sleep: process may be dead during STR.
+          Actions mirror FlymePlatform.wakeSignals()
+          (directBootAware, priority 1000, DEFAULT category).
+        -->
+        <receiver
+            android:name="cc.opencar.assistant.integrations.platform.flyme.FlymeWakeReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:directBootAware="true">
+            <intent-filter android:priority="1000">
+                <action android:name="com.ecarx.intent.action.SYSTEM_READY" />
+                <action android:name="com.ecarx.intent.action.ACC_ON" />
+                <action android:name="com.ecarx.intent.action.IGN_ON" />
+                <action android:name="com.ecarx.intent.action.WAKEUP" />
+                <action android:name="com.ecarx.intent.action.STR_RESUME" />
+                <action android:name="com.ecarx.intent.action.POWER_ON" />
+                <action android:name="com.ecarx.systemui.SYSTEM_UI_READY" />
+                <action android:name="com.lynkco.intent.action.SYSTEM_READY" />
+                <action android:name="com.lynkco.intent.action.WAKEUP" />
+                <action android:name="com.lynkco.intent.action.STR_RESUME" />
+                <action android:name="com.geely.intent.action.SYSTEM_READY" />
+                <action android:name="com.geely.intent.action.WAKEUP" />
+                <action android:name="ecarx.intent.action.power.STRMODE" />
+                <action android:name="ecarx.intent.action.DISPLAY_ON" />
+                <action android:name="ecarx.intent.action.carsignal.AVNOFF_OFF" />
+                <action android:name="ecarx.intent.action.TEST_EXIT_STR" />
+                <action android:name="ecarx.intent.action.DISPLAY_OFF" />
+                <action android:name="ecarx.intent.action.carsignal.AVNOFF_ON" />
+                <action android:name="ecarx.intent.action.TEST_ENTER_STR" />
+                <action android:name="ecarx.intent.action.power.SHUTDOWN" />
+                <action android:name="com.ecarx.intent.action.ACC_OFF" />
+                <action android:name="com.ecarx.intent.action.STR_ENTER" />
+                <action android:name="com.geely.intent.action.STR_ENTER" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

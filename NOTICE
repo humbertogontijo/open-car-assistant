@@ -1,0 +1,39 @@
+Open Car Assistant
+Copyright contributors to Open Car Assistant.
+
+This product includes software developed by third parties.
+
+---------------------------------------------------------------------------
+AOSP community testkey (signing/ and feature-install assets)
+
+This repository ships the well-known Android Open Source Project (AOSP)
+"community" / testkey commonly trusted on unlocked / userdebug AAOS head
+units. The private key material is already public as the standard AOSP
+community testkey; it is included here so clones build and resign without
+an extra download step.
+
+  Files: signing/community.pk8, signing/community.pem
+         (also under feature-install/src/main/assets/signing/;
+          :feature-install copyCommunityKeys keeps them in sync from signing/)
+  Fingerprint historically noted as: d7f1f224
+  Subject: AOSP Android CN test certificate
+
+This is NOT an OEM platform signing key (for example Geely / Antora
+platform signature 3075720b). It does not grant signature|privileged
+permissions by itself; see docs/safety.md.
+
+Intended use: resign APKs for install on userdebug / remountable HUs that
+already trust this community key. Do not use it to sign software for
+distribution to end users as a unique identity.
+
+---------------------------------------------------------------------------
+Third-party runtime dependencies (see module build.gradle.kts for versions)
+
+  - AndroidX libraries (Apache-2.0) — https://developer.android.com/jetpack
+  - Kotlin / Kotlin Coroutines (Apache-2.0) — https://kotlinlang.org/
+  - Ktor (Apache-2.0) — https://ktor.io/
+  - OkHttp (Apache-2.0) — https://square.github.io/okhttp/
+  - Android Gradle Plugin / Gradle wrapper (Apache-2.0)
+
+Full license texts for dependencies are available from their upstream
+projects and from the SPDX identifiers in each package.

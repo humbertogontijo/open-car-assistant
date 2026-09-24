@@ -1,0 +1,46 @@
+{
+  "strings": {
+    "integration.display_name": "IHU629G (EX2 / Geometry E)",
+    "control.charge_limit": "Limite de corrente de carga",
+    "control.charge_limit.hint": "Limite AC selecionável (5–32 A)",
+    "control.charge_switch": "Comando de carga",
+    "control.charge_switch.hint": "Parar / reiniciar / iniciar carga agora",
+    "control.parking_comfort.hint": "Mantém o carro ligado após travar",
+    "opt.charge_switch.609": "Parar",
+    "opt.charge_switch.610": "Reiniciar",
+    "opt.charge_switch.611": "Iniciar agora",
+    "opt.hvac_fan.8": "Nível 8",
+    "opt.hvac_fan_direction.1": "Rosto",
+    "opt.hvac_fan_direction.2": "Pés",
+    "opt.hvac_fan_direction.3": "Rosto + pés",
+    "opt.hvac_fan_direction.4": "Desembaçador",
+    "opt.hvac_fan_direction.6": "Desembaçador + pés",
+    "opt.regen.537003265": "Baixa",
+    "opt.regen.537003266": "Média",
+    "opt.regen.537003267": "Alta"
+  },
+  "valueMaps": {
+    "drive_mode": {
+      "570491137": "drive_mode.eco",
+      "570491138": "drive_mode.comfort",
+      "570491139": "drive_mode.sport"
+    },
+    "regen": {
+      "537003265": "opt.regen.537003265",
+      "537003266": "opt.regen.537003266",
+      "537003267": "opt.regen.537003267"
+    },
+    "hvac_fan_direction": {
+      "1": "opt.hvac_fan_direction.1",
+      "2": "opt.hvac_fan_direction.2",
+      "3": "opt.hvac_fan_direction.3",
+      "4": "opt.hvac_fan_direction.4",
+      "6": "opt.hvac_fan_direction.6"
+    },
+    "charge_switch": {
+      "609": "opt.charge_switch.609",
+      "610": "opt.charge_switch.610",
+      "611": "opt.charge_switch.611"
+    }
+  }
+}

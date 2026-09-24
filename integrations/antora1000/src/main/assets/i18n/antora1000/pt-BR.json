@@ -1,0 +1,12 @@
+{
+  "strings": {
+    "integration.display_name": "Antora 1000 (SE1000)"
+  },
+  "valueMaps": {
+    "drive_mode": {
+      "5": "opt.drive_mode.1",
+      "6": "opt.drive_mode.2",
+      "7": "opt.drive_mode.3"
+    }
+  }
+}

@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+# Open Car Assistant — host-side setup (build / sign / install / permissions).
+#
+# Usage:
+#   ./tools/oca-setup [--integration antora1000] [--host IP] [--user N] <command>
+#
+# Commands:
+#   connect              adb connect to the HU
+#   build                gradle :app:assembleDebug
+#   sign                 sign APK with community testkey (:signing:signApk)
+#   install              normal /data install + runtime grants
+#   install-privileged   remount + priv-app + whitelist (needs reboot)
+#   grant                grant runtime car/camera permissions for the Android user
+#   check                print permission / package status
+#   setup                connect → build → sign → install → grant → check
+#   setup --privileged   same, ending in install-privileged (reboot required)
+#   uninstall            remove data + optional priv-app package
+#   start                launch MainActivity for the target user
+#
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/common.sh
+source "$ROOT/tools/lib/common.sh"
+# shellcheck source=lib/permissions.sh
+source "$ROOT/tools/lib/permissions.sh"
+# shellcheck source=lib/install.sh
+source "$ROOT/tools/lib/install.sh"
+
+INTEGRATION="${OCA_INTEGRATION:-antora1000}"
+HOST="${OCA_HOST:-}"
+ANDROID_USER="${OCA_USER:-}"
+DO_PRIVILEGED=0
+CMD=""
+
+usage() {
+  sed -n '2,22p' "$0" | sed 's/^# \?//'
+  echo
+  echo "Integrations:"
+  for f in "$ROOT/integrations"/*/host.sh; do
+    [[ -f "$f" ]] && basename "$(dirname "$f")"
+  done | sed 's/^/  /'
+  echo
+  echo "Device commands require --host / -H CAR_IP (or OCA_HOST)."
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --integration|-i) INTEGRATION="$2"; shift 2 ;;
+    --host|-H) HOST="$2"; shift 2 ;;
+    --user|-u) ANDROID_USER="$2"; shift 2 ;;
+    --privileged) DO_PRIVILEGED=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    -*) die "Unknown flag: $1" ;;
+    *) CMD="$1"; shift; break ;;
+  esac
+done
+
+# Flags after the command (e.g. setup --privileged)
+EXTRA=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --privileged) DO_PRIVILEGED=1; shift ;;
+    *) EXTRA+=("$1"); shift ;;
+  esac
+done
+load_integration "$INTEGRATION"
+
+# CLI overrides
+[[ -n "$HOST" ]] && OCA_HOST="$HOST"
+[[ -n "$ANDROID_USER" ]] && OCA_ANDROID_USER="$ANDROID_USER"
+
+case "${CMD:-}" in
+  connect)
+    oca_connect
+    ;;
+  build)
+    oca_build
+    ;;
+  sign)
+    oca_sign
+    ;;
+  install)
+    oca_connect
+    oca_ensure_apk
+    oca_install_data
+    oca_grant_runtime
+    oca_check
+    ;;
+  install-privileged)
+    oca_connect
+    oca_ensure_apk
+    oca_install_privileged
+    log "Reboot the HU, then run: $0 --integration $INTEGRATION --host $OCA_HOST grant && $0 check"
+    ;;
+  grant)
+    oca_connect
+    oca_grant_runtime
+    oca_check
+    ;;
+  check)
+    oca_connect
+    oca_check
+    ;;
+  setup)
+    oca_connect
+    oca_build
+    oca_sign
+    if [[ "$DO_PRIVILEGED" -eq 1 ]]; then
+      oca_install_privileged
+      log "Reboot required. After reboot: $0 -i $INTEGRATION -H $OCA_HOST grant && $0 -i $INTEGRATION -H $OCA_HOST check"
+    else
+      oca_install_data
+      oca_grant_runtime
+      oca_check
+      log "Telemetry-ready. For VHAL/HVAC: $0 -i $INTEGRATION -H $OCA_HOST setup --privileged"
+    fi
+    ;;
+  uninstall)
+    oca_connect
+    oca_uninstall "${EXTRA[@]:-}"
+    ;;
+  start)
+    oca_connect
+    oca_start
+    ;;
+  "" )
+    usage
+    exit 1
+    ;;
+  *)
+    die "Unknown command: $CMD"
+    ;;
+esac

@@ -1,0 +1,65 @@
+name: Bug report
+description: Something broken in OCA on a head unit or in the build
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Attach a Lab **Export zip** when possible (`/debug/export` — VIN is redacted).
+        Do **not** paste OEM platform keys, long-lived Home Assistant tokens, or personal LAN credentials.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong?
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform / integration
+      description: e.g. antora1000, ihu629g, or unknown
+      placeholder: antora1000
+    validations:
+      required: true
+  - type: input
+    id: variant
+    attributes:
+      label: Variant (if known)
+      placeholder: phev / bev / default
+  - type: dropdown
+    id: install
+    attributes:
+      label: Install path
+      options:
+        - Unprivileged /data (community testkey)
+        - Privileged priv-app
+        - Other / unknown
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. …
+        2. …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs actual
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / export
+      description: Paste short log lines or note that you attached oca-debug.zip
+  - type: input
+    id: version
+    attributes:
+      label: Commit / version
+      description: git SHA or versionName from About

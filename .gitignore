@@ -1,0 +1,42 @@
+# Gradle / Android
+.gradle/
+**/build/
+.kotlin/
+local.properties
+*.apk
+*_signed.apk
+*.ap_
+*.dex
+*.class
+captures/
+.externalNativeBuild/
+.cxx/
+*.hprof
+*.iml
+
+# IDE
+.idea/
+*.ipr
+*.iws
+.vscode/
+*.swp
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Secrets / device keys (never commit OEM platform keys)
+*.jks
+*.keystore
+keys/
+apks/
+# Only the disclosed AOSP community testkey under signing/ (and the synced
+# feature-install copy) should exist as *.pem / *.pk8 in this repo.
+# Do not add other PEM/PKCS8 material.
+
+# Local tooling leftovers
+APK.Easy.Tool*/
+*.log
+out/
