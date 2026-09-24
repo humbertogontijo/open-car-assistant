@@ -1,77 +1,104 @@
 /**
- * Shared camera player: live MJPEG stream or recorded concatenated-JPEG playback.
+ * Camera player:
+ *   live       → HLS (hls.js) on <video>
+ *   recording  → .mp4 on <video>, legacy .mjpeg multipart on <img>
  */
 import { html, nothing } from "../lit.js";
 import { state, patch } from "../store.js";
 import { t } from "../i18n.js";
 import { api } from "../api.js";
+import { startH264Live, stopH264Live, isLivePlaying } from "./live-h264.js";
 
-const FPS = 10;
-const FRAME_MS = 1000 / FPS;
+const FRAME_MS = 100;
+let liveH264Active = false;
+let liveBusy = false;
 
-/** @type {{ name: string, frames: Uint8Array[], index: number, timer: number|null, url: string|null }|null} */
+/** @type {{ name: string, durationMs: number, positionMs: number, timer: number|null, format: "mp4"|"mjpeg" }|null} */
 let playback = null;
+let seeking = false;
 
 export function isRecordingPlayback() {
   return state.cameraPlayerMode === "recording";
 }
 
 export function canPlayRecording(name) {
-  return typeof name === "string" && /\.mjpeg$/i.test(name);
+  return typeof name === "string" && /\.(mjpeg|mp4)$/i.test(name);
 }
 
-function splitJpegFrames(buffer) {
-  const bytes = new Uint8Array(buffer);
-  const frames = [];
-  let i = 0;
-  while (i < bytes.length - 1) {
-    if (bytes[i] === 0xff && bytes[i + 1] === 0xd8) {
-      let j = i + 2;
-      while (j < bytes.length - 1) {
-        if (bytes[j] === 0xff && bytes[j + 1] === 0xd9) {
-          frames.push(bytes.subarray(i, j + 2));
-          i = j + 2;
-          break;
-        }
-        j++;
-      }
-      if (j >= bytes.length - 1) break;
-    } else {
-      i++;
-    }
-  }
-  return frames;
+function isMp4Name(name) {
+  return typeof name === "string" && /\.mp4$/i.test(name);
 }
 
 function playerImg() {
   return document.getElementById("cameraPlayerFrame");
 }
 
-function revokeFrameUrl() {
-  if (playback && playback.url) {
-    try {
-      URL.revokeObjectURL(playback.url);
-    } catch (e) {}
-    playback.url = null;
-  }
+function playerVideo() {
+  return document.getElementById("cameraPlayerVideo");
 }
 
-function showFrame(index) {
-  if (!playback || !playback.frames.length) return;
+function fmtTime(ms) {
+  const total = Math.max(0, Math.floor(Number(ms) / 1000));
+  return Math.floor(total / 60) + ":" + String(total % 60).padStart(2, "0");
+}
+
+function detachImg() {
   const img = playerImg();
   if (!img) return;
-  const i = ((index % playback.frames.length) + playback.frames.length) % playback.frames.length;
-  playback.index = i;
-  revokeFrameUrl();
-  const blob = new Blob([playback.frames[i]], { type: "image/jpeg" });
-  const url = URL.createObjectURL(blob);
-  playback.url = url;
   img.dataset.ocaSrc = "";
-  img.src = url;
-  const counter = document.getElementById("cameraPlayerCounter");
-  if (counter) {
-    counter.textContent = i + 1 + "/" + playback.frames.length;
+  try {
+    img.removeAttribute("src");
+  } catch (e) {}
+}
+
+function detachVideo() {
+  const v = playerVideo();
+  if (!v) return;
+  try {
+    v.pause();
+    v.removeAttribute("src");
+    v.load();
+  } catch (e) {}
+}
+
+function streamUrl(name, fromMs) {
+  return (
+    "/api/dvr/recordings/" +
+    encodeURIComponent(name) +
+    "/stream?fromMs=" +
+    encodeURIComponent(String(Math.max(0, Math.floor(fromMs || 0)))) +
+    "&t=" +
+    Date.now()
+  );
+}
+
+function recordingUrl(name) {
+  return "/api/dvr/recordings/" + encodeURIComponent(name) + "?inline=1&t=" + Date.now();
+}
+
+function attachStream(name, fromMs) {
+  if (isMp4Name(name)) {
+    const v = playerVideo();
+    if (!v || !playback) return;
+    const startSec = Math.max(0, (fromMs || 0) / 1000);
+    const onMeta = function () {
+      v.removeEventListener("loadedmetadata", onMeta);
+      try {
+        if (startSec > 0 && Number.isFinite(v.duration)) {
+          v.currentTime = Math.min(startSec, v.duration);
+        }
+        v.play().catch(function () {});
+      } catch (e) {}
+    };
+    v.addEventListener("loadedmetadata", onMeta);
+    v.src = recordingUrl(name);
+    v.load();
+    return;
   }
+  const img = playerImg();
+  if (!img || !playback) return;
+  img.dataset.ocaSrc = streamUrl(name, fromMs);
+  img.src = img.dataset.ocaSrc;
 }
 
 function clearTimer() {
@@ -81,15 +108,65 @@ function clearTimer() {
   }
 }
 
-function tick() {
-  if (!playback || state.cameraPlaybackPaused) return;
-  showFrame(playback.index + 1);
+function syncTransport() {
+  if (!playback) return;
+  const cur = document.getElementById("cameraPlayerTime");
+  const dur = document.getElementById("cameraPlayerDuration");
+  const seek = document.getElementById("cameraPlayerSeek");
+  let posMs = playback.positionMs;
+  let durMs = Math.max(playback.durationMs, FRAME_MS);
+  if (playback.format === "mp4") {
+    const v = playerVideo();
+    if (v && Number.isFinite(v.duration) && v.duration > 0) {
+      durMs = Math.round(v.duration * 1000);
+      playback.durationMs = durMs;
+    }
+    if (v && !seeking) posMs = Math.round((v.currentTime || 0) * 1000);
+    playback.positionMs = posMs;
+  }
+  if (cur) cur.textContent = fmtTime(posMs);
+  if (dur) dur.textContent = fmtTime(durMs);
+  if (seek && !seeking) {
+    seek.max = String((durMs / 1000).toFixed(1));
+    seek.value = String((posMs / 1000).toFixed(1));
+  }
+}
+
+function tickClock() {
+  if (!playback || state.cameraPlaybackPaused || seeking) return;
+  if (playback.format === "mp4") {
+    const v = playerVideo();
+    if (v) {
+      playback.positionMs = Math.round((v.currentTime || 0) * 1000);
+      syncTransport();
+      if (v.ended) {
+        clearTimer();
+        patch({ cameraPlaybackPaused: true });
+      }
+    }
+    return;
+  }
+  playback.positionMs = Math.min(playback.durationMs, playback.positionMs + FRAME_MS);
+  syncTransport();
+  if (playback.positionMs >= playback.durationMs) {
+    clearTimer();
+    detachImg();
+    patch({ cameraPlaybackPaused: true });
+  }
+}
+
+function startClock() {
+  clearTimer();
+  if (!playback) return;
+  playback.timer = setInterval(tickClock, FRAME_MS);
 }
 
 export function stopRecordingPlayback() {
   clearTimer();
-  revokeFrameUrl();
+  detachImg();
+  detachVideo();
   playback = null;
+  seeking = false;
   if (state.cameraPlayerMode === "recording") {
     patch({
       cameraPlayerMode: "live",
@@ -98,12 +175,17 @@ export function stopRecordingPlayback() {
       cameraPlaybackLoading: false,
       cameraPlaybackIndex: 0,
       cameraPlaybackCount: 0,
+      cameraPlaybackDurationMs: 0,
       cameraPreviewError: "",
     });
   }
 }
 
-export async function playRecording(name) {
+/**
+ * @param {string} name
+ * @param {{ durationMs?: number, frameCount?: number }} [opts]
+ */
+export async function playRecording(name, opts) {
   if (!canPlayRecording(name)) {
     patch({
       cameraPreviewError: t("cameras.play.unsupported", "This file cannot be played"),
@@ -111,171 +193,244 @@ export async function playRecording(name) {
     return;
   }
   clearTimer();
-  revokeFrameUrl();
-  playback = null;
+  detachImg();
+  detachVideo();
+  stopH264Live(playerVideo());
+  liveH264Active = false;
+  seeking = false;
 
-  // Free the live camera while reviewing a clip.
-  try {
-    await api("/api/dvr/preview/stop", { method: "POST" });
-  } catch (e) {}
+  if (!(state.status && state.status.dvr && state.status.dvr.recording)) {
+    try {
+      await api("/api/dvr/preview/stop", { method: "POST" });
+    } catch (e) {}
+  }
 
+  const format = isMp4Name(name) ? "mp4" : "mjpeg";
+  let durationMs = Number(opts && opts.durationMs) > 0 ? Number(opts.durationMs) : 0;
+  if (!durationMs && format === "mjpeg" && Number(opts && opts.frameCount) > 0) {
+    durationMs = Number(opts.frameCount) * FRAME_MS;
+  }
+  if (format === "mjpeg" && !durationMs) {
+    patch({ cameraPreviewError: t("cameras.play.empty", "No frames in recording") });
+    return;
+  }
+
+  playback = {
+    name: name,
+    durationMs: Math.max(format === "mp4" ? 0 : FRAME_MS, durationMs || FRAME_MS),
+    positionMs: 0,
+    timer: null,
+    format: format,
+  };
   patch({
     cameraPlayerMode: "recording",
     cameraPlayingName: name,
     cameraPlaybackPaused: false,
-    cameraPlaybackLoading: true,
-    cameraPlaybackIndex: 0,
-    cameraPlaybackCount: 0,
+    cameraPlaybackLoading: false,
+    cameraPlaybackDurationMs: playback.durationMs,
     cameraPreviewActive: false,
     cameraPreviewSrc: "",
     cameraPreviewError: "",
   });
-
-  try {
-    const res = await fetch(
-      "/api/dvr/recordings/" + encodeURIComponent(name) + "?inline=1",
-    );
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const buf = await res.arrayBuffer();
-    const frames = splitJpegFrames(buf);
-    if (!frames.length) throw new Error(t("cameras.play.empty", "No frames in recording"));
-
-    playback = {
-      name: name,
-      frames: frames,
-      index: 0,
-      timer: null,
-      url: null,
-    };
-    patch({
-      cameraPlaybackLoading: false,
-      cameraPlaybackIndex: 0,
-      cameraPlaybackCount: frames.length,
-      cameraPreviewError: "",
-    });
-    requestAnimationFrame(function () {
-      if (!playback || playback.name !== name) return;
-      showFrame(0);
-      if (playback.timer == null) {
-        playback.timer = setInterval(tick, FRAME_MS);
-      }
-    });
-  } catch (e) {
-    playback = null;
-    patch({
-      cameraPlayerMode: "live",
-      cameraPlayingName: "",
-      cameraPlaybackLoading: false,
-      cameraPlaybackPaused: false,
-      cameraPreviewError: String(e && e.message ? e.message : e),
-    });
-  }
+  requestAnimationFrame(function () {
+    if (!playback || playback.name !== name) return;
+    attachStream(name, 0);
+    startClock();
+    syncTransport();
+  });
 }
 
 export function togglePlaybackPause() {
   if (!playback) return;
   const next = !state.cameraPlaybackPaused;
-  patch({
-    cameraPlaybackPaused: next,
-    cameraPlaybackIndex: playback.index,
-    cameraPlaybackCount: playback.frames.length,
-  });
-  if (!next) {
-    // Resume immediately so UI feels responsive.
-    showFrame(playback.index + 1);
+  patch({ cameraPlaybackPaused: next });
+  if (playback.format === "mp4") {
+    const v = playerVideo();
+    if (v) {
+      if (next) v.pause();
+      else {
+        if (v.ended) v.currentTime = 0;
+        v.play().catch(function () {});
+        startClock();
+      }
+    }
+    if (next) clearTimer();
+    return;
   }
+  if (next) {
+    clearTimer();
+    detachImg();
+  } else {
+    if (playback.positionMs >= playback.durationMs) playback.positionMs = 0;
+    attachStream(playback.name, playback.positionMs);
+    startClock();
+  }
+}
+
+export function seekPlaybackSeconds(sec) {
+  if (!playback) return;
+  const ms = Math.max(0, Math.min(playback.durationMs, Number(sec) * 1000));
+  playback.positionMs = ms;
+  syncTransport();
+  if (playback.format === "mp4") {
+    const v = playerVideo();
+    if (v) {
+      try {
+        v.currentTime = ms / 1000;
+      } catch (e) {}
+      if (!state.cameraPlaybackPaused) v.play().catch(function () {});
+    }
+    return;
+  }
+  if (!state.cameraPlaybackPaused) attachStream(playback.name, ms);
 }
 
 export async function backToLive(startLive) {
   stopRecordingPlayback();
-  if (typeof startLive === "function") {
-    await startLive();
-  }
+  if (typeof startLive === "function") await startLive();
 }
 
-/** Keep live <img src> in sync without resetting recording frames on re-render. */
-export function applyCameraPlayerSrc() {
-  const img = playerImg();
-  if (!img) return;
+/** Attach / keep HLS live on <video>. */
+export async function applyCameraPlayerSrc() {
   if (state.cameraPlayerMode === "recording") return;
   const want = state.cameraPreviewSrc || "";
-  if (img.dataset.ocaSrc === want) return;
-  img.dataset.ocaSrc = want;
-  if (want) img.src = want;
-  else {
+  const video = playerVideo();
+  const img = playerImg();
+  if (img) {
+    img.style.display = "none";
     img.removeAttribute("src");
+    img.dataset.ocaSrc = "";
+  }
+  if (!want || want.indexOf("live.m3u8") < 0 || !video) {
+    if (liveH264Active || isLivePlaying()) {
+      stopH264Live(video);
+      liveH264Active = false;
+    }
+    if (video) {
+      video.style.display = "none";
+      video.dataset.ocaSrc = "";
+    }
+    return;
+  }
+  video.style.display = "";
+  // Soft refresh must not tear down HLS.
+  if (liveH264Active && isLivePlaying()) {
+    video.dataset.ocaSrc = want;
+    return;
+  }
+  if (video.dataset.ocaSrc === want && liveH264Active) return;
+  if (liveBusy) return;
+  liveBusy = true;
+  video.dataset.ocaSrc = want;
+  try {
+    const ok = await startH264Live(video);
+    liveH264Active = !!ok;
+    if (!ok) {
+      video.style.display = "none";
+      const msg = t("cameras.live.failed", "Live H.264 stream failed — check device logs");
+      if (state.cameraPreviewError !== msg) patch({ cameraPreviewError: msg });
+    } else if (state.cameraPreviewError) {
+      patch({ cameraPreviewError: "" });
+    }
+  } finally {
+    liveBusy = false;
   }
 }
 
 export function cameraPlayerView(opts) {
   const mode = state.cameraPlayerMode || "live";
   const playingName = state.cameraPlayingName || "";
-  const loading = !!state.cameraPlaybackLoading;
   const paused = !!state.cameraPlaybackPaused;
-  const index = state.cameraPlaybackIndex || 0;
-  const count = state.cameraPlaybackCount || 0;
   const err = state.cameraPreviewError || "";
   const lastError = (opts && opts.lastError) || "";
   const startLive = opts && opts.startLive;
-
+  const showTransport = mode === "recording";
+  const useVideo =
+    mode === "live" || (mode === "recording" && isMp4Name(playingName));
   const label =
     mode === "recording"
       ? t("cameras.play.playing", "Playing") + (playingName ? " · " + playingName : "")
       : t("cameras.live", "Live");
 
   return html`
-    <div class="card camera-player" style="margin-top:18px">
+    <div
+      class=${"card camera-player" + ((opts && opts.embedded) ? " camera-player-fill" : "")}
+      style=${(opts && opts.embedded) ? "margin:0" : "margin-top:18px"}
+    >
       <div
-        class="row"
+        class="row camera-player-bar"
         style="justify-content:space-between;align-items:center;margin:0 0 10px;gap:8px;flex-wrap:wrap"
       >
         <div class="row" style="margin:0;gap:8px;align-items:center;min-width:0">
           <span class="badge ${mode === "recording" ? "accent" : "ok"}">${label}</span>
-          ${mode === "recording" && count
-            ? html`<span class="sub mono" id="cameraPlayerCounter"
-                >${index + 1}/${count}</span
-              >`
-            : nothing}
-          ${loading
-            ? html`<span class="sub">${t("cameras.play.loading", "Loading…")}</span>`
-            : nothing}
         </div>
         ${mode === "recording"
           ? html`<div class="row" style="margin:0;gap:6px;flex-shrink:0">
-              <button
-                type="button"
-                class="btn"
-                ?disabled=${loading || !count}
-                @click=${function () {
-                  togglePlaybackPause();
-                }}
-              >
-                ${paused
-                  ? t("cameras.play.resume", "Resume")
-                  : t("cameras.play.pause", "Pause")}
-              </button>
-              <button
-                type="button"
-                class="btn ghost"
-                @click=${async function () {
-                  await backToLive(startLive);
-                }}
-              >
+              <button type="button" class="btn ghost" @click=${async function () {
+                await backToLive(startLive);
+              }}>
                 ${t("cameras.play.live", "Back to live")}
               </button>
             </div>`
           : nothing}
       </div>
-      <img
-        class="preview"
-        id="cameraPlayerFrame"
-        alt=""
-        style="display:block;width:100%;max-height:520px;object-fit:contain;background:#000"
-      />
-      ${err ? html`<p class="sub">${err}</p>` : nothing}
-      ${lastError
-        ? html`<p class="sub" style="color:var(--warn)">${lastError}</p>`
+      <div class="camera-preview-wrap">
+        <img class="preview" id="cameraPlayerFrame" alt="" style=${useVideo ? "display:none" : ""} />
+        <video
+          class="preview"
+          id="cameraPlayerVideo"
+          playsinline
+          muted
+          style=${useVideo ? "" : "display:none"}
+        ></video>
+      </div>
+      ${showTransport
+        ? html`<div class="camera-transport">
+            <button type="button" class="btn ghost camera-transport-play" @click=${function () {
+              togglePlaybackPause();
+            }}>${paused ? "▶" : "❚❚"}</button>
+            <span class="sub mono" id="cameraPlayerTime">0:00</span>
+            <input
+              type="range"
+              id="cameraPlayerSeek"
+              class="camera-seek"
+              min="0"
+              max="1"
+              step="0.1"
+              value="0"
+              @pointerdown=${function () {
+                seeking = true;
+                clearTimer();
+                if (playback && playback.format === "mjpeg") detachImg();
+                else {
+                  const v = playerVideo();
+                  if (v) v.pause();
+                }
+              }}
+              @pointerup=${function (ev) {
+                seeking = false;
+                seekPlaybackSeconds(ev.target.value);
+                if (!state.cameraPlaybackPaused) {
+                  if (playback && playback.format === "mjpeg") {
+                    attachStream(playback.name, playback.positionMs);
+                  }
+                  startClock();
+                }
+              }}
+              @input=${function (ev) {
+                if (!playback) return;
+                playback.positionMs = Math.max(
+                  0,
+                  Math.min(playback.durationMs, Number(ev.target.value) * 1000),
+                );
+                syncTransport();
+              }}
+            />
+            <span class="sub mono" id="cameraPlayerDuration">0:00</span>
+          </div>`
         : nothing}
+      ${err ? html`<p class="sub">${err}</p>` : nothing}
+      ${lastError ? html`<p class="sub" style="color:var(--warn)">${lastError}</p>` : nothing}
     </div>
   `;
 }

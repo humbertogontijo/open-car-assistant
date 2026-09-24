@@ -2,7 +2,6 @@
 export {
   shouldShowSetup,
   renderSetupOverlay,
-  renderStatusBar,
   setupOverlayTemplate,
 } from "./ui/setup.js";
 

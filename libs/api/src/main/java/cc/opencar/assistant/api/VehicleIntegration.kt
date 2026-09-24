@@ -61,6 +61,12 @@ interface VehicleSession {
     fun catalog(): List<CatalogEntry>
     fun cameras(): List<CameraSource>
 
+    /**
+     * Platform mosaic/live stream tuning from `platform.json` (`dvr`).
+     * Not user-configurable — integrations set what the HU can sustain.
+     */
+    fun dvrStreamConfig(): DvrStreamConfig = DvrStreamConfig.DEFAULT
+
     fun close()
 }
 

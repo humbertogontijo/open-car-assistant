@@ -18,6 +18,8 @@ class PlatformConfigTest {
         assertTrue(cfg.bindings.containsKey("speed_kmh"))
         assertTrue(cfg.writableAllowlist.isNotEmpty())
         assertEquals(0x11600207, cfg.bindings.getValue("speed_kmh").nativeId)
+        assertEquals(5, cfg.dvr.fps)
+        assertEquals(720, cfg.dvr.mosaicHeight)
     }
 
     @Test

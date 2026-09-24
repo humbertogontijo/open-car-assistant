@@ -65,3 +65,18 @@ data class CameraSource(
     val label: String,
     val cameraId: String,
 )
+
+/**
+ * Platform-declared mosaic stream tuning (not a user preference).
+ * Loaded from integration `platform.json` → `dvr`.
+ */
+data class DvrStreamConfig(
+    /** Target mosaic / live frame rate. */
+    val fps: Int = 5,
+    /** Mosaic output height in px (480 / 720 / 1080); width is 16:9. */
+    val mosaicHeight: Int = 720,
+) {
+    companion object {
+        val DEFAULT = DvrStreamConfig()
+    }
+}

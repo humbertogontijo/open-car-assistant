@@ -48,6 +48,4 @@ export function applyChrome() {
     const label = el.querySelector(".label");
     if (label) label.textContent = t("nav." + sec, label.textContent);
   });
-  const left = document.getElementById("statusLeft");
-  if (left) left.textContent = t("app.name", "Open Car Assistant");
 }

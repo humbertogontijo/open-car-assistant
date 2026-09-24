@@ -36,16 +36,17 @@ export const state = {
   historyView: null,
   recordings: [],
   cameraPreviewActive: false,
-  /** Stable MJPEG URL while preview is live — avoid resetting <img src> on every render. */
+  /** Stable HLS URL while preview is active — avoid resetting video src on every render. */
   cameraPreviewSrc: "",
   cameraPreviewError: "",
-  /** Shared player: "live" MJPEG stream or "recording" clip playback. */
+  /** Shared player: "live" HLS or "recording" clip playback. */
   cameraPlayerMode: "live",
   cameraPlayingName: "",
   cameraPlaybackPaused: false,
   cameraPlaybackLoading: false,
   cameraPlaybackIndex: 0,
   cameraPlaybackCount: 0,
+  cameraPlaybackDurationMs: 0,
   sounds: null,
   hiddenEntities: [],
   labTab: "vhal",

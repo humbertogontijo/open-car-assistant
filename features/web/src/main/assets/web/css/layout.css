@@ -31,33 +31,12 @@ a.btn {
   text-decoration: none;
 }
 
-/* —— Status bar —— */
-.status-bar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0.55rem 1.25rem; gap: 0.75rem; flex-wrap: wrap;
-  background: var(--surface);
-  backdrop-filter: var(--glass);
-  -webkit-backdrop-filter: var(--glass);
-  border-bottom: 1px solid var(--border);
-  font-size: 0.9rem; color: var(--text-muted);
-  z-index: 5; flex-shrink: 0;
-}
-.status-bar #statusLeft {
-  font-weight: 650; color: var(--text); letter-spacing: 0.01em; font-size: 1rem;
-}
-.status-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
 .chip {
   display: inline-flex; align-items: center; gap: 0.4rem;
   padding: 0.35rem 0.75rem; border-radius: var(--radius-pill);
   background: var(--surface-2); border: 1px solid var(--border);
   color: var(--text); font-size: 0.85rem; font-weight: 550;
 }
-.status-bar .dot {
-  width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--status-ok);
-  display: inline-block;
-}
-.status-bar .dot.warn { background: var(--warn); }
-.status-bar .dot.bad { background: var(--danger); }
 
 /* —— Shell + Dock —— */
 .shell { display: flex; flex: 1; min-height: 0; overflow: hidden; }
@@ -160,6 +139,166 @@ pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-s
   width: 100%; max-height: 60vh; max-height: 60dvh; object-fit: contain;
   background: #000; border-radius: var(--radius); display: block;
 }
+.storage-bar {
+  height: 0.55rem; border-radius: var(--radius-pill);
+  background: var(--surface-2); border: 1px solid var(--border); overflow: hidden;
+}
+.storage-bar-fill {
+  height: 100%; background: var(--accent); border-radius: var(--radius-pill);
+  min-width: 0; transition: width 0.2s ease;
+}
+
+.cameras-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(15rem, 22rem);
+  gap: 1rem;
+  align-items: stretch;
+  margin-bottom: 1rem;
+}
+.cameras-side {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+  height: 100%;
+}
+.cameras-side > .card,
+.cameras-side > .ctrl-card {
+  flex: 1 1 0;
+}
+.cameras-hero .camera-player-fill {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  box-sizing: border-box;
+}
+.cameras-hero .camera-player-fill .camera-player-bar {
+  flex-shrink: 0;
+}
+.cameras-hero .camera-player-fill .preview {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 12rem;
+  max-height: none;
+  height: auto;
+  object-fit: contain;
+  background: #000;
+  border-radius: var(--radius);
+  display: block;
+}
+.camera-preview-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.camera-preview-wrap .preview {
+  width: 100%;
+}
+.cameras-hero .camera-player-fill .sub {
+  flex-shrink: 0;
+}
+.camera-transport {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.65rem;
+  flex-shrink: 0;
+}
+.camera-transport-play {
+  min-width: var(--touch);
+  padding: 0 0.75rem;
+  font-size: 0.95rem;
+}
+.camera-seek {
+  flex: 1 1 auto;
+  min-width: 0;
+  /* Tall hit area so the thumb sits centered on the track */
+  height: 1.25rem;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  accent-color: var(--accent);
+}
+.camera-seek::-webkit-slider-runnable-track {
+  height: 0.4rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: linear-gradient(
+    to right,
+    var(--accent) 0%,
+    var(--accent) var(--progress, 0%),
+    var(--surface-2) var(--progress, 0%),
+    var(--surface-2) 100%
+  );
+}
+.camera-seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 1rem;
+  height: 1rem;
+  /* Center thumb on track: (trackHeight - thumbHeight) / 2 */
+  margin-top: calc((0.4rem - 1rem) / 2);
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--text);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+.camera-seek::-moz-range-track {
+  height: 0.4rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.camera-seek::-moz-range-progress {
+  height: 0.4rem;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+.camera-seek::-moz-range-thumb {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--text);
+  cursor: pointer;
+}
+.cameras-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  align-items: stretch;
+}
+@media (max-aspect-ratio: 4/3), (orientation: portrait) {
+  .cameras-hero {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+  .cameras-side {
+    height: auto;
+  }
+  .cameras-side > .card,
+  .cameras-side > .ctrl-card {
+    flex: 0 0 auto;
+  }
+  .cameras-hero .camera-player-fill {
+    height: auto;
+  }
+  .cameras-hero .camera-player-fill .preview {
+    flex: 0 0 auto;
+    max-height: min(40vh, 22rem);
+    min-height: 0;
+  }
+  .cameras-meta { grid-template-columns: 1fr; }
+}
 
 .panel, .card {
   background: var(--surface);
@@ -246,7 +385,6 @@ pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-s
     --nav-label: 0.85rem;
   }
   .nav-item { flex: 0 0 auto; max-height: none; min-height: 1.75rem; }
-  .status-bar { padding: 0.35rem 0.9rem; }
 }
 
 /* ~4:3 and squarer landscapes: fewer columns, slightly tighter cards */

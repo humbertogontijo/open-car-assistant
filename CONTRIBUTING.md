@@ -25,6 +25,8 @@ export OCA_HOST=CAR_IP   # or pass -H every time
 ./tools/oca-setup -i antora1000 -H CAR_IP setup
 ```
 
+`oca-setup` force-stops the app, **pushes** the APK, then runs `pm install` on-device. Avoid plain `adb install` over wireless ADB on Antora — streamed install often hangs at “Performing Streamed Install” and drops the device offline (worse when DVR holds cameras open).
+
 See [README.md](README.md) and [docs/safety.md](docs/safety.md). Default install is unprivileged `/data`. Optional priv-app (`setup --privileged`) is only for formal vendor/HVAC grants on hardware you own.
 
 ## Adding a platform integration

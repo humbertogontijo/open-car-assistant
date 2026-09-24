@@ -1,0 +1,262 @@
+package cc.opencar.assistant.feature.dvr
+
+import android.graphics.SurfaceTexture
+import android.media.MediaCodec
+import android.media.MediaFormat
+import android.media.MediaMuxer
+import android.util.Log
+import java.io.File
+import java.nio.ByteBuffer
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
+
+/**
+ * Shared H.264 pipeline: camera OES → GLES mosaic → HW [MediaCodec] Surface.
+ * Live: minimal fMP4 / HLS. DVR: [MediaMuxer] MP4.
+ */
+class SharedH264Pipeline(
+    private val width: Int,
+    private val height: Int,
+    private val fps: Int,
+) {
+    private val encoder = MosaicH264Encoder(width, height, fps = fps)
+    private val fmp4 = Fmp4LiveMuxer(width, height).also { it.setFps(fps) }
+    private val gl = MosaicGlComposer(width, height)
+    private val running = AtomicBoolean(false)
+
+    private val muxerLock = Any()
+    private var dvrMuxer: MediaMuxer? = null
+    private var dvrTrack = -1
+    private var dvrStarted = false
+    private var activeMp4: File? = null
+    private val bytesWritten = AtomicLong(0)
+    private var liveParamsSet = false
+
+    private var glJob: Future<*>? = null
+    private val glExec = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "oca-h264-gl").apply { isDaemon = true }
+    }
+    @Volatile private var cameraTextures: List<SurfaceTexture> = emptyList()
+    var lastError: String? = null
+        private set
+
+    fun isRunning(): Boolean = running.get()
+    fun fmp4Init(): ByteArray? = fmp4.initSegment()
+    fun fmp4Fragment(seq: Long): ByteArray? = fmp4.fragment(seq)
+    fun hlsPlaylist(): String? = fmp4.hlsPlaylist()
+    fun hlsPlaylistBlocking(msn: Long?, timeoutMs: Long = 3_000L): String? =
+        fmp4.hlsPlaylistBlocking(msn, timeoutMs)
+    fun activeFile(): File? = activeMp4
+    fun bytesWritten(): Long = bytesWritten.get()
+
+    fun start(
+        tileCount: Int,
+        rebind: (List<SurfaceTexture>) -> Boolean,
+    ): Boolean {
+        if (running.get()) return true
+        if (tileCount <= 0) {
+            lastError = "no cameras"
+            return false
+        }
+        if (!encoder.start()) {
+            lastError = encoder.lastError ?: "encoder failed"
+            return false
+        }
+        val surface = encoder.inputSurface()
+        if (surface == null || !gl.init(surface)) {
+            lastError = gl.lastError ?: "GL init failed"
+            encoder.stop()
+            return false
+        }
+        encoder.listener = object : MosaicH264Encoder.Listener {
+            override fun onAccessUnit(unit: MosaicH264Encoder.AccessUnit) {
+                writeSamples(unit)
+            }
+
+            override fun onError(message: String) {
+                lastError = message
+            }
+        }
+        running.set(true)
+
+        val intervalMs = (1000L / fps.coerceIn(1, 30)).coerceAtLeast(66L)
+        val attached = AtomicBoolean(false)
+        val attachError = AtomicReference<String?>(null)
+        val latch = CountDownLatch(1)
+        glJob = glExec.submit {
+            var frames = 0
+            try {
+                val textures = gl.createBoundTextures(tileCount)
+                if (!rebind(textures)) {
+                    attachError.set("camera rebind failed")
+                    textures.forEach { runCatching { it.release() } }
+                    latch.countDown()
+                    return@submit
+                }
+                cameraTextures = textures
+                attached.set(true)
+                latch.countDown()
+                Thread.sleep(120)
+                while (running.get()) {
+                    if (gl.drawFrame(textures, tileCount)) {
+                        encoder.onGlFramePresented()
+                        encoder.drain(timeoutUs = 20_000L)
+                        frames++
+                        if (frames == 1 || frames == 15) {
+                            Log.i(TAG, "GL frame=$frames hasInit=${fmp4.initSegment() != null}")
+                        }
+                    } else {
+                        lastError = gl.lastError
+                        Log.w(TAG, "drawFrame failed: $lastError")
+                    }
+                    Thread.sleep(intervalMs)
+                }
+            } catch (_: InterruptedException) {
+                latch.countDown()
+            } catch (t: Throwable) {
+                attachError.set(t.message)
+                lastError = t.message
+                Log.e(TAG, "GL loop failed", t)
+                latch.countDown()
+            }
+        }
+        latch.await(3, TimeUnit.SECONDS)
+        if (!attached.get()) {
+            lastError = attachError.get() ?: gl.lastError ?: "GL bind failed"
+            Log.e(TAG, "start failed: $lastError")
+            stop()
+            return false
+        }
+        lastError = null
+        Log.i(TAG, "H264 GL pipeline active ${width}x${height}@${fps} encoder=${encoder.codecName()}")
+        return true
+    }
+
+    fun openMp4(file: File): Boolean {
+        synchronized(muxerLock) {
+            closeDvrLocked()
+            return try {
+                dvrMuxer = MediaMuxer(file.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+                activeMp4 = file
+                dvrTrack = -1
+                dvrStarted = false
+                bytesWritten.set(0)
+                true
+            } catch (t: Throwable) {
+                lastError = t.message
+                Log.e(TAG, "openMp4 failed", t)
+                false
+            }
+        }
+    }
+
+    fun closeMp4(): File? = synchronized(muxerLock) { closeDvrLocked() }
+
+    private fun closeDvrLocked(): File? {
+        val file = activeMp4
+        runCatching {
+            if (dvrStarted) dvrMuxer?.stop()
+            dvrMuxer?.release()
+        }
+        dvrMuxer = null
+        dvrTrack = -1
+        dvrStarted = false
+        activeMp4 = null
+        return file
+    }
+
+    private fun writeSamples(unit: MosaicH264Encoder.AccessUnit) {
+        ensureLiveParams()
+        if (unit.isConfig) return
+        synchronized(muxerLock) {
+            writeDvrLocked(unit)
+            fmp4.onSample(unit.data, unit.isKeyFrame)
+        }
+    }
+
+    private fun ensureLiveParams() {
+        if (liveParamsSet) return
+        val s0 = encoder.csd0()
+        val s1 = encoder.csd1()
+        if (s0 != null && s1 != null) {
+            fmp4.setParameterSets(s0, s1)
+            liveParamsSet = fmp4.initSegment() != null
+        }
+    }
+
+    private fun writeDvrLocked(unit: MosaicH264Encoder.AccessUnit) {
+        val m = dvrMuxer ?: return
+        if (encoder.csd0() == null && encoder.spsPps() == null) return
+        try {
+            if (!dvrStarted) {
+                dvrTrack = m.addTrack(videoFormat())
+                m.start()
+                dvrStarted = true
+            }
+            val info = MediaCodec.BufferInfo()
+            info.offset = 0
+            info.size = unit.data.size
+            info.presentationTimeUs = unit.ptsUs
+            info.flags = if (unit.isKeyFrame) MediaCodec.BUFFER_FLAG_KEY_FRAME else 0
+            m.writeSampleData(dvrTrack, ByteBuffer.wrap(unit.data), info)
+            bytesWritten.addAndGet(unit.data.size.toLong())
+        } catch (t: Throwable) {
+            lastError = t.message
+            Log.w(TAG, "dvr muxer: ${t.message}")
+        }
+    }
+
+    private fun videoFormat(): MediaFormat {
+        val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height)
+        val s0 = encoder.csd0()
+        val s1 = encoder.csd1()
+        if (s0 != null) {
+            format.setByteBuffer("csd-0", ByteBuffer.wrap(s0))
+            if (s1 != null) format.setByteBuffer("csd-1", ByteBuffer.wrap(s1))
+        } else {
+            val csd = encoder.spsPps()
+            if (csd != null) format.setByteBuffer("csd-0", ByteBuffer.wrap(csd))
+        }
+        return format
+    }
+
+    fun stop() {
+        running.set(false)
+        glJob?.cancel(true)
+        try {
+            glExec.submit {
+                cameraTextures = emptyList()
+                gl.release()
+            }.get(1, TimeUnit.SECONDS)
+        } catch (_: Throwable) {
+            runCatching { gl.release() }
+            cameraTextures = emptyList()
+        }
+        glJob = null
+        synchronized(muxerLock) { closeDvrLocked() }
+        encoder.listener = null
+        encoder.stop()
+        fmp4.clear()
+        liveParamsSet = false
+    }
+
+    fun status(): Map<String, Any?> = mapOf(
+        "running" to running.get(),
+        "mode" to if (running.get()) "h264-gl" else "off",
+        "gpu" to running.get(),
+        "encoder" to encoder.codecName(),
+        "hasInit" to (fmp4.initSegment() != null),
+        "activeMp4" to activeMp4?.name,
+        "bytesWritten" to bytesWritten.get(),
+        "lastError" to (lastError ?: encoder.lastError ?: gl.lastError),
+    )
+
+    companion object {
+        private const val TAG = "OcaH264Pipe"
+    }
+}

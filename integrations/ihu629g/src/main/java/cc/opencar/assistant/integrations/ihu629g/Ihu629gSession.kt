@@ -5,6 +5,7 @@ import android.hardware.camera2.CameraManager
 import android.util.Log
 import cc.opencar.assistant.api.CameraSource
 import cc.opencar.assistant.api.CatalogEntry
+import cc.opencar.assistant.api.DvrStreamConfig
 import cc.opencar.assistant.api.PlatformVariant
 import cc.opencar.assistant.api.PropertyValue
 import cc.opencar.assistant.api.ReadOutcome
@@ -134,6 +135,8 @@ class Ihu629gSession(
             emptyList()
         }
     }
+
+    override fun dvrStreamConfig(): DvrStreamConfig = platform.dvr
 
     override fun close() {
         pollJob?.cancel()

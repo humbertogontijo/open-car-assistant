@@ -152,12 +152,68 @@ export async function runPref(pref, next, extra) {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: "id=" + encodeURIComponent(next),
     });
-    if (state.status && state.status.dvr) {
-      state.status.dvr.storageId = next;
+    try {
+      const s = await api("/api/status");
+      patch({ status: s });
+    } catch (e) {
+      if (state.status && state.status.dvr) {
+        state.status.dvr.storageId = next;
+      }
+      notify();
     }
     const { loadRecordings, stopCameraLive } = await import("./sections/cameras.js");
     await loadRecordings();
     await stopCameraLive();
+    return;
+  }
+  if (pref === "cam-mode") {
+    const storage =
+      (state.status && state.status.dvr && state.status.dvr.storageId) || "";
+    await api("/api/dvr/mode", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body:
+        "mode=" +
+        encodeURIComponent(next) +
+        "&storage=" +
+        encodeURIComponent(storage || ""),
+    });
+    try {
+      const s = await api("/api/status");
+      patch({ status: s });
+    } catch (e) {
+      notify();
+    }
+    const { loadRecordings } = await import("./sections/cameras.js");
+    await loadRecordings();
+    return;
+  }
+  if (pref === "cam-retention-size") {
+    await api("/api/dvr/policy", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "maxTotalMb=" + encodeURIComponent(next),
+    });
+    try {
+      const s = await api("/api/status");
+      patch({ status: s });
+    } catch (e) {
+      notify();
+    }
+    return;
+  }
+  if (pref === "cam-retention-age") {
+    await api("/api/dvr/policy", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "maxAgeDays=" + encodeURIComponent(next),
+    });
+    try {
+      const s = await api("/api/status");
+      patch({ status: s });
+    } catch (e) {
+      notify();
+    }
     return;
   }
   if (pref === "hist-range") {
@@ -172,10 +228,18 @@ export async function runPref(pref, next, extra) {
     return;
   }
   if (pref === "cam-rec") {
+    // Legacy binary toggle → segment on / off
     const storage =
       (state.status && state.status.dvr && state.status.dvr.storageId) || "";
-    await api("/api/dvr/toggle?storage=" + encodeURIComponent(storage || ""), {
+    const mode = next === "1" ? "segment" : "off";
+    await api("/api/dvr/mode", {
       method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body:
+        "mode=" +
+        encodeURIComponent(mode) +
+        "&storage=" +
+        encodeURIComponent(storage || ""),
     });
     try {
       const s = await api("/api/status");

@@ -12,7 +12,7 @@ import {
   ensureStoreLoaded,
 } from "./sections/index.js";
 import { loadShortcuts } from "./sections/shortcuts.js";
-import { shouldShowSetup, renderSetupOverlay, renderStatusBar } from "./ui/setup.js";
+import { shouldShowSetup, renderSetupOverlay } from "./ui/setup.js";
 import { setTheme } from "./theme.js";
 import { loadI18n } from "./i18n.js";
 import { loadIcons, mountNavIcons } from "./icons.js";
@@ -45,7 +45,6 @@ function paint() {
   const prevProbeScroll = probeScrollEl ? probeScrollEl.scrollTop : 0;
 
   litRender(sectionView(state.section), main);
-  renderStatusBar();
   renderSetupOverlay();
   mountNavIcons();
   updateNavActive(state.section);
@@ -54,9 +53,10 @@ function paint() {
 
   if (state.section === "cameras" || state.section === "dvr") {
     if (state.cameraPlayerMode !== "recording") {
-      startCameraLive();
+      Promise.resolve(startCameraLive()).then(function () {
+        return applyCameraPlayerSrc();
+      });
     }
-    applyCameraPlayerSrc();
   } else if (state.cameraPreviewActive || state.cameraPlayerMode === "recording") {
     stopCameraLive();
   }
@@ -286,7 +286,6 @@ async function softRefresh() {
     const pair = await Promise.all([api("/api/entities"), api("/api/controls")]);
     state.entities = pair[0];
     state.controls = pair[1];
-    renderStatusBar();
     if (shouldSkipSoftRender()) return;
     // Remember scroll before notify so paint can restore within-section position.
     const main = $("main");

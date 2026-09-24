@@ -164,6 +164,12 @@ class AssistantRuntime(private val app: OcaApp) {
         // Manifest wake (FlymeWakeReceiver / BootReceiver) may have arrived while we
         // were still matching — flush now that shortcuts exist.
         flushPendingScreen()
+        // If DVR mode is enabled and we are already awake (no queued edge), start now.
+        scope.launch(Dispatchers.IO) {
+            if (dvr?.mode() == DvrController.MODE_DVR) {
+                dvr?.onVehicleWake("runtime_ready")
+            }
+        }
 
         web = OcaWebServer(
             context = app,
@@ -202,6 +208,7 @@ class AssistantRuntime(private val app: OcaApp) {
         if (s != null) {
             s.onScreenOn(source)
             scope.launch(Dispatchers.IO) { memory?.reapplyOnWake() }
+            scope.launch(Dispatchers.IO) { dvr?.onVehicleWake(source) }
         } else {
             queuedScreen.set(QueuedScreen("on", source))
             PendingWake.persist(app, "on", source)
@@ -214,6 +221,7 @@ class AssistantRuntime(private val app: OcaApp) {
         val s = shortcuts
         if (s != null) {
             s.onScreenOff(source)
+            scope.launch(Dispatchers.IO) { dvr?.onVehicleSleep(source) }
         } else {
             queuedScreen.set(QueuedScreen("off", source))
             PendingWake.persist(app, "off", source)
@@ -242,8 +250,12 @@ class AssistantRuntime(private val app: OcaApp) {
             "on" -> {
                 shortcuts?.onScreenOn(source)
                 scope.launch(Dispatchers.IO) { memory?.reapplyOnWake() }
+                scope.launch(Dispatchers.IO) { dvr?.onVehicleWake(source) }
             }
-            "off" -> shortcuts?.onScreenOff(source)
+            "off" -> {
+                shortcuts?.onScreenOff(source)
+                scope.launch(Dispatchers.IO) { dvr?.onVehicleSleep(source) }
+            }
         }
     }
 

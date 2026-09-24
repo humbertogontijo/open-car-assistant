@@ -63,6 +63,9 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
                 "setup" to SetupStatus.snapshot(context, session, prefs),
                 "plugins" to deps.pluginDetailMaps(),
                 "dvr" to deps.dvr.status(),
+                "storage" to mapOf(
+                    "volumes" to deps.dvr.volumeStats(),
+                ),
                 "webPort" to port,
                 "theme" to (prefs.getString("theme", "dark") ?: "dark"),
                 "adb" to WirelessAdbController(context, debug).status(),

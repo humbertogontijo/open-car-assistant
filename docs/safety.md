@@ -66,7 +66,7 @@ Web UI setup (`/api/setup/actions/*`): request runtime permissions; elevate/host
 
 ### Camera note
 
-Camera2 `MediaRecorder` on Antora may deny third-party video sources — OCA DVR falls back to segmented `.seg` markers under app files so the pipeline still validates storage and timing.
+Live and DVR share one GPU path: camera `SurfaceTexture` → GLES mosaic → HW `MediaCodec` H.264. Live is HLS (CMAF); recordings are `MediaMuxer` `.mp4`. Legacy `.mjpeg` / `.seg` files remain readable if present.
 
 ## Multi-app VHAL writers
 
@@ -74,4 +74,14 @@ Prefer a single writer for regen / drive mode / ADAS toggles when other apps als
 
 ## Parking Comfort / DVR
 
-Live DVR runs as part of the foreground `AssistantService` (`camera` FGS type). Stop recording when leaving the vehicle if Parking Comfort suspends cameras; segmented files land under app external files `dvr/`.
+DVR runs in the foreground `AssistantService` (`camera` FGS type). Modes:
+
+- **Off** — not writing (live mosaic preview still available in the Cameras UI)
+- **Segment** — one clip up to ~5 min / 100 MB, then auto-stop
+- **DVR** — continuous rotate at the same segment limit; **auto-starts on ACC/boot wake** and **stops on screen-off / vendor sleep** (Parking Comfort–safe). Retention prunes oldest unlocked clips by max total size and optional max age. Locked clips (`.lock` sidecar) are skipped by prune.
+
+Save targets: app files `dvr/`, internal Movies/`OpenCarAssistant`, and mounted SD/USB volumes under `OpenCarAssistant/dvr/`.
+
+**Shared mosaic stream:** GPU path only — camera `SurfaceTexture` → GLES → HW `MediaCodec` → H.264. Live UI: **HLS** (`/api/dvr/live.m3u8` + CMAF) via **hls.js** on one `<video>`. DVR: `MediaMuxer` `.mp4`. Status: `stream.format`, `h264.*`, `camera2Probe`.
+
+**Camera2 probe (Antora, measured):** all four ids `0–3` open concurrently with preview Surfaces (`allOpened=true`, hardware level `limited`, preview `640x480`). No `LOGICAL_MULTI_CAMERA` ids reported. Vendor mosaic Surface not found via Camera2 caps — appside merge still required.

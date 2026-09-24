@@ -2,6 +2,7 @@ package cc.opencar.assistant.integrations.common
 
 import android.content.Context
 import cc.opencar.assistant.api.Capability
+import cc.opencar.assistant.api.DvrStreamConfig
 import cc.opencar.assistant.api.PlatformVariant
 import cc.opencar.assistant.api.VehicleProperty
 import cc.opencar.assistant.api.WellKnownProperties
@@ -23,6 +24,7 @@ data class PlatformConfig(
     val bindings: Map<String, Binding>,
     val writableAllowlist: Set<Int>,
     val driveModeEnum: Map<Int, String> = emptyMap(),
+    val dvr: DvrStreamConfig = DvrStreamConfig.DEFAULT,
 ) {
     data class Binding(val nativeId: Int, val areaId: Int = 0, val functionId: Int? = null)
     data class VariantDef(
@@ -101,6 +103,15 @@ data class PlatformConfig(
                     enumMap[k.toInt()] = eObj.getString(k)
                 }
             }
+            val dvrObj = root.optJSONObject("dvr")
+            val dvr = if (dvrObj != null) {
+                DvrStreamConfig(
+                    fps = dvrObj.optInt("fps", DvrStreamConfig.DEFAULT.fps),
+                    mosaicHeight = dvrObj.optInt("mosaicHeight", DvrStreamConfig.DEFAULT.mosaicHeight),
+                )
+            } else {
+                DvrStreamConfig.DEFAULT
+            }
             return PlatformConfig(
                 id = root.getString("id"),
                 displayName = root.optString("displayName", root.getString("id")),
@@ -111,6 +122,7 @@ data class PlatformConfig(
                 bindings = bindings,
                 writableAllowlist = allow,
                 driveModeEnum = enumMap,
+                dvr = dvr,
             )
         }
 

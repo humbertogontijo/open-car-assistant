@@ -136,12 +136,16 @@ export function segmentToggle(opts) {
             type="button"
             class="toggle-seg ${active ? "active" : ""} ${pinned ? "pin-mark" : ""}"
             data-val=${o.value}
-            ?disabled=${locked}
+            ?disabled=${locked || !!o.disabled}
             aria-pressed=${active ? "true" : "false"}
-            title=${pinned ? pinTitle : nothing}
+            title=${o.disabled
+              ? o.title || t("cameras.storage.unavailable", "Not available")
+              : pinned
+                ? pinTitle
+                : nothing}
             @click=${function (ev) {
               ev.stopPropagation();
-              if (locked) return;
+              if (locked || o.disabled) return;
               opts.onSelect(o.value);
             }}
           >
@@ -217,12 +221,16 @@ export function choiceSelect(opts) {
               class="choice-opt ${active ? "active" : ""} ${pinned ? "pin-mark" : ""}"
               role="option"
               data-val=${o.value}
-              ?disabled=${locked}
+              ?disabled=${locked || !!o.disabled}
               aria-selected=${active ? "true" : "false"}
-              title=${pinned ? pinTitle : nothing}
+              title=${o.disabled
+                ? o.title || t("cameras.storage.unavailable", "Not available")
+                : pinned
+                  ? pinTitle
+                  : nothing}
               @click=${function (ev) {
                 ev.stopPropagation();
-                if (locked) return;
+                if (locked || o.disabled) return;
                 patch({ openChoiceId: null });
                 opts.onSelect(o.value);
               }}

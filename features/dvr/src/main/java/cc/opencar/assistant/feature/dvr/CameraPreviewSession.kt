@@ -3,152 +3,155 @@ package cc.opencar.assistant.feature.dvr
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.ImageFormat
-import android.graphics.Rect
 import android.graphics.SurfaceTexture
-import android.graphics.YuvImage
 import android.hardware.Camera
 import android.hardware.camera2.CameraManager
 import android.util.Log
-import java.io.ByteArrayOutputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * LAN preview capture. Antora exposes legacy Camera HAL devices — Camera1
- * preview callbacks are far more reliable there than Camera2+ImageReader alone.
+ * Camera1 preview capture for the GPU mosaic path.
  *
- * Frames are stored **per cameraId**. Only one Camera1 device can be open at a
- * time on most HUs; [snapshot] / round-robin open→grab→close still fills the
- * per-id map so callers never confuse one camera's JPEG with another's.
+ * Opens cameras concurrently onto [SurfaceTexture]s that [SharedH264Pipeline]
+ * later rebinds to GLES OES textures. No NV21 / JPEG path.
  */
 class CameraPreviewSession(private val context: Context) : AutoCloseable {
-    /** Latest JPEG for each camera that has successfully produced a frame. */
-    private val latestByCamera = ConcurrentHashMap<String, ByteArray>()
+    private data class Slot(
+        val id: String,
+        val index: Int,
+        var camera: Camera? = null,
+        var surfaceTexture: SurfaceTexture? = null,
+        var width: Int = 0,
+        var height: Int = 0,
+    )
+
+    private val slots = ConcurrentHashMap<String, Slot>()
     private val running = AtomicBoolean(false)
-    private var cameraId: String? = null
-    private var camera: Camera? = null
-    private var surfaceTexture: SurfaceTexture? = null
+    @Volatile private var mode: String = MODE_IDLE
     var lastError: String? = null
         private set
 
     fun isRunning(): Boolean = running.get()
-    fun activeCameraId(): String? = cameraId
+    fun captureMode(): String = mode
+    fun openCameraIds(): List<String> = slots.keys.toList()
+    fun surfaceTexture(cameraId: String): SurfaceTexture? = slots[cameraId]?.surfaceTexture
 
-    /** Frame for [cameraId], or the currently open camera if null. */
-    fun latestJpeg(cameraId: String? = null): ByteArray? {
-        val id = cameraId ?: this.cameraId ?: return null
-        return latestByCamera[id]
-    }
-
-    fun latestByCamera(): Map<String, ByteArray> = latestByCamera.toMap()
-
+    /**
+     * Open every id concurrently. Returns false if any open fails
+     * (all hardware released on failure).
+     */
     @Synchronized
-    fun start(preferredCameraId: String? = null): Boolean {
-        if (running.get() && (preferredCameraId == null || preferredCameraId == cameraId)) {
+    fun startAll(ids: List<String>): Boolean {
+        if (ids.isEmpty()) {
+            lastError = "No cameras"
+            return false
+        }
+        if (running.get() && mode == MODE_CONCURRENT && slots.keys.toSet() == ids.toSet()) {
             return true
         }
         stopHardware()
         val pmState = context.checkSelfPermission(Manifest.permission.CAMERA)
         Log.i(TAG, "CAMERA checkSelfPermission=$pmState (granted=${PackageManager.PERMISSION_GRANTED})")
-        val id = preferredCameraId ?: "0"
-        val camIndex = resolveCamera1Index(id)
+        for (id in ids) {
+            if (!openSlot(id)) {
+                val err = lastError ?: "open failed"
+                Log.w(TAG, "concurrent open failed at cam=$id ($err); releasing")
+                stopHardware()
+                lastError = "Concurrent open failed at $id: $err"
+                mode = MODE_IDLE
+                return false
+            }
+        }
+        running.set(true)
+        mode = MODE_CONCURRENT
+        lastError = null
+        Log.i(TAG, "concurrent cameras opened=${ids.size} ids=$ids")
+        return true
+    }
+
+    @Synchronized
+    fun stop() = stopHardware()
+
+    /**
+     * Swap each open camera's preview [SurfaceTexture] for ones already bound to
+     * GL OES texture ids (created on the GL thread).
+     */
+    @Synchronized
+    fun rebindPreviewTextures(orderedIds: List<String>, glTextures: List<SurfaceTexture>): Boolean {
+        if (glTextures.isEmpty() || orderedIds.isEmpty()) return false
         return try {
-            @Suppress("DEPRECATION")
-            val cam = Camera.open(camIndex)
-            camera = cam
-            val params = cam.parameters
-            val (pw, ph) = choosePreviewSize(params.supportedPreviewSizes)
-            params.setPreviewSize(pw, ph)
-            params.previewFormat = ImageFormat.NV21
-            runCatching { cam.parameters = params }
-            val st = SurfaceTexture(10 + camIndex)
-            st.setDefaultBufferSize(pw, ph)
-            surfaceTexture = st
-            cam.setPreviewTexture(st)
-            cameraId = id
-            running.set(true)
-            // Clear only this camera's slot so we wait for a fresh frame from
-            // *this* device, without wiping other cameras' cached tiles.
-            latestByCamera.remove(id)
-            cam.setPreviewCallback { data, _ ->
-                if (data == null) return@setPreviewCallback
-                if (!running.get() || cameraId != id) return@setPreviewCallback
-                runCatching {
-                    val yuv = YuvImage(data, ImageFormat.NV21, pw, ph, null)
-                    val out = ByteArrayOutputStream()
-                    yuv.compressToJpeg(Rect(0, 0, pw, ph), 70, out)
-                    latestByCamera[id] = out.toByteArray()
-                }
+            for ((i, id) in orderedIds.withIndex()) {
+                if (i >= glTextures.size) break
+                val slot = slots[id] ?: continue
+                val cam = slot.camera ?: continue
+                val st = glTextures[i]
+                runCatching { cam.stopPreview() }
+                val old = slot.surfaceTexture
+                st.setDefaultBufferSize(slot.width.coerceAtLeast(1), slot.height.coerceAtLeast(1))
+                cam.setPreviewTexture(st)
+                slot.surfaceTexture = st
+                runCatching { old?.release() }
+                cam.startPreview()
             }
-            cam.startPreview()
-            val deadline = System.currentTimeMillis() + 2500
-            while (latestByCamera[id] == null && System.currentTimeMillis() < deadline) {
-                Thread.sleep(40)
-            }
-            lastError = if (latestByCamera[id] == null) {
-                "Preview running but no frames yet (cam=$id idx=$camIndex ${pw}x${ph})"
-            } else {
-                null
-            }
-            Log.i(TAG, "Camera1 preview cam=$id idx=$camIndex ${pw}x${ph} frame=${latestByCamera[id]?.size}")
+            Log.i(TAG, "rebound ${glTextures.size} previews to GL OES textures")
             true
         } catch (t: Throwable) {
             lastError = t.message
-            Log.e(TAG, "preview start failed cam=$id idx=$camIndex", t)
-            stopHardware()
+            Log.e(TAG, "rebindPreviewTextures failed", t)
             false
         }
     }
 
-    @Synchronized
-    fun stop() {
-        stopHardware()
-    }
-
-    /** Release hardware but keep per-camera JPEG cache for mosaic tiles. */
-    fun stopHardwareOnly() = stopHardware()
-
-    fun clearFrames() {
-        latestByCamera.clear()
-    }
-
-    fun snapshot(preferredCameraId: String? = null): ByteArray? {
-        val id = preferredCameraId ?: "0"
-        if (!start(id)) return null
-        val deadline = System.currentTimeMillis() + 2000
-        while (System.currentTimeMillis() < deadline) {
-            latestByCamera[id]?.let { return it }
-            Thread.sleep(40)
-        }
-        return latestByCamera[id]
-    }
-
     fun status(): Map<String, Any?> = mapOf(
         "previewRunning" to running.get(),
-        "previewCameraId" to cameraId,
-        "cachedCameras" to latestByCamera.keys.toList(),
-        "hasFrame" to (latestJpeg() != null),
-        "frameBytes" to (latestJpeg()?.size),
+        "captureMode" to mode,
+        "openCameras" to slots.keys.toList(),
         "lastError" to lastError,
     )
 
-    override fun close() {
-        stopHardware()
-        latestByCamera.clear()
+    override fun close() = stopHardware()
+
+    private fun openSlot(id: String): Boolean {
+        val camIndex = resolveCamera1Index(id)
+        return try {
+            @Suppress("DEPRECATION")
+            val cam = Camera.open(camIndex)
+            val params = cam.parameters
+            val (pw, ph) = choosePreviewSize(params.supportedPreviewSizes)
+            params.setPreviewSize(pw, ph)
+            runCatching { cam.parameters = params }
+            val st = if (android.os.Build.VERSION.SDK_INT >= 26) {
+                SurfaceTexture(/* singleBuffered = */ false)
+            } else {
+                SurfaceTexture(100 + camIndex)
+            }
+            st.setDefaultBufferSize(pw, ph)
+            cam.setPreviewTexture(st)
+            slots[id] = Slot(id, camIndex, cam, st, pw, ph)
+            cam.startPreview()
+            Log.i(TAG, "Camera1 open cam=$id idx=$camIndex ${pw}x${ph}")
+            true
+        } catch (t: Throwable) {
+            lastError = t.message
+            Log.e(TAG, "Camera1 open failed cam=$id idx=$camIndex", t)
+            false
+        }
     }
 
     private fun stopHardware() {
         running.set(false)
-        runCatching {
-            camera?.setPreviewCallback(null)
-            camera?.stopPreview()
-            camera?.release()
+        mode = MODE_IDLE
+        for ((_, slot) in slots) {
+            runCatching {
+                slot.camera?.stopPreview()
+                slot.camera?.release()
+            }
+            runCatching { slot.surfaceTexture?.release() }
+            slot.camera = null
+            slot.surfaceTexture = null
         }
-        camera = null
-        runCatching { surfaceTexture?.release() }
-        surfaceTexture = null
-        cameraId = null
+        slots.clear()
     }
 
     @Suppress("DEPRECATION")
@@ -156,17 +159,12 @@ class CameraPreviewSession(private val context: Context) : AutoCloseable {
         if (sizes.isNullOrEmpty()) return 640 to 480
         val best = sizes
             .filter { it.width <= 1280 && it.height <= 720 }
-            .minByOrNull { kotlin.math.abs(it.width * it.height - 640 * 480) }
+            .minByOrNull { kotlin.math.abs(it.width * it.height - 640 * 360) }
             ?: sizes.minByOrNull { it.width * it.height }
             ?: sizes.first()
         return best.width to best.height
     }
 
-    /**
-     * Map a Camera2-style id (or Camera1 index string) onto Camera.open(index).
-     * Prefer an exact integer id in range; otherwise use the id's position in
-     * CameraManager.cameraIdList so non-numeric HAL ids still round-robin.
-     */
     @Suppress("DEPRECATION")
     private fun resolveCamera1Index(id: String): Int {
         val n = Camera.getNumberOfCameras().coerceAtLeast(1)
@@ -182,5 +180,7 @@ class CameraPreviewSession(private val context: Context) : AutoCloseable {
 
     companion object {
         private const val TAG = "OcaCamPreview"
+        private const val MODE_IDLE = "idle"
+        private const val MODE_CONCURRENT = "concurrent"
     }
 }

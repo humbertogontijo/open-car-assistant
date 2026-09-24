@@ -1,43 +1,38 @@
 package cc.opencar.assistant.feature.dvr
 
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.Rect
 import android.util.Log
-import java.io.ByteArrayOutputStream
-import java.util.concurrent.Executors
-import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicReference
 
 /**
- * Round-robins Camera1 devices (most HUs allow only one open at a time) and
- * paints the latest tile frames into a single mosaic JPEG for preview/record.
+ * Owns concurrent camera opens for the shared mosaic. Composition and encode
+ * live in [SharedH264Pipeline] (GLES → MediaCodec).
  */
 class MosaicPreviewSession(
-    private val grabber: (cameraId: String) -> ByteArray?,
+    private val cameras: CameraPreviewSession,
 ) {
-    private val tiles = AtomicReference<Map<String, ByteArray>>(emptyMap())
-    private val mosaicJpeg = AtomicReference<ByteArray?>(null)
     private val running = AtomicBoolean(false)
-    private var cameraIds: List<String> = emptyList()
-    private var job: Future<*>? = null
-    private val exec = Executors.newSingleThreadExecutor()
+    private var orderedIds: List<String> = emptyList()
+    @Volatile private var captureMode: String = "idle"
+    @Volatile var targetHeight: Int = DEFAULT_HEIGHT
+    @Volatile var targetFps: Int = DEFAULT_FPS
+    @Volatile var onStopped: (() -> Unit)? = null
     var lastError: String? = null
         private set
 
     fun isRunning(): Boolean = running.get()
+    fun cameraIds(): List<String> = orderedIds
+    fun camerasSession(): CameraPreviewSession = cameras
+    fun captureMode(): String = captureMode
+    fun mosaicWidth(): Int = normalizeHeight(targetHeight) * 16 / 9
+    fun mosaicHeight(): Int = normalizeHeight(targetHeight)
 
-    /** Single unified mosaic JPEG of all cameras. */
-    fun latestJpeg(): ByteArray? = mosaicJpeg.get()
+    fun frameIntervalMs(): Long =
+        (1000L / targetFps.coerceIn(MIN_FPS, MAX_FPS)).coerceAtLeast(66L)
 
-    /** Individual tile for one camera (last successful grab). */
-    fun latestTile(cameraId: String): ByteArray? = tiles.get()[cameraId]
-
-    fun latestTiles(): Map<String, ByteArray> = tiles.get()
+    fun applyQuality(fps: Int, height: Int) {
+        targetFps = fps.coerceIn(MIN_FPS, MAX_FPS)
+        targetHeight = normalizeHeight(height)
+    }
 
     @Synchronized
     fun start(ids: List<String>): Boolean {
@@ -45,41 +40,19 @@ class MosaicPreviewSession(
             lastError = "No cameras"
             return false
         }
-        if (running.get() && cameraIds == ids) return true
+        if (running.get() && orderedIds == ids) return true
         stopInternal()
-        cameraIds = ids
+        orderedIds = ids
+        if (!cameras.startAll(ids)) {
+            lastError = cameras.lastError ?: "Concurrent open failed"
+            orderedIds = emptyList()
+            return false
+        }
+        captureMode = "concurrent"
         running.set(true)
-        job = exec.submit {
-            var idx = 0
-            while (running.get()) {
-                val id = cameraIds[idx % cameraIds.size]
-                idx++
-                try {
-                    val frame = grabber(id)
-                    if (frame != null) {
-                        val next = tiles.get().toMutableMap()
-                        next[id] = frame
-                        tiles.set(next)
-                        mosaicJpeg.set(compose(next, cameraIds))
-                        lastError = null
-                    }
-                } catch (t: Throwable) {
-                    lastError = t.message
-                    Log.w(TAG, "tile grab $id failed", t)
-                }
-                try {
-                    Thread.sleep(if (cameraIds.size <= 1) 80 else 220)
-                } catch (_: InterruptedException) {
-                    break
-                }
-            }
-        }
-        // Wait briefly for first mosaic
-        val deadline = System.currentTimeMillis() + 4000
-        while (mosaicJpeg.get() == null && System.currentTimeMillis() < deadline && running.get()) {
-            Thread.sleep(50)
-        }
-        return mosaicJpeg.get() != null || running.get()
+        lastError = null
+        Log.i(TAG, "mosaic cameras ready (${ids.size})")
+        return true
     }
 
     @Synchronized
@@ -88,56 +61,36 @@ class MosaicPreviewSession(
     fun status(): Map<String, Any?> = mapOf(
         "previewRunning" to running.get(),
         "merged" to true,
-        "cameras" to cameraIds,
-        "tiles" to tiles.get().keys.toList(),
-        "hasFrame" to (mosaicJpeg.get() != null),
-        "frameBytes" to mosaicJpeg.get()?.size,
+        "captureMode" to captureMode,
+        "cameras" to orderedIds,
+        "size" to "${mosaicWidth()}x${mosaicHeight()}",
+        "fps" to targetFps,
+        "mosaicHeight" to targetHeight,
+        "frameIntervalMs" to frameIntervalMs(),
+        "format" to "h264",
         "lastError" to lastError,
+        "camera" to cameras.status(),
     )
 
     private fun stopInternal() {
         running.set(false)
-        job?.cancel(true)
-        job = null
-        mosaicJpeg.set(null)
-        tiles.set(emptyMap())
-        cameraIds = emptyList()
-    }
-
-    private fun compose(frames: Map<String, ByteArray>, order: List<String>): ByteArray {
-        val n = order.size.coerceAtLeast(1)
-        val cols = if (n <= 1) 1 else if (n <= 4) 2 else 3
-        val rows = (n + cols - 1) / cols
-        val cellW = 640
-        val cellH = 360
-        val bmp = Bitmap.createBitmap(cols * cellW, rows * cellH, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bmp)
-        canvas.drawColor(Color.BLACK)
-        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            textSize = 28f
-        }
-        order.forEachIndexed { i, id ->
-            val col = i % cols
-            val row = i / cols
-            val dst = Rect(col * cellW, row * cellH, (col + 1) * cellW, (row + 1) * cellH)
-            val jpeg = frames[id]
-            if (jpeg != null) {
-                val tile = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size)
-                if (tile != null) {
-                    canvas.drawBitmap(tile, null, dst, null)
-                    tile.recycle()
-                }
-            }
-            canvas.drawText(id, dst.left + 12f, dst.top + 36f, labelPaint)
-        }
-        val out = ByteArrayOutputStream()
-        bmp.compress(Bitmap.CompressFormat.JPEG, 70, out)
-        bmp.recycle()
-        return out.toByteArray()
+        onStopped?.invoke()
+        cameras.stop()
+        orderedIds = emptyList()
+        captureMode = "idle"
     }
 
     companion object {
         private const val TAG = "OcaMosaic"
+        const val DEFAULT_FPS = 5
+        const val DEFAULT_HEIGHT = 720
+        const val MIN_FPS = 1
+        const val MAX_FPS = 15
+
+        fun normalizeHeight(h: Int): Int = when {
+            h <= 480 -> 480
+            h <= 720 -> 720
+            else -> 1080
+        }
     }
 }

@@ -8,6 +8,10 @@
     "ADAS_TOGGLES", "LOCK_PROXIMITY", "WINDOWS_SUNROOF", "CAMERAS_DVR",
     "GEAR_EVENTS", "IGNITION_EVENTS"
   ],
+  "dvr": {
+    "fps": 5,
+    "mosaicHeight": 720
+  },
   "variants": [
     { "id": "phev", "label": "PHEV / EM-i", "extraCapabilities": ["HYBRID_ENERGY"], "detect": "fuel_or_hybrid_soc" },
     { "id": "bev", "label": "Battery electric", "extraCapabilities": [] },

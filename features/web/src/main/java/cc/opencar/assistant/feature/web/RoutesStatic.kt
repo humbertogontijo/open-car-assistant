@@ -24,9 +24,10 @@ internal fun Routing.registerStaticRoutes(deps: OcaWebDeps) {
         val asset = "web/$rel"
         val type = when {
             rel.endsWith(".css") -> ContentType.Text.CSS
-            rel.endsWith(".js") -> ContentType.Text.JavaScript
+            rel.endsWith(".js") || rel.endsWith(".mjs") -> ContentType.Text.JavaScript
             rel.endsWith(".html") -> ContentType.Text.Html
             rel.endsWith(".svg") -> ContentType.parse("image/svg+xml")
+            rel.endsWith(".m3u8") -> ContentType.parse("application/vnd.apple.mpegurl")
             else -> ContentType.Application.OctetStream
         }
         val bytes = try {

@@ -1,6 +1,6 @@
 import { html, render, nothing } from "../lit.js";
-import { api, $, fmt } from "../api.js";
-import { state, patch, notify } from "../store.js";
+import { api, $ } from "../api.js";
+import { state, patch } from "../store.js";
 import { t } from "../i18n.js";
 
 export function shouldShowSetup(setup) {
@@ -168,41 +168,4 @@ export function renderSetupOverlay() {
     document.body.appendChild(host);
   }
   render(setupOverlayTemplate(), host);
-}
-
-export function renderStatusBar() {
-  const s = state.status || {};
-  const tel = s.telemetry || {};
-  const soc =
-    tel.evBatteryPercent != null
-      ? Math.round(tel.evBatteryPercent) + "%"
-      : tel.hybridSocPercent != null
-        ? Math.round(tel.hybridSocPercent) + "%"
-        : null;
-  const left =
-    (tel.model ? tel.model + " · " : "") +
-    "SOC " +
-    fmt(soc) +
-    " · " +
-    t("sensor.gear", "Gear") +
-    " " +
-    fmt(tel.gearLabel || tel.gear) +
-    " · " +
-    fmt(tel.speedKmh != null ? Number(tel.speedKmh).toFixed(0) + " km/h" : null) +
-    " · " +
-    fmt(tel.rangeKm != null ? Math.round(tel.rangeKm) + " km" : null);
-  const leftEl = $("statusLeft");
-  if (leftEl) leftEl.textContent = left;
-  const setup = state.setup || s.setup;
-  const ok = !!s.integration && (setup ? setup.hasBasicTelemetry : true);
-  const dot = document.querySelector("#statusRight .dot");
-  if (dot) {
-    dot.classList.remove("warn", "bad");
-    if (!ok) dot.classList.add("bad");
-  }
-  const conn = $("connLabel");
-  if (conn) {
-    conn.textContent = ok ? t("app.connected", "Conectado") : t("app.offline", "Offline");
-    if (s.remote) conn.textContent += " · Remoto";
-  }
 }
