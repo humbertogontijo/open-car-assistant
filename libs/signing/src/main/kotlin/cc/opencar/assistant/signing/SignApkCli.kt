@@ -75,9 +75,11 @@ private fun defaultCertFile(): File = findSibling("community.pem")
 
 private fun findSibling(name: String): File {
     val candidates = listOf(
+        File("libs/signing", name),
         File("signing", name),
         File(name),
         File("../signing", name),
+        File("../../libs/signing", name),
     )
     // Also resolve relative to this class's jar/module root when run via Gradle
     val fromProp = System.getProperty("oca.signing.dir")
@@ -86,5 +88,5 @@ private fun findSibling(name: String): File {
         if (f.isFile) return f
     }
     return candidates.firstOrNull { it.isFile }
-        ?: File("signing", name)
+        ?: File("libs/signing", name)
 }

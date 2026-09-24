@@ -25,7 +25,8 @@ Shared layers (not auto-registered as integrations):
 ```
 integrations/platform/common/   # AAOS plumbing: PlatformConfig, CarPropertyBridge, …
 integrations/platform/flyme/    # Flyme Auto family helpers
-support/                        # :oca-support — I18nBundle, LastKnownStore (product helpers)
+libs/support/                   # :oca-support — I18nBundle, LastKnownStore (product helpers)
+libs/api/                       # :integration-api — SPI
 ```
 
 ## Steps
@@ -40,11 +41,11 @@ support/                        # :oca-support — I18nBundle, LastKnownStore (p
 
 ## Internationalization
 
-Common strings live in `:oca-support` assets:
+Common strings live in `:oca-support` assets (`libs/support/`):
 
 ```
-i18n/common/en.json
-i18n/common/pt-BR.json
+libs/support/src/main/assets/i18n/common/en.json
+libs/support/src/main/assets/i18n/common/pt-BR.json
 ```
 
 Per-integration packs (path includes the id so APK asset merge does not collide):

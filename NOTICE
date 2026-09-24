@@ -4,7 +4,7 @@ Copyright contributors to Open Car Assistant.
 This product includes software developed by third parties.
 
 ---------------------------------------------------------------------------
-AOSP community testkey (signing/ and feature-install assets)
+AOSP community testkey (libs/signing/ and features/install assets)
 
 This repository ships the well-known Android Open Source Project (AOSP)
 "community" / testkey commonly trusted on unlocked / userdebug AAOS head
@@ -12,9 +12,9 @@ units. The private key material is already public as the standard AOSP
 community testkey; it is included here so clones build and resign without
 an extra download step.
 
-  Files: signing/community.pk8, signing/community.pem
-         (also under feature-install/src/main/assets/signing/;
-          :feature-install copyCommunityKeys keeps them in sync from signing/)
+  Files: libs/signing/community.pk8, libs/signing/community.pem
+         (also under features/install/src/main/assets/signing/;
+          :feature-install copyCommunityKeys keeps them in sync from libs/signing/)
   Fingerprint historically noted as: d7f1f224
   Subject: AOSP Android CN test certificate
 

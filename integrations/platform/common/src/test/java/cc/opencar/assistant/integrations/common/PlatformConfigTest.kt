@@ -61,7 +61,7 @@ class PlatformConfigTest {
 class I18nKeyParityTest {
     @Test
     fun commonEnAndPtBrShareSameStringKeys() {
-        val root = File("../../../support/src/main/assets/i18n/common")
+        val root = File("../../../libs/support/src/main/assets/i18n/common")
         val en = loadStringKeys(File(root, "en.json"))
         val pt = loadStringKeys(File(root, "pt-BR.json"))
         val missingInPt = en - pt

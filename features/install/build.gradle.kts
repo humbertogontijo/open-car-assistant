@@ -13,9 +13,12 @@ android {
     kotlinOptions { jvmTarget = "17" }
 }
 
-// Single source of truth: signing/community.* → packaged assets at build time
+// Single source of truth: libs/signing/community.* → packaged assets at build time
 val copyCommunityKeys by tasks.registering(Copy::class) {
-    from(rootProject.file("signing/community.pk8"), rootProject.file("signing/community.pem"))
+    from(
+        rootProject.file("libs/signing/community.pk8"),
+        rootProject.file("libs/signing/community.pem"),
+    )
     into(layout.projectDirectory.dir("src/main/assets/signing"))
 }
 

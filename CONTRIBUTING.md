@@ -16,7 +16,7 @@ From the repository root:
 ./gradlew :app:assembleDebug
 ```
 
-This compiles the app and integrations against `car-stubs`. Vehicle reads/writes need a real AAOS head unit (or a device with matching VHAL).
+This compiles the app and integrations against `libs/car-stubs`. Vehicle reads/writes need a real AAOS head unit (or a device with matching VHAL).
 
 ## Install on a head unit
 
@@ -33,11 +33,11 @@ Follow [docs/adding-an-integration.md](docs/adding-an-integration.md): add `inte
 
 ## Adding a plugin
 
-Follow [docs/plugins.md](docs/plugins.md): add `plugin-<id>/` implementing `OcaPlugin` plus a ServiceLoader entry. System UI and shortcuts pick it up automatically.
+Follow [docs/plugins.md](docs/plugins.md): add `plugins/<id>/` implementing `OcaPlugin` plus a ServiceLoader entry. System UI and shortcuts pick it up automatically.
 
 ## Adding a first-party feature
 
-Shell `feature-*` modules are **curated** (not auto-discovered). Follow [docs/adding-a-feature.md](docs/adding-a-feature.md).
+Shell features under `features/` are **curated** (not auto-discovered). Follow [docs/adding-a-feature.md](docs/adding-a-feature.md).
 
 ## Pull requests
 

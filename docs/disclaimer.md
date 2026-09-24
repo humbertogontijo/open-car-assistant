@@ -29,7 +29,7 @@ OEM firmware, platform signing keys, or closed-source binaries.
 ## No OEM platform keys
 
 This repository ships only the well-known AOSP **community testkey** (see
-[NOTICE](../NOTICE) and [signing/README.md](../signing/README.md)). OEM /
+[NOTICE](../NOTICE) and [libs/signing/README.md](../libs/signing/README.md)). OEM /
 platform signing keys are **not** included and must never be committed.
 
 ## Safety

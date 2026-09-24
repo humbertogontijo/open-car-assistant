@@ -1,6 +1,6 @@
 # App store catalog
 
-The in-app store reads [`feature-install/src/main/assets/store/extras.json`](../feature-install/src/main/assets/store/extras.json).
+The in-app store reads [`features/install/src/main/assets/store/extras.json`](../features/install/src/main/assets/store/extras.json).
 
 Default entries:
 

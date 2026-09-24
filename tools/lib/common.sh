@@ -84,8 +84,8 @@ oca_sign() {
     gradlew -q :signing:signApk \
       "-Pin=$debug_apk" \
       "-Pout=$signed_apk" \
-      "-Pkey=$ROOT/signing/community.pk8" \
-      "-Pcert=$ROOT/signing/community.pem"
+      "-Pkey=$ROOT/libs/signing/community.pk8" \
+      "-Pcert=$ROOT/libs/signing/community.pem"
   ) || die "Gradle signApk failed"
   [[ -f "$signed_apk" ]] || die "Signed APK not produced: $signed_apk"
   ok "Signed $signed_apk"

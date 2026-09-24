@@ -28,15 +28,15 @@ jobs:
           set -euo pipefail
           antora="$(cat integrations/antora1000/src/main/resources/META-INF/services/cc.opencar.assistant.api.VehicleIntegration)"
           ihu="$(cat integrations/ihu629g/src/main/resources/META-INF/services/cc.opencar.assistant.api.VehicleIntegration)"
-          ha="$(cat plugin-homeassistant/src/main/resources/META-INF/services/cc.opencar.assistant.api.plugin.OcaPlugin)"
+          ha="$(cat plugins/homeassistant/src/main/resources/META-INF/services/cc.opencar.assistant.api.plugin.OcaPlugin)"
           echo "antora1000 -> $antora"
           echo "ihu629g -> $ihu"
           echo "homeassistant -> $ha"
           echo "$antora" | grep -q 'Antora1000Integration'
           echo "$ihu" | grep -q 'Ihu629gIntegration'
           echo "$ha" | grep -q 'HomeAssistantPlugin'
-          test -f signing/community.pem
-          test -f signing/community.pk8
+          test -f libs/signing/community.pem
+          test -f libs/signing/community.pk8
           test -f NOTICE
           test -f LICENSE
           test -f SECURITY.md

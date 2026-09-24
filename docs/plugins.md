@@ -2,9 +2,9 @@
 
 OCA distinguishes **vehicle integrations** (HU / SoC platforms) from **plugins** (external bridges such as Home Assistant).
 
-Plugins are **compile-time** Gradle modules under `plugin-<id>/`. Folders are auto-included and wired into `:app`. Runtime discovery uses Java ServiceLoader (`META-INF/services`). There is no dynamic ClassLoader / store-loaded plugin APK path.
+Plugins are **compile-time** Gradle modules under `plugins/<id>/`. Folders are auto-included as `:plugin-<id>` and wired into `:app`. Runtime discovery uses Java ServiceLoader (`META-INF/services`). There is no dynamic ClassLoader / store-loaded plugin APK path.
 
-Collaborator work stays under `plugin-<id>/` — no edits to `AssistantRuntime`, `feature-web`, or Gradle include lists.
+Collaborator work stays under `plugins/<id>/` — no edits to `AssistantRuntime`, `features/web`, or Gradle include lists.
 
 ## SPI (`:integration-api`)
 
@@ -66,16 +66,16 @@ Uses **REST + WebSocket** only (not MQTT). Works with:
 ## Adding a plugin
 
 ```
-plugin-<id>/
+plugins/<id>/
   build.gradle.kts                 # depend on :integration-api
   src/main/java/.../YourPlugin.kt  # implements OcaPlugin
   src/main/resources/META-INF/services/
     cc.opencar.assistant.api.plugin.OcaPlugin
 ```
 
-1. Create `plugin-<id>/` as above.
+1. Create `plugins/<id>/` as above.
 2. Implement `OcaPlugin` (+ optional shortcut handler/source + config schema).
 3. Register the FQCN in `META-INF/services/cc.opencar.assistant.api.plugin.OcaPlugin`.
 4. Never return secrets in `status()` / `configSnapshot()`.
 
-Gradle discovers the folder automatically. Shortcuts and the Plugins UI pick up contributions from the SPI.
+Gradle discovers the folder automatically as `:plugin-<id>`. Shortcuts and the Plugins UI pick up contributions from the SPI.

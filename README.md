@@ -15,7 +15,7 @@ Requires **JDK 17** and an **Android SDK** (`ANDROID_HOME`, or `sdk.dir` in a lo
 ./gradlew :app:assembleDebug
 ```
 
-This compiles against `car-stubs`. Live vehicle property reads/writes need a real AAOS head unit.
+This compiles against `libs/car-stubs`. Live vehicle property reads/writes need a real AAOS head unit.
 
 ## Install on a head unit (optional)
 
@@ -29,7 +29,7 @@ From a computer on the same LAN as an unlocked / userdebug HU you own:
 ./tools/oca-setup -i ihu629g -H CAR_IP setup
 ```
 
-This builds, signs with the [community testkey](signing/README.md), installs under **`/data`** (uninstallable), grants runtime car/camera permissions, and prints a permission report.
+This builds, signs with the [community testkey](libs/signing/README.md), installs under **`/data`** (uninstallable), grants runtime car/camera permissions, and prints a permission report.
 
 Optional later — formal `CAR_VENDOR_EXTENSION` / `CONTROL_CAR_CLIMATE` via priv-app (reboot required; not uninstallable from Settings):
 
@@ -50,8 +50,8 @@ Other commands: `connect` · `build` · `sign` · `install` · `grant` · `check
 | Goal | How | Locality |
 |------|-----|----------|
 | New **vehicle platform** | [docs/adding-an-integration.md](docs/adding-an-integration.md) — copy `integrations/<id>/`; use **ihu629g** as the simple reference | One folder tree (auto Gradle + ServiceLoader) |
-| New **external plugin** | [docs/plugins.md](docs/plugins.md) — `plugin-<id>/` + `OcaPlugin` | One folder tree (auto-discovered) |
-| New **shell feature** | [docs/adding-a-feature.md](docs/adding-a-feature.md) — curated `feature-*` | Multi-file (Gradle + `AssistantRuntime` + often web) |
+| New **external plugin** | [docs/plugins.md](docs/plugins.md) — `plugins/<id>/` + `OcaPlugin` | One folder tree (auto-discovered) |
+| New **shell feature** | [docs/adding-a-feature.md](docs/adding-a-feature.md) — curated `features/<id>/` | Multi-file (Gradle + `AssistantRuntime` + often web) |
 | Install / debug on HU | [docs/contributor-debug.md](docs/contributor-debug.md) — Lab tab + `oca-setup` | — |
 
 **Design:** integrations and plugins are plug-and-play. First-party features and the product control catalog are curated on purpose.

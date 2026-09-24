@@ -70,12 +70,12 @@ dependencies {
             implementation(project(":integrations:${dir.name}"))
         }
 
-    // Auto-wire plugins (plugin-*/)
-    rootProject.projectDir.listFiles()
-        ?.filter { it.isDirectory && it.name.startsWith("plugin-") && File(it, "build.gradle.kts").exists() }
+    // Auto-wire plugins (plugins/<id>/ → :plugin-<id>)
+    file("${rootProject.projectDir}/plugins").listFiles()
+        ?.filter { it.isDirectory && File(it, "build.gradle.kts").exists() }
         ?.sortedBy { it.name }
         ?.forEach { dir ->
-            implementation(project(":${dir.name}"))
+            implementation(project(":plugin-${dir.name}"))
         }
 
     implementation("androidx.activity:activity-ktx:1.9.3")

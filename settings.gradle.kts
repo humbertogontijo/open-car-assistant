@@ -17,9 +17,19 @@ dependencyResolutionManagement {
 rootProject.name = "open-car-assistant"
 
 include(":app")
+
+// Shared libraries under libs/
 include(":integration-api")
+project(":integration-api").projectDir = file("libs/api")
+
 include(":oca-support")
-project(":oca-support").projectDir = file("support")
+project(":oca-support").projectDir = file("libs/support")
+
+include(":car-stubs")
+project(":car-stubs").projectDir = file("libs/car-stubs")
+
+include(":signing")
+project(":signing").projectDir = file("libs/signing")
 
 include(":integrations:platform:common")
 include(":integrations:platform:flyme")
@@ -36,21 +46,28 @@ file("integrations").listFiles()
         project(path).projectDir = dir
     }
 
-// External bridge plugins: every plugin-*/ with a build.gradle.kts
-rootDir.listFiles()
-    ?.filter { it.isDirectory && it.name.startsWith("plugin-") && File(it, "build.gradle.kts").exists() }
+// External bridge plugins: every plugins/<id>/ with a build.gradle.kts
+file("plugins").listFiles()
+    ?.filter { it.isDirectory && File(it, "build.gradle.kts").exists() }
     ?.sortedBy { it.name }
     ?.forEach { dir ->
-        include(":${dir.name}")
+        val path = ":plugin-${dir.name}"
+        include(path)
+        project(path).projectDir = dir
     }
 
-include(":feature-memory")
-include(":feature-telemetry")
-include(":feature-web")
-include(":feature-install")
-include(":signing")
-include(":feature-dvr")
-include(":feature-debug")
-include(":feature-history")
-include(":feature-shortcuts")
-include(":car-stubs")
+// Curated shell features under features/ (Gradle names stay :feature-<id>)
+listOf(
+    "memory",
+    "telemetry",
+    "web",
+    "install",
+    "dvr",
+    "debug",
+    "history",
+    "shortcuts",
+).forEach { id ->
+    val path = ":feature-$id"
+    include(path)
+    project(path).projectDir = file("features/$id")
+}

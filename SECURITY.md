@@ -28,5 +28,5 @@ See [docs/safety.md](docs/safety.md) and [docs/disclaimer.md](docs/disclaimer.md
 
 ## Secrets in this repository
 
-- The AOSP **community testkey** under `signing/` is intentional and disclosed in [NOTICE](NOTICE).
+- The AOSP **community testkey** under `libs/signing/` is intentional and disclosed in [NOTICE](NOTICE).
 - OEM / platform signing keys must never be committed.

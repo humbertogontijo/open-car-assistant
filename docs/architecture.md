@@ -4,21 +4,20 @@ Open Car Assistant (OCA) is a head-unit app where **vehicle platform is a plugin
 
 ## Modules
 
-| Module | Role |
-|--------|------|
-| `:app` | Thin WebView host → `http://127.0.0.1:8787`, `AssistantRuntime`, foreground service, boot receiver |
-| `:integration-api` | SPI: `VehicleIntegration`, `VehicleSession`, capabilities, opaque properties, `OcaPlugin`, ServiceLoader registries |
-| `:oca-support` | Product helpers shared by features: `I18nBundle`, `LastKnownStore` (not vehicle-specific) |
-| `:integrations:antora1000` | Antora / SE1000 (EX5 EM-i) — `platform.json` + dual VHAL backends (gRPC / CarProperty) |
-| `:integrations:ihu629g` | IHU629G (BR/CN EX2) — VHAL via CarPropertyManager |
-| `:integrations:platform:common` | Universal AAOS plumbing: `PlatformConfig`, `CarPropertyBridge`, `VehiclePropertyBackend`, `AospVehicleIds` |
-| `:integrations:platform:flyme` | Flyme Auto family helpers shared by EX2 + EX5 |
-| `:feature-web` | **Single product UI** (Flyme-inspired HTML/CSS/JS shell + themes) + Ktor APIs + `/debug` |
-| `:feature-history` | Entity history recorder |
-| `:feature-shortcuts` | Shortcut macros, wake/wheel/plugin triggers, float chip |
-| `:plugin-homeassistant` | Home Assistant REST + WebSocket bridge (shortcut actions/triggers) |
-| `:feature-*` | Memory, telemetry, install, DVR, debug/`CatalogProbe`, history, shortcuts |
-| `:car-stubs` | Compile-only `android.car` stubs (never packaged) |
+| Module | Path | Role |
+|--------|------|------|
+| `:app` | `app/` | Thin WebView host → `http://127.0.0.1:8787`, `AssistantRuntime`, foreground service, boot receiver |
+| `:integration-api` | `libs/api/` | SPI: `VehicleIntegration`, `VehicleSession`, capabilities, opaque properties, `OcaPlugin`, ServiceLoader registries |
+| `:oca-support` | `libs/support/` | Product helpers shared by features: `I18nBundle`, `LastKnownStore` (not vehicle-specific) |
+| `:car-stubs` | `libs/car-stubs/` | Compile-only `android.car` stubs (never packaged) |
+| `:signing` | `libs/signing/` | Community testkey + host APK re-sign CLI |
+| `:integrations:antora1000` | `integrations/antora1000/` | Antora / SE1000 (EX5 EM-i) — `platform.json` + dual VHAL backends (gRPC / CarProperty) |
+| `:integrations:ihu629g` | `integrations/ihu629g/` | IHU629G (BR/CN EX2) — VHAL via CarPropertyManager |
+| `:integrations:platform:common` | `integrations/platform/common/` | Universal AAOS plumbing: `PlatformConfig`, `CarPropertyBridge`, `VehiclePropertyBackend`, `AospVehicleIds` |
+| `:integrations:platform:flyme` | `integrations/platform/flyme/` | Flyme Auto family helpers shared by EX2 + EX5 |
+| `:feature-web` | `features/web/` | **Single product UI** (Flyme-inspired HTML/CSS/JS shell + themes) + Ktor APIs + `/debug` |
+| `:feature-*` | `features/<id>/` | Memory, telemetry, install, DVR, debug/`CatalogProbe`, history, shortcuts |
+| `:plugin-homeassistant` | `plugins/homeassistant/` | Home Assistant REST + WebSocket bridge (shortcut actions/triggers) |
 
 HU and phone share the same UI. Native code owns VHAL, DVR, install, and the HTTP server — not a second Compose product surface.
 
@@ -45,7 +44,8 @@ External bridges (not HU platforms) implement `OcaPlugin` under `cc.opencar.assi
 
 Vehicle integrations and plugins are **folder-discovered**:
 
-- Gradle scans `integrations/<id>/` (except `platform/`) and `plugin-*/` for `build.gradle.kts`, includes them, and wires them into `:app`.
+- Gradle scans `integrations/<id>/` (except `platform/`) and `plugins/<id>/` for `build.gradle.kts`, includes them (`:integrations:<id>`, `:plugin-<id>`), and wires them into `:app`.
+- Curated shell features live under `features/<id>/` as `:feature-<id>` (explicit list in `settings.gradle.kts`).
 - Runtime loads implementations via `ServiceLoaderIntegrationRegistry` / `ServiceLoaderPluginRegistry` from `META-INF/services`.
 - `:app` and `:feature-*` depend only on `:integration-api` interfaces (plus `:oca-support` for i18n/cache). They never import concrete integration or plugin classes.
 
@@ -107,7 +107,7 @@ A native **quick entry** (hosted by `AssistantService`) is provided by the match
 
 The shared dropdown (Open / Cameras / Shortcuts / Background / Exit + pinned slots) lives in `:feature-shortcuts` and is platform-agnostic. Config UI: web **Shortcuts** section (`/api/shortcuts`, `/api/apps`).
 
-Wake / `screen` triggers (`on` / `off`) listen for AOSP `ACTION_SCREEN_ON` / `USER_PRESENT` / display + interactive polls, plus optional platform [WakeSignals](../integration-api/src/main/java/cc/opencar/assistant/api/WakeSignals.kt) (Flyme: ECARX `ACC_ON` / `DISPLAY_ON` / `STR_RESUME` / … via `:integrations:platform:flyme`). **Manifest-registered** [FlymeWakeReceiver](../integrations/platform/flyme/src/main/java/cc/opencar/assistant/integrations/platform/flyme/FlymeWakeReceiver.kt) catches those when the process was dead during STR; pending edges are flushed once shortcuts start. Debounced ~5 s. Antora polls `WHEEL_HARD_KEY_*` for press edges and emits `VehicleEvent.WheelKeyPressed`. OEM `BCM_FUNC_CUSTOM_KEY` is exposed as cabin control `wheel_custom_key`. **Custom AVAS audio files** remain out of scope.
+Wake / `screen` triggers (`on` / `off`) listen for AOSP `ACTION_SCREEN_ON` / `USER_PRESENT` / display + interactive polls, plus optional platform [WakeSignals](../libs/api/src/main/java/cc/opencar/assistant/api/WakeSignals.kt) (Flyme: ECARX `ACC_ON` / `DISPLAY_ON` / `STR_RESUME` / … via `:integrations:platform:flyme`). **Manifest-registered** [FlymeWakeReceiver](../integrations/platform/flyme/src/main/java/cc/opencar/assistant/integrations/platform/flyme/FlymeWakeReceiver.kt) catches those when the process was dead during STR; pending edges are flushed once shortcuts start. Debounced ~5 s. Antora polls `WHEEL_HARD_KEY_*` for press edges and emits `VehicleEvent.WheelKeyPressed`. OEM `BCM_FUNC_CUSTOM_KEY` is exposed as cabin control `wheel_custom_key`. **Custom AVAS audio files** remain out of scope.
 
 ## Safety
 
@@ -117,6 +117,6 @@ Writable VHAL IDs live in each integration's `platform.json` `writableAllowlist`
 
 New SoC/HU family → new folder `integrations/<platform-id>/` (+ ServiceLoader entry). Same chip, market quirk → new `PlatformVariant` or property override map, not a new module. Prefer **ihu629g** as the thin CarProperty reference when cloning. See [adding-an-integration.md](adding-an-integration.md).
 
-New external bridge → new `plugin-<id>/` implementing `OcaPlugin` (+ ServiceLoader entry). See [plugins.md](plugins.md).
+New external bridge → new folder `plugins/<id>/` implementing `OcaPlugin` (+ ServiceLoader entry). See [plugins.md](plugins.md).
 
-New first-party shell feature → curated `feature-*` (Gradle + `AssistantRuntime` + often web). Integrations/plugins are plug-and-play; features are not. See [adding-a-feature.md](adding-a-feature.md).
+New first-party shell feature → curated `features/<id>/` (Gradle + `AssistantRuntime` + often web). Integrations/plugins are plug-and-play; features are not. See [adding-a-feature.md](adding-a-feature.md).
