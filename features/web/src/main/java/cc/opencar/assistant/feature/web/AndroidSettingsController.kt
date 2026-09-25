@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.net.wifi.WifiManager
 import android.util.Log
+import cc.opencar.assistant.api.EntityContract
 import cc.opencar.assistant.api.EntityType
 import cc.opencar.assistant.feature.memory.ExternalSettingsApplier
 import cc.opencar.assistant.support.I18nBundle
@@ -121,25 +122,27 @@ class AndroidSettingsController(
         val value = if (enabled) "1" else "0"
         val pinEnabled = pin?.get("enabled") == true
         val pVal = pin?.get("value") as? String
-        return mapOf(
-            "id" to id,
-            "group" to "connect",
-            "entity" to EntityType.ANDROID.id,
-            "label" to label,
-            "hint" to hint,
-            "description" to hint,
-            "input" to "bool",
-            "icon" to "system",
-            "writable" to available,
-            "value" to value,
-            "valueLabel" to if (enabled) onLabel else offLabel,
-            "status" to if (available) "ok" else "unavailable",
-            "needsPrivilege" to false,
-            "stale" to false,
-            "history" to false,
-            "persistEnabled" to pinEnabled,
-            "persistValue" to pVal,
-            "persistLabel" to pVal,
+        return EntityContract.enrich(
+            mapOf(
+                "id" to id,
+                "group" to "connect",
+                "entity" to EntityType.ANDROID.id,
+                "label" to label,
+                "hint" to hint,
+                "description" to hint,
+                "input" to "bool",
+                "icon" to "system",
+                "writable" to available,
+                "value" to value,
+                "valueLabel" to if (enabled) onLabel else offLabel,
+                "status" to if (available) "ok" else "unavailable",
+                "needsPrivilege" to false,
+                "stale" to false,
+                "history" to false,
+                "persistEnabled" to pinEnabled,
+                "persistValue" to pVal,
+                "persistLabel" to pVal,
+            ),
         )
     }
 

@@ -2,6 +2,7 @@ package cc.opencar.assistant.feature.web
 
 import android.content.Context
 import cc.opencar.assistant.api.DeviceClass
+import cc.opencar.assistant.api.EntityContract
 import cc.opencar.assistant.api.EntityType
 import cc.opencar.assistant.api.PropertyValue
 import cc.opencar.assistant.api.ReadOutcome
@@ -793,33 +794,35 @@ object ControlCatalog {
         val unitLabel = resolveUnitLabel(def.unitOfMeasurement, i18n)
         val writable = forceWritable
             ?: (def.writable && (status == "ok" || status == "cached"))
-        return mapOf(
-            "id" to def.id,
-            "group" to def.group,
-            "entity" to def.entity.id,
-            "label" to label,
-            "labelKey" to def.resolvedLabelKey(),
-            "hint" to hint,
-            "description" to hint,
-            "acronym" to def.acronym,
-            "input" to def.input,
-            "icon" to def.resolvedIcon(),
-            "deviceClass" to def.deviceClass?.id,
-            "unitOfMeasurement" to def.unitOfMeasurement?.id,
-            "unitLabel" to unitLabel,
-            "min" to def.min,
-            "max" to def.max,
-            "step" to def.step,
-            "history" to def.history,
-            "writable" to writable,
-            "options" to optionMaps(def, i18n).ifEmpty { null },
-            "value" to value,
-            "valueLabel" to valueLabel(def, value, i18n),
-            "status" to status,
-            "permission" to permission,
-            "needsPrivilege" to (status == "denied"),
-            "stale" to stale,
-            "writeOnly" to (def.input == "command"),
+        return EntityContract.enrich(
+            mapOf(
+                "id" to def.id,
+                "group" to def.group,
+                "entity" to def.entity.id,
+                "label" to label,
+                "labelKey" to def.resolvedLabelKey(),
+                "hint" to hint,
+                "description" to hint,
+                "acronym" to def.acronym,
+                "input" to def.input,
+                "icon" to def.resolvedIcon(),
+                "deviceClass" to def.deviceClass?.id,
+                "unitOfMeasurement" to def.unitOfMeasurement?.id,
+                "unitLabel" to unitLabel,
+                "min" to def.min,
+                "max" to def.max,
+                "step" to def.step,
+                "history" to def.history,
+                "writable" to writable,
+                "options" to optionMaps(def, i18n).ifEmpty { null },
+                "value" to value,
+                "valueLabel" to valueLabel(def, value, i18n),
+                "status" to status,
+                "permission" to permission,
+                "needsPrivilege" to (status == "denied"),
+                "stale" to stale,
+                "writeOnly" to (def.input == "command"),
+            ),
         )
     }
 
@@ -878,29 +881,31 @@ object ControlCatalog {
             binary -> sensorBinaryLabel(value, i18n)
             else -> null
         }
-        return mapOf(
-            "id" to id,
-            "group" to group,
-            "entity" to EntityType.SENSOR.id,
-            "label" to label,
-            "labelKey" to stringKey,
-            "hint" to hint,
-            "description" to hint,
-            "input" to "sensor",
-            "icon" to icon,
-            "deviceClass" to deviceClass?.id,
-            "unitOfMeasurement" to unitOfMeasurement?.id,
-            "unitLabel" to unitLabel,
-            "writable" to false,
-            "options" to null,
-            "value" to if (ok) value else null,
-            "valueLabel" to valueLabel,
-            "status" to if (ok) "ok" else "unavailable",
-            "permission" to null,
-            "needsPrivilege" to false,
-            "stale" to false,
-            "history" to history,
-            "persistEnabled" to false,
+        return EntityContract.enrich(
+            mapOf(
+                "id" to id,
+                "group" to group,
+                "entity" to EntityType.SENSOR.id,
+                "label" to label,
+                "labelKey" to stringKey,
+                "hint" to hint,
+                "description" to hint,
+                "input" to "sensor",
+                "icon" to icon,
+                "deviceClass" to deviceClass?.id,
+                "unitOfMeasurement" to unitOfMeasurement?.id,
+                "unitLabel" to unitLabel,
+                "writable" to false,
+                "options" to null,
+                "value" to if (ok) value else null,
+                "valueLabel" to valueLabel,
+                "status" to if (ok) "ok" else "unavailable",
+                "permission" to null,
+                "needsPrivilege" to false,
+                "stale" to false,
+                "history" to history,
+                "persistEnabled" to false,
+            ),
         )
     }
 

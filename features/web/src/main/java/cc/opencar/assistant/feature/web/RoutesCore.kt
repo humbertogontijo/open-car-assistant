@@ -1,5 +1,6 @@
 package cc.opencar.assistant.feature.web
 
+import cc.opencar.assistant.api.EntityContract
 import cc.opencar.assistant.support.I18nBundle
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
@@ -106,7 +107,7 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
         val virtual = deps.shortcuts?.virtualEntityMaps().orEmpty()
         val all = (ControlCatalog.snapshot(session, context, memory) + virtual).map { row ->
             val id = row["id"] as? String
-            row + ("hidden" to (id != null && id in hidden))
+            EntityContract.enrich(row) + ("hidden" to (id != null && id in hidden))
         }
         call.respond(if (includeHidden) all else all.filter { it["hidden"] != true })
     }
@@ -116,7 +117,7 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
         val virtual = deps.shortcuts?.virtualEntityMaps().orEmpty()
         val all = (ControlCatalog.entities(session, context, memory, deps.androidSettings) + virtual).map { row ->
             val id = row["id"] as? String
-            row + ("hidden" to (id != null && id in hidden))
+            EntityContract.enrich(row) + ("hidden" to (id != null && id in hidden))
         }
         call.respond(if (includeHidden) all else all.filter { it["hidden"] != true })
     }
@@ -128,10 +129,19 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
             mapOf(
                 "ids" to hidden.toList().sorted(),
                 "entities" to all.filter { (it["id"] as? String) in hidden }.map {
-                    it + ("hidden" to true)
+                    EntityContract.enrich(it) + ("hidden" to true)
                 },
             ),
         )
+    }
+    get("/api/entities/{id}") {
+        val id = call.parameters["id"] ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("ok" to false))
+        val hidden = deps.entityVisibility.hiddenIds()
+        val virtual = deps.shortcuts?.virtualEntityMaps().orEmpty()
+        val row = (ControlCatalog.entities(session, context, memory, deps.androidSettings) + virtual)
+            .firstOrNull { it["id"] == id }
+            ?: return@get call.respond(HttpStatusCode.NotFound, mapOf("ok" to false, "error" to "not found"))
+        call.respond(EntityContract.enrich(row) + ("hidden" to (id in hidden)))
     }
     post("/api/entities/{id}/visibility") {
         val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("ok" to false))
@@ -217,11 +227,16 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
         val start = call.request.queryParameters["start"]?.toLongOrNull()
             ?: (end - 24L * 60 * 60 * 1000)
         val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 2000
+        val virtual = deps.shortcuts?.virtualEntityMaps().orEmpty()
+        val entityMeta = (ControlCatalog.entities(session, context, memory, deps.androidSettings) + virtual)
+            .firstOrNull { it["id"] == entityId }
+            ?.let { EntityContract.enrich(it) }
         call.respond(
             mapOf(
                 "entityId" to entityId,
                 "start" to start,
                 "end" to end,
+                "entity" to entityMeta,
                 "points" to history.query(entityId, start, end, limit),
             ),
         )
@@ -269,6 +284,9 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
             return@post
         }
         val result = ControlCatalog.set(session, id, value, context)
+        if (result.isSuccess) {
+            deps.shortcuts?.onControlWritten(id)
+        }
         call.respond(
             mapOf(
                 "ok" to result.isSuccess,

@@ -4,6 +4,7 @@ import { render as litRender } from "./lit.js";
 import { sectionView } from "./sections/index.js";
 import {
   loadHistoryPoints,
+  loadEnergyDash,
   loadRecordings,
   loadSounds,
   startCameraLive,
@@ -199,6 +200,9 @@ export async function refresh() {
       await loadHistoryPoints();
     }
   }
+  if (state.section === "energy") {
+    await loadEnergyDash();
+  }
   if (state.section === "sound" || !state._soundsLoaded) {
     state._soundsLoaded = true;
     await loadSounds();
@@ -242,6 +246,10 @@ function goSection(sec) {
       patch({ historyView: null });
     }
     loadHistoryPoints().then(function () {
+      notify();
+    });
+  } else if (sec === "energy") {
+    loadEnergyDash().then(function () {
       notify();
     });
   } else if (sec === "cameras" || sec === "dvr") {

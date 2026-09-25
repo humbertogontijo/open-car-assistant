@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import cc.opencar.assistant.api.EntityContract
 import cc.opencar.assistant.api.QuickEntry
 import cc.opencar.assistant.api.VehicleSession
 import cc.opencar.assistant.api.plugin.ShortcutActionHandler
@@ -41,9 +42,18 @@ class ShortcutsController(
         readEntity = { id -> readEntity?.invoke(id) },
     )
 
+    /** Writes from flows/routines — may conflict with an active scene. */
+    private suspend fun trackedSetControl(entityId: String, value: String): Result<Unit> {
+        val result = setControl(entityId, value)
+        if (result.isSuccess) {
+            sceneEngine.onExternalWrite(entityId)
+        }
+        return result
+    }
+
     val runner = ShortcutRunner(
         context = context,
-        setControl = setControl,
+        setControl = ::trackedSetControl,
         launcher = launcher,
         actionHandlers = actionHandlers,
         setScene = { sceneId, active ->
@@ -102,7 +112,33 @@ class ShortcutsController(
     }
 
     fun onBoot() {
-        engine.onBoot()
+        scope.launch(Dispatchers.IO) {
+            try {
+                sceneEngine.restoreAllActive()
+            } catch (t: Throwable) {
+                Log.w(TAG, "boot scene restore failed: ${t.message}")
+            }
+            // Await boot flows so they cannot start until scene off-path finishes.
+            engine.onBoot()
+        }
+    }
+
+    /**
+     * Notify that [entityId] was written outside the scene engine (web UI, etc.).
+     * Active scenes that list this entity as a target are deactivated.
+     */
+    fun onControlWritten(entityId: String) {
+        if (entityId.isBlank()) return
+        if (entityId.startsWith("shortcut_") ||
+            entityId.startsWith("scene_") ||
+            entityId.startsWith("routine_")
+        ) {
+            return
+        }
+        scope.launch(Dispatchers.IO) {
+            runCatching { sceneEngine.onExternalWrite(entityId) }
+                .onFailure { Log.w(TAG, "scene conflict check failed: ${it.message}") }
+        }
     }
 
     fun onScreenOn(source: String = "direct") {
@@ -350,44 +386,48 @@ class ShortcutsController(
                 val scene = sceneStore.get(setScene.sceneId)
                 val isOn = setScene.sceneId in active
                 out.add(
-                    mapOf(
-                        "id" to "shortcut_${flow.id}",
-                        "group" to ui.group,
-                        "entity" to "extra",
-                        "label" to flow.name,
-                        "input" to "bool",
-                        "value" to if (isOn) "1" else "0",
-                        "valueLabel" to if (isOn) "on" else "off",
-                        "writable" to true,
-                        "status" to "ok",
-                        "stale" to false,
-                        "icon" to (scene?.icon ?: flow.icon),
-                        "writeOnly" to false,
-                        "virtual" to true,
-                        "virtualKind" to "shortcut_scene",
-                        "virtualRef" to flow.id,
-                        "sceneId" to setScene.sceneId,
+                    EntityContract.enrich(
+                        mapOf(
+                            "id" to "shortcut_${flow.id}",
+                            "group" to ui.group,
+                            "entity" to "extra",
+                            "label" to flow.name,
+                            "input" to "bool",
+                            "value" to if (isOn) "1" else "0",
+                            "valueLabel" to if (isOn) "on" else "off",
+                            "writable" to true,
+                            "status" to "ok",
+                            "stale" to false,
+                            "icon" to (scene?.icon ?: flow.icon),
+                            "writeOnly" to false,
+                            "virtual" to true,
+                            "virtualKind" to "shortcut_scene",
+                            "virtualRef" to flow.id,
+                            "sceneId" to setScene.sceneId,
+                        ),
                     ),
                 )
             } else {
                 out.add(
-                    mapOf(
-                        "id" to "shortcut_${flow.id}",
-                        "group" to ui.group,
-                        "entity" to "extra",
-                        "label" to flow.name,
-                        "input" to "command",
-                        "value" to null,
-                        "valueLabel" to null,
-                        "options" to listOf(mapOf("label" to "Run", "value" to "1")),
-                        "writable" to true,
-                        "status" to "ok",
-                        "stale" to false,
-                        "icon" to flow.icon,
-                        "writeOnly" to true,
-                        "virtual" to true,
-                        "virtualKind" to "shortcut",
-                        "virtualRef" to flow.id,
+                    EntityContract.enrich(
+                        mapOf(
+                            "id" to "shortcut_${flow.id}",
+                            "group" to ui.group,
+                            "entity" to "extra",
+                            "label" to flow.name,
+                            "input" to "command",
+                            "value" to null,
+                            "valueLabel" to null,
+                            "options" to listOf(mapOf("label" to "Run", "value" to "1")),
+                            "writable" to true,
+                            "status" to "ok",
+                            "stale" to false,
+                            "icon" to flow.icon,
+                            "writeOnly" to true,
+                            "virtual" to true,
+                            "virtualKind" to "shortcut",
+                            "virtualRef" to flow.id,
+                        ),
                     ),
                 )
             }

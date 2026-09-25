@@ -34,6 +34,7 @@ export const state = {
   historySelected: null,
   historyRangeHours: 24,
   historyView: null,
+  energySparks: null,
   recordings: [],
   dvrTimeline: { segments: [], recording: false },
   /** Local calendar day for the DVR scrubber: "YYYY-MM-DD". null = today. */

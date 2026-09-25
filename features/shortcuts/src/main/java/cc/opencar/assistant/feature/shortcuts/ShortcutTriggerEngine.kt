@@ -98,11 +98,10 @@ class ShortcutTriggerEngine(
         job = null
     }
 
-    fun onBoot() {
-        scope.launch {
-            val matched = matchAndRun { it is ShortcutTrigger.Boot }
-            Log.i(TAG, "boot: matched=$matched")
-        }
+    /** Run boot-trigger shortcuts. Suspends until matching flows finish. */
+    suspend fun onBoot() {
+        val matched = matchAndRun { it is ShortcutTrigger.Boot }
+        Log.i(TAG, "boot: matched=$matched")
     }
 
     fun onScreenOn(source: String = "direct") {

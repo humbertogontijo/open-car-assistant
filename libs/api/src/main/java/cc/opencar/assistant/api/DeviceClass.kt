@@ -2,7 +2,7 @@ package cc.opencar.assistant.api
 
 /**
  * Semantic measurement class, aligned with Home Assistant `device_class`.
- * Used for icon defaults, history charts, and future MQTT/HA discovery — not for display text.
+ * Used for icon defaults, history charts, and (deferred) MQTT/HA discovery — not for display text.
  */
 enum class DeviceClass(val id: String) {
     BATTERY("battery"),

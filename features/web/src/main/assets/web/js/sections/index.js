@@ -1,6 +1,9 @@
 import { t } from "../i18n.js";
 import { sectionHome } from "./home.js";
 import { sectionGroup } from "./group.js";
+import { sectionEnergy, loadEnergyDash } from "./energy.js";
+import { sectionControls } from "./controls.js";
+import { sectionDrive } from "./drive.js";
 import { sectionSound, loadSounds } from "./sound.js";
 import { sectionConnect } from "./connect.js";
 import { sectionAssistant } from "./assistant.js";
@@ -16,6 +19,9 @@ import { sectionPlugins } from "./plugins.js";
 export {
   sectionHome,
   sectionGroup,
+  sectionEnergy,
+  sectionControls,
+  sectionDrive,
   sectionSound,
   sectionConnect,
   sectionAssistant,
@@ -28,6 +34,7 @@ export {
   sectionShortcuts,
   sectionPlugins,
   loadHistoryPoints,
+  loadEnergyDash,
   loadRecordings,
   loadSounds,
   startCameraLive,
@@ -41,15 +48,9 @@ export function sectionView(section) {
   const map = {
     home: sectionHome,
     history: sectionHistory,
-    controls: function () {
-      return sectionGroup(t("section.controls.title", "Controles"), "", "controls");
-    },
-    drive: function () {
-      return sectionGroup(t("section.drive.title", "Condução"), "", "drive");
-    },
-    energy: function () {
-      return sectionGroup(t("section.energy.title", "Energia"), "", "energy");
-    },
+    controls: sectionControls,
+    drive: sectionDrive,
+    energy: sectionEnergy,
     lights: function () {
       return sectionGroup(t("section.lights.title", "Iluminação"), "", "lights");
     },
@@ -73,12 +74,8 @@ export function sectionView(section) {
     settings: sectionSettings,
     // Legacy deep-links / quick-entry
     system: sectionSettings,
-    climate: function () {
-      return sectionGroup(t("section.controls.title", "Controles"), "", "controls");
-    },
-    cabin: function () {
-      return sectionGroup(t("section.controls.title", "Controles"), "", "controls");
-    },
+    climate: sectionControls,
+    cabin: sectionControls,
     safety: function () {
       return sectionGroup(t("section.adas.title", "ADAS"), "", "adas");
     },
