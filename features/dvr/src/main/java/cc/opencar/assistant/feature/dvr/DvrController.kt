@@ -30,9 +30,9 @@ class DvrController(
     private val recording = AtomicBoolean(false)
     private var activeCameraId: String? = null
     private var activeFile: File? = null
-    /** Wall-clock start of the current recording session (segment or DVR). */
+    /** Wall-clock start of the current DVR session. */
     private var recordingStartedAt: Long = 0L
-    /** Wall-clock start of the current output file (rotates with each clip). */
+    /** Wall-clock start of the current output file (rotates with each file). */
     private var segmentJobStartedAt: Long = 0L
     private val segmentBytes = AtomicLong(0L)
     @Volatile private var mode: String = MODE_OFF
@@ -51,6 +51,8 @@ class DvrController(
     }
     /** Extra hub seat held while the DVR writer is running. */
     private var recordingHubHeld = false
+    /** Extra hub seat held while a live preview / HLS client is active. */
+    private var previewHubHeld = false
     private var mosaicWriter: Future<*>? = null
     private val writerExec = Executors.newSingleThreadExecutor { r ->
         Thread(r, "oca-dvr-writer").apply { isDaemon = true }
@@ -60,6 +62,13 @@ class DvrController(
     @Volatile private var camera2ProbeReport: Map<String, Any?>? = null
     var lastError: String? = null
         private set
+
+    /** Debounce wake/sleep flaps (aligned with shortcut screen debounce). */
+    @Volatile private var lastWakeSleepAtMs: Long = 0L
+    @Volatile private var lastWakeSleepWasWake: Boolean? = null
+    @Volatile private var wakeSleepDebounceSkips: Long = 0L
+    @Volatile private var lastCutSegments: Int = 0
+    @Volatile private var lastCutBytes: Long = 0L
 
     init {
         storageId = prefs.getString(KEY_STORAGE, STORAGE_APP) ?: STORAGE_APP
@@ -160,7 +169,9 @@ class DvrController(
             return cached
         }
         val out = mutableListOf<Map<String, Any?>>()
-        val app = File(context.getExternalFilesDir(null), "dvr").also { it.mkdirs() }
+        // Roots without trailing dvr/ — [dvrDir] appends DvrStorageMath.SUBDIR_DVR once.
+        val app = context.getExternalFilesDir(null)?.also { it.mkdirs() }
+            ?: File(context.filesDir, "external-dvr").also { it.mkdirs() }
         out += targetMap(
             id = STORAGE_APP,
             labelKey = "cameras.storage.app",
@@ -188,7 +199,7 @@ class DvrController(
                 val path = volumePath(vol)
                 val usb = looksLikeUsb(desc, vol)
                 if (path != null && state == Environment.MEDIA_MOUNTED) {
-                    val dir = File(path, "OpenCarAssistant/dvr")
+                    val dir = File(path, "OpenCarAssistant")
                     val created = runCatching { dir.mkdirs(); true }.getOrDefault(false)
                     val writable = created && dir.canWrite()
                     out += targetMap(
@@ -275,12 +286,10 @@ class DvrController(
     /**
      * Set recording mode.
      * - [MODE_OFF]: stop writing
-     * - [MODE_SEGMENT]: start one-shot segment (does not persist across restarts)
      * - [MODE_DVR]: enable continuous DVR (persisted; wake/sleep lifecycle)
      */
     fun setMode(next: String?): Map<String, Any?> {
         val m = when (next?.lowercase(Locale.US)) {
-            MODE_SEGMENT -> MODE_SEGMENT
             MODE_DVR -> MODE_DVR
             else -> MODE_OFF
         }
@@ -289,17 +298,6 @@ class DvrController(
                 mode = MODE_OFF
                 prefs.edit().putString(KEY_MODE, MODE_OFF).apply()
                 stop()
-            }
-            MODE_SEGMENT -> {
-                mode = MODE_SEGMENT
-                // Segment is transient — do not persist as segment.
-                prefs.edit().putString(KEY_MODE, MODE_OFF).apply()
-                if (!recording.get()) {
-                    val ok = startInternal()
-                    if (!ok) {
-                        mode = MODE_OFF
-                    }
-                }
             }
             MODE_DVR -> {
                 mode = MODE_DVR
@@ -315,6 +313,7 @@ class DvrController(
     /** ACC/boot wake: start only when DVR mode is enabled. */
     fun onVehicleWake(source: String = "wake") {
         if (mode != MODE_DVR && prefs.getString(KEY_MODE, MODE_OFF) != MODE_DVR) return
+        if (!allowWakeSleepTransition(wake = true, source = source)) return
         mode = MODE_DVR
         if (!recording.get()) {
             Log.i(TAG, "DVR auto-start source=$source")
@@ -322,34 +321,66 @@ class DvrController(
         }
     }
 
-    /** Screen-off / sleep: stop only when in DVR mode (leave Segment alone). */
+    /** Screen-off / sleep: stop only when in DVR mode. */
     fun onVehicleSleep(source: String = "sleep") {
         if (mode != MODE_DVR) return
+        if (!allowWakeSleepTransition(wake = false, source = source)) return
         if (recording.get()) {
             Log.i(TAG, "DVR auto-stop source=$source")
             stop()
         }
     }
 
+    private fun allowWakeSleepTransition(wake: Boolean, source: String): Boolean {
+        val now = System.currentTimeMillis()
+        val prev = lastWakeSleepWasWake
+        val elapsed = now - lastWakeSleepAtMs
+        if (prev != null && prev != wake && elapsed < WAKE_SLEEP_DEBOUNCE_MS) {
+            wakeSleepDebounceSkips++
+            Log.i(
+                TAG,
+                "DVR wake/sleep debounced source=$source wake=$wake elapsedMs=$elapsed skips=$wakeSleepDebounceSkips",
+            )
+            return false
+        }
+        lastWakeSleepAtMs = now
+        lastWakeSleepWasWake = wake
+        return true
+    }
+
+    /** Storage root (app / primary / USB). Continuous files live under [dvrDir]. */
     fun outputDir(): File {
         ensureStorageMounted()
         val path = storageTargets().firstOrNull { it["id"] == storageId }?.get("path") as? String
-        val dir = if (path != null) File(path) else File(context.getExternalFilesDir(null), "dvr")
+        val dir = if (path != null) {
+            File(path)
+        } else {
+            context.getExternalFilesDir(null) ?: File(context.filesDir, "external-dvr")
+        }
         dir.mkdirs()
         return dir
     }
+
+    fun dvrDir(): File = DvrStorageMath.dvrDirUnder(outputDir()).also { it.mkdirs() }
 
     fun startPreview(cameraId: String? = null): Boolean {
         // Merged H.264 mosaic only — single-camera JPEG preview is gone.
         if (cameraId != null) {
             Log.i(TAG, "startPreview(cam=$cameraId): using merged mosaic")
         }
-        return hub.ensureStarted()
+        if (previewHubHeld) return hub.isRunning()
+        if (!hub.acquire()) {
+            lastError = hub.lastError() ?: lastError ?: "Mosaic failed"
+            return false
+        }
+        previewHubHeld = true
+        return true
     }
 
     fun stopPreview() {
-        if (!recording.get() && hub.refCount() == 0) {
-            mosaic.stop()
+        if (previewHubHeld) {
+            previewHubHeld = false
+            hub.release()
         }
     }
 
@@ -358,22 +389,25 @@ class DvrController(
             return hub.status() + mapOf(
                 "merged" to true,
                 "previewRunning" to true,
+                "previewHeld" to previewHubHeld,
                 "format" to streamFormat,
                 "h264" to h264?.status(),
             )
         }
         return mapOf(
             "previewRunning" to false,
+            "previewHeld" to previewHubHeld,
             "merged" to true,
             "format" to streamFormat,
             "h264" to h264?.status(),
         )
     }
 
-    /** @deprecated Prefer [setMode]; kept for older clients. */
+    /** Legacy alias for [setMode](MODE_DVR). Persists mode and starts the writer. */
+    @Deprecated("Prefer setMode(MODE_DVR)")
     fun start(cameraId: String? = null): Boolean {
-        if (mode == MODE_OFF) mode = MODE_SEGMENT
-        return startInternal()
+        val res = setMode(MODE_DVR)
+        return res["ok"] == true && (recording.get() || mode == MODE_DVR)
     }
 
     private fun startInternal(): Boolean {
@@ -435,18 +469,9 @@ class DvrController(
                 val hitLimit =
                     pipe.bytesWritten() >= SEGMENT_MAX_BYTES || elapsed >= SEGMENT_MAX_MS
                 if (hitLimit) {
-                    val closed = pipe.closeMp4()
-                    activeFile = null
-                    segmentBytes.set(0L)
-                    closed?.let {
-                        writeSegmentMetaMp4(it, elapsed.coerceAtLeast(frameIntervalMs()))
-                    }
+                    closeActiveSegment("rotate")
                     prune()
-                    if (mode == MODE_SEGMENT) {
-                        recording.set(false)
-                        mode = MODE_OFF
-                        break
-                    }
+                    // Continuous DVR: open the next file on the next loop iteration.
                 }
                 try {
                     Thread.sleep(frameIntervalMs())
@@ -458,19 +483,8 @@ class DvrController(
             lastError = t.message
             Log.w(TAG, "writeLoopH264: ${t.message}")
         } finally {
-            val closed = pipe.closeMp4()
-            activeFile = null
-            val startedAt = segmentJobStartedAt
-            segmentJobStartedAt = 0L
-            recordingStartedAt = 0L
-            segmentBytes.set(0L)
-            closed?.let {
-                val elapsed = (System.currentTimeMillis() - startedAt)
-                    .coerceAtLeast(frameIntervalMs())
-                writeSegmentMetaMp4(it, elapsed)
-            }
+            closeActiveSegment("stop")
             prune()
-            if (mode == MODE_SEGMENT) mode = MODE_OFF
             recording.set(false)
             if (recordingHubHeld) {
                 hub.release()
@@ -479,70 +493,209 @@ class DvrController(
         }
     }
 
-    private fun writeSegmentMetaMp4(file: File, durationMs: Long) {
+    /**
+     * Finalize the open MP4 (stop muxer + write startUtcMs meta).
+     * Safe to call twice — second call is a no-op.
+     */
+    @Synchronized
+    private fun closeActiveSegment(reason: String) {
+        val file = activeFile ?: return
+        val startedAt = segmentJobStartedAt.takeIf { it > 0L } ?: System.currentTimeMillis()
+        val closed = runCatching { h264?.closeMp4() }.getOrNull() ?: file
+        activeFile = null
+        segmentJobStartedAt = 0L
+        segmentBytes.set(0L)
+        val wallElapsed = (System.currentTimeMillis() - startedAt).coerceAtLeast(frameIntervalMs())
+        val ptsDur = extractMp4DurationMs(closed)
+        val durationMs = ptsDur?.takeIf { it > 0L } ?: wallElapsed
+        writeSegmentMetaMp4(closed, durationMs, startUtcMs = startedAt, ptsDurationMs = ptsDur)
+        Log.i(
+            TAG,
+            "segment closed reason=$reason file=${closed.name} durMs=$durationMs ptsMs=$ptsDur wallMs=$wallElapsed",
+        )
+    }
+
+    private fun extractMp4DurationMs(file: File): Long? {
+        if (!file.name.endsWith(".mp4") || !file.isFile) return null
+        return runCatching {
+            val r = android.media.MediaMetadataRetriever()
+            try {
+                r.setDataSource(file.absolutePath)
+                r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
+                    ?.toLongOrNull()
+            } finally {
+                runCatching { r.release() }
+            }
+        }.getOrNull()
+    }
+
+    private fun writeSegmentMetaMp4(
+        file: File,
+        durationMs: Long,
+        startUtcMs: Long,
+        ptsDurationMs: Long? = null,
+    ) {
         runCatching {
-            metaFileFor(file).writeText(
-                "{\"durationMs\":$durationMs,\"format\":\"mp4\"}\n",
+            val end = startUtcMs + durationMs
+            val pts = ptsDurationMs?.takeIf { it > 0L }
+            val ptsField = if (pts != null) ",\"ptsDurationMs\":$pts" else ""
+            val meta = metaFileFor(file)
+            meta.writeText(
+                "{\"durationMs\":$durationMs,\"startUtcMs\":$startUtcMs," +
+                    "\"endUtcMs\":$end,\"format\":\"mp4\"$ptsField}\n",
             )
+            Log.i(TAG, "wrote meta ${meta.name} start=$startUtcMs dur=$durationMs pts=$pts")
+        }.onFailure {
+            Log.w(TAG, "meta write failed for ${file.name}: ${it.message}")
+            lastError = "meta write: ${it.message}"
         }
     }
 
     private fun newRecordingFile(ext: String): File {
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        return File(outputDir(), "oca_merged_$stamp.$ext")
+        return File(dvrDir(), "oca_dvr_$stamp.$ext")
     }
 
     fun stop() {
         recording.set(false)
-        mosaicWriter?.cancel(false)
+        val w = mosaicWriter
         mosaicWriter = null
-        // writeLoop finally releases the hub seat + prunes
+        // Wait for writeLoop finally (close + meta) before returning.
+        if (w != null) {
+            runCatching { w.get(20, java.util.concurrent.TimeUnit.SECONDS) }
+                .onFailure { Log.w(TAG, "stop wait: ${it.message}") }
+        }
+        // Fallback if the writer never finalized (cancel / crash).
+        closeActiveSegment("stop-fallback")
+        recordingStartedAt = 0L
         activeCameraId = null
     }
 
-    fun toggleRecording(): Map<String, Any?> {
-        return if (recording.get()) {
-            setMode(MODE_OFF)
-        } else {
-            setMode(MODE_SEGMENT)
-        }
+    data class TimelineSegment(
+        val name: String,
+        val startUtcMs: Long,
+        val endUtcMs: Long,
+        val durationMs: Long,
+        val file: File,
+    )
+
+    /** Closed DVR segments with startUtcMs meta only (active file excluded). */
+    fun timelineSegments(): List<TimelineSegment> {
+        val active = activeFile?.canonicalPath
+        return recordingFiles()
+            .mapNotNull { f ->
+                if (active != null && f.canonicalPath == active) return@mapNotNull null
+                if (!f.name.endsWith(".mp4")) return@mapNotNull null
+                val start = readMetaLong(f, "startUtcMs") ?: return@mapNotNull null
+                val dur = readMetaLong(f, "durationMs")?.takeIf { it > 0 } ?: durationMsFor(f)
+                if (dur <= 0L) return@mapNotNull null
+                val end = readMetaLong(f, "endUtcMs") ?: (start + dur)
+                TimelineSegment(f.name, start, end, dur, f)
+            }
+            .sortedBy { it.startUtcMs }
     }
 
-    fun listRecordings(): List<Map<String, Any?>> {
-        storageTargets(forceRefresh = true)
-        prune()
-        return recordingFiles()
-            .sortedByDescending { it.lastModified() }
-            .map { f ->
-                mapOf(
-                    "name" to f.name,
-                    "size" to f.length(),
-                    "mtime" to f.lastModified(),
-                    "path" to f.absolutePath,
-                    "locked" to isLocked(f),
-                    "durationMs" to durationMsFor(f),
-                    "frameCount" to frameCountFor(f),
-                    "format" to when {
-                        f.name.endsWith(".mp4") -> "mp4"
-                        f.name.endsWith(".mjpeg") -> "mjpeg"
-                        else -> "other"
-                    },
-                )
+    fun timeline(): Map<String, Any?> {
+        val closed = timelineSegments()
+        val now = System.currentTimeMillis()
+        val activeStart = segmentJobStartedAt.takeIf { recording.get() && activeFile != null && it > 0L }
+        val segs = ArrayList<Map<String, Any?>>(closed.size + 1)
+        closed.forEach { s ->
+            segs += mapOf(
+                "name" to s.name,
+                "startUtcMs" to s.startUtcMs,
+                "endUtcMs" to s.endUtcMs,
+                "durationMs" to s.durationMs,
+                "active" to false,
+            )
+        }
+        if (activeStart != null) {
+            val af = activeFile!!
+            val dur = (now - activeStart).coerceAtLeast(0L)
+            segs += mapOf(
+                "name" to af.name,
+                "startUtcMs" to activeStart,
+                "endUtcMs" to now,
+                "durationMs" to dur,
+                "active" to true,
+            )
+        }
+        val rangeStart = when {
+            closed.isNotEmpty() && activeStart != null ->
+                minOf(closed.first().startUtcMs, activeStart)
+            closed.isNotEmpty() -> closed.first().startUtcMs
+            activeStart != null -> activeStart
+            else -> null
+        }
+        val rangeEnd = when {
+            activeStart != null -> now
+            closed.isNotEmpty() -> closed.last().endUtcMs
+            else -> null
+        }
+        return mapOf(
+            "ok" to true,
+            "segments" to segs,
+            "rangeStartUtcMs" to rangeStart,
+            "rangeEndUtcMs" to rangeEnd,
+            "recording" to recording.get(),
+            "mode" to mode,
+        )
+    }
+
+    /**
+     * Resolve wall-clock [atUtcMs] to a closed segment + media offset.
+     * Seeking into the still-open file seals it first so it becomes playable.
+     * Snaps into gaps to the nearest recorded edge.
+     */
+    fun resolvePlayAt(atUtcMs: Long): Map<String, Any?> {
+        maybeSealActiveForSeek(atUtcMs)
+        val segs = timelineSegments()
+        if (segs.isEmpty()) {
+            // Still recording but nothing sealed yet (too short) → stay live.
+            if (recording.get()) {
+                return mapOf("ok" to true, "live" to true, "atUtcMs" to atUtcMs)
             }
+            return mapOf("ok" to false, "error" to "no recordings")
+        }
+        val mathSegs = segs.map {
+            DvrTimelineMath.Segment(it.startUtcMs, it.endUtcMs, it.durationMs)
+        }
+        val snap = DvrTimelineMath.resolvePlayAt(mathSegs, atUtcMs)
+            ?: return mapOf("ok" to false, "error" to "no recordings")
+        val snapped = segs[snap.index]
+        return mapOf(
+            "ok" to true,
+            "name" to snapped.name,
+            "offsetMs" to snap.offsetMs,
+            "atUtcMs" to snap.wallUtcMs,
+            "startUtcMs" to snapped.startUtcMs,
+            "endUtcMs" to snapped.endUtcMs,
+            "durationMs" to snapped.durationMs,
+        )
+    }
+
+    /**
+     * Finalize the open muxer file when the user seeks into its wall-clock range,
+     * so the writer loop opens the next file and the sealed MP4 becomes playable.
+     */
+    private fun maybeSealActiveForSeek(atUtcMs: Long) {
+        if (!recording.get()) return
+        val started = segmentJobStartedAt
+        if (activeFile == null || started <= 0L) return
+        val now = System.currentTimeMillis()
+        if (atUtcMs < started || atUtcMs > now + 1_000L) return
+        if (now - started < 1_000L) return
+        closeActiveSegment("seek-seal")
     }
 
     fun recordingFile(name: String): File? {
-        if (name.isBlank() || name.contains("..") || name.contains('/') || name.contains('\\')) {
-            return null
-        }
-        if (name.endsWith(".lock") || name.endsWith(".meta")) return null
-        val f = File(outputDir(), name)
-        if (!f.isFile || !f.canonicalPath.startsWith(outputDir().canonicalPath)) return null
-        if (!f.name.startsWith("oca_merged_")) return null
-        if (!f.name.endsWith(".mjpeg") && !f.name.endsWith(".mp4") && !f.name.endsWith(".seg")) {
-            return null
-        }
-        return f
+        if (!DvrStorageMath.isDvrRecordingName(name)) return null
+        val root = outputDir().canonicalFile
+        val f = File(dvrDir(), name)
+        if (!f.isFile) return null
+        val canon = runCatching { f.canonicalFile }.getOrNull() ?: return null
+        if (!canon.path.startsWith(root.path)) return null
+        return canon
     }
 
     fun deleteRecording(name: String): Boolean {
@@ -550,6 +703,45 @@ class DvrController(
         lockFileFor(f).delete()
         metaFileFor(f).delete()
         return f.delete()
+    }
+
+    /**
+     * Delete closed DVR files (and their meta/locks). Skips the active open file.
+     * @return count deleted
+     */
+    fun clearRecordings(includeLocked: Boolean = true): Map<String, Any?> {
+        val active = activeFile?.canonicalPath
+        var deleted = 0
+        var skippedLocked = 0
+        var skippedActive = 0
+        recordingFiles().forEach { f ->
+            if (active != null && f.canonicalPath == active) {
+                skippedActive++
+                return@forEach
+            }
+            if (!includeLocked && isLocked(f)) {
+                skippedLocked++
+                return@forEach
+            }
+            lockFileFor(f).delete()
+            metaFileFor(f).delete()
+            if (f.delete()) deleted++
+        }
+        // Orphan meta/locks for missing files
+        metaDir().listFiles()?.forEach { m ->
+            val n = m.name
+            if (n.endsWith(".meta") || n.endsWith(".lock")) {
+                val base = n.removeSuffix(".meta").removeSuffix(".lock")
+                if (recordingFile(base) == null) m.delete()
+            }
+        }
+        return mapOf(
+            "ok" to true,
+            "deleted" to deleted,
+            "skippedLocked" to skippedLocked,
+            "skippedActive" to skippedActive,
+            "status" to status(),
+        )
     }
 
     fun setLocked(name: String, locked: Boolean): Boolean {
@@ -562,34 +754,77 @@ class DvrController(
         }
     }
 
-    fun prune() {
-        val dir = outputDir()
-        val active = activeFile?.canonicalPath
-        val files = recordingFiles().filter { it.canonicalPath != active }
-        if (files.isEmpty()) return
+    data class CutResult(
+        val file: File,
+        val downloadName: String,
+        val durationMs: Long,
+    )
 
-        val cutoff = if (maxAgeDays > 0) {
-            System.currentTimeMillis() - maxAgeDays * 86_400_000L
-        } else {
-            0L
+    /**
+     * Remux wall-clock [fromUtcMs, toUtcMs] across segments into a temp MP4.
+     * Seals the active file first when the range overlaps it (same as play).
+     * Caller deletes [CutResult.file] when done.
+     */
+    fun cutWallClockToTemp(fromUtcMs: Long, toUtcMs: Long): CutResult {
+        val from = fromUtcMs
+        val to = toUtcMs
+        if (to <= from) error("invalid range")
+        maybeSealActiveForSeek(to)
+        val segs = timelineSegments().filter { it.startUtcMs < to && it.endUtcMs > from }
+        if (segs.isEmpty()) error("no recordings in range")
+        val ranges = segs.map { s ->
+            val (mediaFrom, mediaTo) = DvrTimelineMath.mediaRangeForCut(
+                s.startUtcMs,
+                s.durationMs,
+                from,
+                to,
+            )
+            Mp4ClipRemuxer.Range(s.file, mediaFrom, mediaTo)
         }
-        if (cutoff > 0) {
-            files.filter { !isLocked(it) && it.lastModified() < cutoff }.forEach { f ->
-                Log.i(TAG, "prune age ${f.name}")
-                lockFileFor(f).delete()
-                metaFileFor(f).delete()
-                f.delete()
+        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val downloadName = "oca_clip_${stamp}.mp4"
+        val out = File(context.cacheDir, "oca_cut_${stamp}_${Thread.currentThread().id}.mp4")
+        try {
+            val durationMs = Mp4ClipRemuxer.remuxRanges(ranges, out)
+            if (durationMs <= 0L || !out.isFile || out.length() < 32) {
+                out.delete()
+                error("cut produced empty file")
             }
+            lastCutSegments = segs.size
+            lastCutBytes = out.length()
+            Log.i(
+                TAG,
+                "cut ok segs=${segs.size} bytes=${out.length()} durMs=$durationMs name=$downloadName",
+            )
+            return CutResult(out, downloadName, durationMs)
+        } catch (t: Throwable) {
+            runCatching { out.delete() }
+            throw t
         }
+    }
 
-        val remaining = recordingFiles().filter { it.canonicalPath != active }
-        val unlocked = remaining.filter { !isLocked(it) }.sortedBy { it.lastModified() }
-        var total = remaining.sumOf { it.length() }
-        val cap = maxTotalMb.toLong() * 1024L * 1024L
-        for (f in unlocked) {
-            if (total <= cap) break
-            Log.i(TAG, "prune size ${f.name}")
-            total -= f.length()
+    fun prune() {
+        val active = activeFile?.canonicalPath
+        val all = recordingFiles()
+        if (all.isEmpty()) return
+        val inputs = all.map { f ->
+            DvrStorageMath.PruneFile(
+                name = f.name,
+                lastModified = f.lastModified(),
+                length = f.length(),
+                locked = isLocked(f),
+                active = active != null && f.canonicalPath == active,
+            )
+        }
+        val names = DvrStorageMath.pruneDeleteNames(
+            inputs,
+            System.currentTimeMillis(),
+            maxAgeDays,
+            maxTotalMb,
+        )
+        for (name in names) {
+            val f = all.firstOrNull { it.name == name } ?: continue
+            Log.i(TAG, "prune ${f.name}")
             lockFileFor(f).delete()
             metaFileFor(f).delete()
             f.delete()
@@ -616,7 +851,13 @@ class DvrController(
             "storages" to targets,
             "storageNote" to storageNote,
             "outputDir" to outputDir().absolutePath,
+            "dvrDir" to dvrDir().absolutePath,
             "activeFile" to activeFile?.absolutePath,
+            "previewHeld" to previewHubHeld,
+            "hubRefs" to hub.refCount(),
+            "wakeSleepDebounceSkips" to wakeSleepDebounceSkips,
+            "lastCutSegments" to lastCutSegments,
+            "lastCutBytes" to lastCutBytes,
             "segmentBytes" to if (recording.get()) segmentBytes.get() else 0L,
             "segmentElapsedMs" to if (recording.get() && segmentJobStartedAt > 0) {
                 System.currentTimeMillis() - segmentJobStartedAt
@@ -657,92 +898,19 @@ class DvrController(
         return files.sumOf { it.length() } to files.size
     }
 
+    /** DVR files under dvr/ only (requires startUtcMs for timeline). */
     private fun recordingFiles(): List<File> {
-        val dir = outputDir()
-        return dir.listFiles { f ->
-            f.isFile &&
-                f.name.startsWith("oca_merged_") &&
-                (f.name.endsWith(".mjpeg") || f.name.endsWith(".mp4") || f.name.endsWith(".seg"))
-        }?.toList().orEmpty()
-    }
-
-    /**
-     * Stream a saved concatenated-JPEG recording as multipart MJPEG (same wire
-     * format as live preview). Skips frames before [fromMs]. Paces at the clip's
-     * recorded interval (falls back to platform FPS).
-     */
-    fun streamRecordingMultipart(
-        file: File,
-        fromMs: Long,
-        out: java.io.OutputStream,
-        cancelled: () -> Boolean = { false },
-    ) {
-        val interval = readMetaLong(file, "frameIntervalMs")?.takeIf { it > 0 } ?: frameIntervalMs()
-        val startFrame = ((fromMs.coerceAtLeast(0L)) / interval).toInt()
-        var index = 0
-        file.inputStream().buffered(64 * 1024).use { input ->
-            while (!cancelled()) {
-                val jpeg = readNextJpeg(input) ?: break
-                if (index++ < startFrame) continue
-                out.write(PART_HEADER)
-                out.write(jpeg.size.toString().toByteArray())
-                out.write(PART_MID)
-                out.write(jpeg)
-                out.write(PART_END)
-                out.flush()
-                try {
-                    Thread.sleep(interval)
-                } catch (_: InterruptedException) {
-                    break
-                }
-            }
+        val out = ArrayList<File>()
+        dvrDir().listFiles()?.forEach { f ->
+            if (!f.isFile) return@forEach
+            if (DvrStorageMath.isDvrRecordingName(f.name)) out += f
         }
-    }
-
-    private fun writeSegmentMeta(file: File, frameCount: Int) {
-        if (!file.name.endsWith(".mjpeg") || !file.isFile || frameCount <= 0) return
-        val interval = frameIntervalMs()
-        val durationMs = frameCount * interval
-        runCatching {
-            metaFileFor(file).writeText(
-                "{\"durationMs\":$durationMs,\"frameCount\":$frameCount," +
-                    "\"frameIntervalMs\":$interval,\"format\":\"mjpeg\"}\n",
-            )
-        }
+        return out
     }
 
     private fun durationMsFor(file: File): Long {
-        if (file.name.endsWith(".mp4")) {
-            // Legacy H.264 clips from earlier builds.
-            readMetaLong(file, "durationMs")?.let { if (it > 0) return it }
-            return runCatching {
-                val r = android.media.MediaMetadataRetriever()
-                try {
-                    r.setDataSource(file.absolutePath)
-                    r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
-                        ?.toLongOrNull()
-                } finally {
-                    runCatching { r.release() }
-                }
-            }.getOrNull() ?: 0L
-        }
         readMetaLong(file, "durationMs")?.let { if (it > 0) return it }
-        val frames = readMetaLong(file, "frameCount")?.toInt()?.takeIf { it > 0 }
-            ?: countJpegFrames(file).also { if (it > 0) writeSegmentMeta(file, it) }
-        if (frames > 0) {
-            val interval = readMetaLong(file, "frameIntervalMs")?.takeIf { it > 0 }
-                ?: frameIntervalMs()
-            return frames * interval
-        }
-        return 0L
-    }
-
-    private fun frameCountFor(file: File): Int {
-        if (file.name.endsWith(".mp4")) return 0
-        readMetaLong(file, "frameCount")?.toInt()?.let { if (it > 0) return it }
-        val frames = countJpegFrames(file)
-        if (frames > 0) writeSegmentMeta(file, frames)
-        return frames
+        return extractMp4DurationMs(file) ?: 0L
     }
 
     private fun readMetaLong(file: File, key: String): Long? {
@@ -753,48 +921,17 @@ class DvrController(
         return re.find(text)?.groupValues?.getOrNull(1)?.toLongOrNull()
     }
 
-    private fun countJpegFrames(file: File): Int {
-        var n = 0
-        runCatching {
-            file.inputStream().buffered(64 * 1024).use { input ->
-                while (readNextJpeg(input) != null) n++
-            }
-        }
-        return n
+    /** App-private meta — Movies/ volumes reject non-media sidecars (EPERM). */
+    private fun metaFileFor(f: File): File = File(metaDir(), f.name + ".meta")
+
+    private fun metaDir(): File =
+        File(context.filesDir, "dvr-meta").also { it.mkdirs() }
+
+    private fun lockFileFor(f: File): File {
+        return File(metaDir(), f.name + ".lock")
     }
-
-    private fun metaFileFor(f: File): File = File(f.absolutePath + ".meta")
-
-    private fun lockFileFor(f: File): File = File(f.absolutePath + ".lock")
 
     private fun isLocked(f: File): Boolean = lockFileFor(f).isFile
-
-    /** Pull one JPEG (SOI…EOI) from a concatenated stream; null at EOF. */
-    private fun readNextJpeg(input: java.io.InputStream): ByteArray? {
-        val bout = java.io.ByteArrayOutputStream(64 * 1024)
-        var prev = -1
-        var inImage = false
-        while (true) {
-            val b = input.read()
-            if (b < 0) {
-                return if (inImage && bout.size() > 2) bout.toByteArray() else null
-            }
-            if (!inImage) {
-                if (prev == 0xff && b == 0xd8) {
-                    inImage = true
-                    bout.write(0xff)
-                    bout.write(0xd8)
-                }
-                prev = b
-                continue
-            }
-            bout.write(b)
-            if (prev == 0xff && b == 0xd9) {
-                return bout.toByteArray()
-            }
-            prev = b
-        }
-    }
 
     private fun ensureStorageMounted() {
         val targets = storageTargets(forceRefresh = true)
@@ -884,17 +1021,14 @@ class DvrController(
         const val STORAGE_PRIMARY = "primary"
         const val STORAGE_USB_PLACEHOLDER = "usb"
         const val MODE_OFF = "off"
-        const val MODE_SEGMENT = "segment"
         const val MODE_DVR = "dvr"
+        const val KIND_DVR = "dvr"
 
         private const val STORAGE_CACHE_MS = 30_000L
         private const val DEFAULT_MAX_TOTAL_MB = 2048
         private const val DEFAULT_MAX_AGE_DAYS = 0
         private const val SEGMENT_MAX_BYTES = 100L * 1024L * 1024L
         private const val SEGMENT_MAX_MS = 5L * 60L * 1000L
-        private val PART_HEADER =
-            "--frame\r\nContent-Type: image/jpeg\r\nContent-Length: ".toByteArray()
-        private val PART_MID = "\r\n\r\n".toByteArray()
-        private val PART_END = "\r\n".toByteArray()
+        private const val WAKE_SLEEP_DEBOUNCE_MS = 5_000L
     }
 }

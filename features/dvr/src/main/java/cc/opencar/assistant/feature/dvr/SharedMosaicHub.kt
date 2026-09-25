@@ -2,7 +2,7 @@ package cc.opencar.assistant.feature.dvr
 
 /**
  * Refcounted handle around [MosaicPreviewSession] + H.264 pipeline lifetime.
- * DVR recording acquires a seat; live preview uses [ensureStarted].
+ * Live preview and DVR recording each [acquire]/[release] a seat.
  */
 class SharedMosaicHub(
     private val mosaic: MosaicPreviewSession,
@@ -15,7 +15,7 @@ class SharedMosaicHub(
     fun lastError(): String? = mosaic.lastError
     fun status(): Map<String, Any?> = mosaic.status() + mapOf("refs" to refs.get())
 
-    /** Start mosaic if needed; does not bump the refcount. */
+    /** Start mosaic if needed; does not bump the refcount. Prefer [acquire] for clients. */
     fun ensureStarted(): Boolean {
         if (mosaic.isRunning()) return true
         return ensureMosaic()

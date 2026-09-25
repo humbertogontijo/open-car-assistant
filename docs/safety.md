@@ -77,10 +77,9 @@ Prefer a single writer for regen / drive mode / ADAS toggles when other apps als
 DVR runs in the foreground `AssistantService` (`camera` FGS type). Modes:
 
 - **Off** — not writing (live mosaic preview still available in the Cameras UI)
-- **Segment** — one clip up to ~5 min / 100 MB, then auto-stop
-- **DVR** — continuous rotate at the same segment limit; **auto-starts on ACC/boot wake** and **stops on screen-off / vendor sleep** (Parking Comfort–safe). Retention prunes oldest unlocked clips by max total size and optional max age. Locked clips (`.lock` sidecar) are skipped by prune.
+- **DVR** — continuous rotate (~5 min / 100 MB per file under `dvr/`); **auto-starts on ACC/boot wake** and **stops on screen-off / vendor sleep** (Parking Comfort–safe; wake/sleep debounced ~5 s). Retention prunes oldest unlocked files by max total size and optional max age. Locked files and segment `.meta` (wall-clock `startUtcMs` / `durationMs`) live under app `files/dvr-meta/` because public `Movies/` volumes reject non-media sidecars. The cameras UI shows a **day-scoped wall-clock timeline** over segments; scrub seeks via `/api/dvr/play?atMs=`, and **Cut** remuxes a wall-clock range (possibly multi-file, sealing the active segment when needed) via `/api/dvr/cut` and **downloads** the clip to the client (not stored on the HU).
 
-Save targets: app files `dvr/`, internal Movies/`OpenCarAssistant`, and mounted SD/USB volumes under `OpenCarAssistant/dvr/`.
+Save targets: app files, internal Movies/`OpenCarAssistant`, and mounted SD/USB volumes under `OpenCarAssistant/` (continuous files always in a `dvr/` subdir).
 
 **Shared mosaic stream:** GPU path only — camera `SurfaceTexture` → GLES → HW `MediaCodec` → H.264. Live UI: **HLS** (`/api/dvr/live.m3u8` + CMAF) via **hls.js** on one `<video>`. DVR: `MediaMuxer` `.mp4`. Status: `stream.format`, `h264.*`, `camera2Probe`.
 

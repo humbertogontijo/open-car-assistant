@@ -49,13 +49,11 @@ function soundKindCard(kind, title) {
   const fileInputId = "sound-file-" + kind;
 
   const rows = files.length
-    ? html`<ul style="list-style:none;margin:0;padding:0;width:100%">
+    ? html`<ul class="file-list" style="width:100%">
         ${files.map(function (f) {
           const on = f.active || f.name === active;
-          return html`<li
-            style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)"
-          >
-            <div style="min-width:0">
+          return html`<li class="file-row">
+            <div class="file-row-meta">
               <strong style=${on ? "color:var(--accent)" : nothing}
                 >${f.name}${on
                   ? html` <span class="chip">${t("sounds.active", "active")}</span>`
@@ -63,7 +61,7 @@ function soundKindCard(kind, title) {
               >
               <p class="sub" style="margin:2px 0 0">${fmtBytes(f.size)}</p>
             </div>
-            <div class="row" style="margin:0;gap:6px;flex-shrink:0">
+            <div class="file-row-actions">
               <button
                 type="button"
                 class="btn ghost"
@@ -180,7 +178,7 @@ function soundKindCard(kind, title) {
   });
 }
 
-export function sectionCabin() {
+export function sectionSound() {
   const snap = state.sounds || {};
   const note =
     snap.note ||
@@ -189,8 +187,8 @@ export function sectionCabin() {
       "Custom files play via app MediaPlayer; OEM AVAS still uses esm_sound / esm_volume.",
     );
   return html`
-    <h1>${t("section.cabin.title", "Cabine")}</h1>
-    ${familySections(entitiesByGroup("cabin"))}
+    <h1>${t("section.sound.title", "Som")}</h1>
+    ${familySections(entitiesByGroup("sound"))}
     <h2 class="section-label" style="margin:28px 0 10px">${t("sounds.title", "Custom sounds")}</h2>
     <p class="sub" style="margin:0 0 12px">${note}</p>
     <div class="grid">

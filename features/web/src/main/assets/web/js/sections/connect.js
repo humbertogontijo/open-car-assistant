@@ -1,7 +1,8 @@
 import { html, nothing } from "../lit.js";
 import { t } from "../i18n.js";
 import { state, entitiesByGroup } from "../store.js";
-import { entityGrid, prefCard, prefBool } from "../ui/cards.js";
+import { familySections } from "./group.js";
+import { prefCard, prefBool } from "../ui/cards.js";
 import { api } from "../api.js";
 
 function fmtBytes(n) {
@@ -26,7 +27,7 @@ function volumeLabel(v) {
   return t(v.labelKey || "cameras.storage.app", v.label || v.id || "");
 }
 
-export function sectionAndroid() {
+export function sectionConnect() {
   const adb = state.adb || {};
   const volumes =
     (state.status && state.status.storage && state.status.storage.volumes) ||
@@ -75,8 +76,8 @@ export function sectionAndroid() {
     : html`<p class="persist-note">${t("android.storage.empty", "No volumes reported")}</p>`;
 
   return html`
-    <h1>${t("section.android.title", "Android")}</h1>
-    ${entityGrid(entitiesByGroup("android"))}
+    <h1>${t("section.connect.title", "Conexão")}</h1>
+    ${familySections(entitiesByGroup("connect"))}
     <div class="grid" style="margin-top:18px">
       ${prefCard({
         icon: "usb",

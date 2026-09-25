@@ -192,7 +192,7 @@ export function sectionLab() {
       <pre class="mono">
 ${JSON.stringify(sum || { tip: t("lab.probe.tip", "Click Re-probe") }, null, 2)}</pre
       >
-      <div id="probeScroll" style="max-height:420px;overflow:auto">
+      <div id="probeScroll" class="table-scroll" style="max-height:420px;overflow:auto">
         <table class="table" id="probeTable">
           <thead>
             <tr>

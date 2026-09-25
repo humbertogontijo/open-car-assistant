@@ -57,6 +57,7 @@ export async function startH264Live(video) {
   video.muted = true;
   video.playsInline = true;
   video.setAttribute("playsinline", "");
+  video.setAttribute("webkit-playsinline", "");
 
   const player = new Hls({
     enableWorker: false,

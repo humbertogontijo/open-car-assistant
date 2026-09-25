@@ -19,24 +19,22 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
+/**
+ * DVR HTTP surface: mode / timeline / play / cut / clear / storage / policy / live HLS.
+ * Legacy start/stop map to setMode; list/lock/mjpeg stream routes are gone.
+ */
 internal fun Routing.registerDvrRoutes(deps: OcaWebDeps) {
     val dvr = deps.dvr
 
+    // Aliases → setMode (prefer POST /api/dvr/mode).
     post("/api/dvr/start") {
         val storage = call.request.queryParameters["storage"]
         if (storage != null) dvr.setStorage(storage)
-        val ok = withContext(Dispatchers.IO) { dvr.start(null) }
-        call.respond(mapOf("ok" to ok, "status" to dvr.status()))
+        val res = withContext(Dispatchers.IO) { dvr.setMode("dvr") }
+        call.respond(res)
     }
     post("/api/dvr/stop") {
-        withContext(Dispatchers.IO) { dvr.stop() }
-        call.respond(mapOf("ok" to true, "status" to dvr.status()))
-    }
-    post("/api/dvr/toggle") {
-        val storage = call.request.queryParameters["storage"]
-            ?: call.receiveParameters()["storage"]
-        if (storage != null) dvr.setStorage(storage)
-        val res = withContext(Dispatchers.IO) { dvr.toggleRecording() }
+        val res = withContext(Dispatchers.IO) { dvr.setMode("off") }
         call.respond(res)
     }
     post("/api/dvr/mode") {
@@ -65,9 +63,50 @@ internal fun Routing.registerDvrRoutes(deps: OcaWebDeps) {
     get("/api/dvr/status") {
         call.respond(withContext(Dispatchers.IO) { dvr.status() })
     }
-    get("/api/dvr/recordings") {
-        val list = withContext(Dispatchers.IO) { dvr.listRecordings() }
-        call.respond(mapOf("ok" to true, "recordings" to list))
+    get("/api/dvr/timeline") {
+        call.respond(withContext(Dispatchers.IO) { dvr.timeline() })
+    }
+    get("/api/dvr/play") {
+        val atMs = call.request.queryParameters["atMs"]?.toLongOrNull()
+        if (atMs == null) {
+            call.respond(HttpStatusCode.BadRequest, mapOf("ok" to false, "error" to "atMs required"))
+            return@get
+        }
+        call.respond(withContext(Dispatchers.IO) { dvr.resolvePlayAt(atMs) })
+    }
+    get("/api/dvr/cut") {
+        val fromMs = call.request.queryParameters["fromMs"]?.toLongOrNull()
+        val toMs = call.request.queryParameters["toMs"]?.toLongOrNull()
+        if (fromMs == null || toMs == null) {
+            call.respond(
+                HttpStatusCode.BadRequest,
+                mapOf("ok" to false, "error" to "fromMs and toMs required"),
+            )
+            return@get
+        }
+        val cut = withContext(Dispatchers.IO) {
+            runCatching { dvr.cutWallClockToTemp(fromMs, toMs) }
+        }.getOrElse { t ->
+            call.respond(
+                HttpStatusCode.BadRequest,
+                mapOf("ok" to false, "error" to (t.message ?: "cut failed")),
+            )
+            return@get
+        }
+        call.response.header(HttpHeaders.CacheControl, "no-store")
+        call.response.header(
+            HttpHeaders.ContentDisposition,
+            "attachment; filename=\"${cut.downloadName}\"",
+        )
+        try {
+            withContext(Dispatchers.IO) {
+                call.respondOutputStream(ContentType.parse("video/mp4")) {
+                    cut.file.inputStream().use { input -> input.copyTo(this) }
+                }
+            }
+        } finally {
+            cut.file.delete()
+        }
     }
     get("/api/dvr/recordings/{name}") {
         val name = call.parameters["name"] ?: return@get
@@ -83,55 +122,8 @@ internal fun Routing.registerDvrRoutes(deps: OcaWebDeps) {
                 "attachment; filename=\"${file.name}\"",
             )
         }
-        if (file.name.endsWith(".mp4")) {
-            call.response.header(HttpHeaders.ContentType, "video/mp4")
-        } else if (file.name.endsWith(".mjpeg")) {
-            call.response.header(HttpHeaders.ContentType, "application/octet-stream")
-        }
+        call.response.header(HttpHeaders.ContentType, "video/mp4")
         call.respondFile(file)
-    }
-    get("/api/dvr/recordings/{name}/stream") {
-        val name = call.parameters["name"] ?: return@get
-        val file = dvr.recordingFile(name)
-        if (file == null || !file.name.endsWith(".mjpeg")) {
-            call.respond(HttpStatusCode.NotFound, mapOf("ok" to false, "error" to "not found"))
-            return@get
-        }
-        val fromMs = call.request.queryParameters["fromMs"]?.toLongOrNull() ?: 0L
-        try {
-            call.respondOutputStream(
-                contentType = ContentType.parse("multipart/x-mixed-replace; boundary=frame"),
-            ) {
-                withContext(Dispatchers.IO) {
-                    dvr.streamRecordingMultipart(file, fromMs, this@respondOutputStream)
-                }
-            }
-        } catch (_: Throwable) {
-            // Client cancelled / replaced img.src
-        }
-    }
-    post("/api/dvr/recordings/{name}/lock") {
-        val name = call.parameters["name"] ?: return@post
-        val params = call.receiveParameters()
-        val locked = when (params["locked"] ?: call.request.queryParameters["locked"]) {
-            "0", "false", "off" -> false
-            else -> true
-        }
-        val ok = withContext(Dispatchers.IO) { dvr.setLocked(name, locked) }
-        if (!ok) {
-            call.respond(HttpStatusCode.NotFound, mapOf("ok" to false, "error" to "not found"))
-        } else {
-            call.respond(mapOf("ok" to true, "locked" to locked))
-        }
-    }
-    delete("/api/dvr/recordings/{name}/lock") {
-        val name = call.parameters["name"] ?: return@delete
-        val ok = withContext(Dispatchers.IO) { dvr.setLocked(name, false) }
-        if (!ok) {
-            call.respond(HttpStatusCode.NotFound, mapOf("ok" to false, "error" to "not found"))
-        } else {
-            call.respond(mapOf("ok" to true, "locked" to false))
-        }
     }
     delete("/api/dvr/recordings/{name}") {
         val name = call.parameters["name"] ?: return@delete
@@ -141,6 +133,15 @@ internal fun Routing.registerDvrRoutes(deps: OcaWebDeps) {
         } else {
             call.respond(mapOf("ok" to true))
         }
+    }
+    post("/api/dvr/clear") {
+        val params = runCatching { call.receiveParameters() }.getOrNull()
+        val includeLocked = when (params?.get("includeLocked") ?: call.request.queryParameters["includeLocked"]) {
+            "0", "false", "off" -> false
+            else -> true
+        }
+        val res = withContext(Dispatchers.IO) { dvr.clearRecordings(includeLocked) }
+        call.respond(res)
     }
     post("/api/dvr/preview/start") {
         val ok = withContext(Dispatchers.IO) { dvr.startPreview(null) }

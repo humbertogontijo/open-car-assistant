@@ -2,12 +2,19 @@ import { html, nothing, repeat, unsafeHTML, classMap } from "../lit.js";
 import { fmt } from "../api.js";
 import { t } from "../i18n.js";
 import { iconSvg } from "../icons.js";
-import { state, patch, findControl } from "../store.js";
+import {
+  state,
+  patch,
+  findControl,
+  hiddenEntitiesByGroup,
+  isShowingHidden,
+} from "../store.js";
 import { faceValue } from "../persist.js";
 import {
   setControl,
   setPersist,
   hideEntity,
+  unhideEntity,
   runPref,
 } from "../actions.js";
 import {
@@ -88,6 +95,19 @@ function pinSnapshot(c) {
 function pinChip(label) {
   const title = t("persist.back_hint", "Applied only after the car restarts");
   return html`<span class="pin-chip" title=${title}>${icon("pin")}${label}</span>`;
+}
+
+function statusNote(c) {
+  if (c.needsPrivilege || c.status === "denied") {
+    return t("status.denied", "Permission denied");
+  }
+  if (c.status === "failed") {
+    return c.permission || t("status.failed", "Read failed");
+  }
+  if (c.status === "unavailable") {
+    return t("status.unavailable", "Unavailable");
+  }
+  return t("status." + c.status, c.status);
 }
 
 function closeChoices() {
@@ -332,6 +352,27 @@ function inputWidget(c) {
     });
   }
 
+  if (input === "command") {
+    return html`
+      <div class="command-actions">
+        ${!locked
+          ? html`<div class="lock-note command-note">
+              ${t("status.write_only", "Write-only command")}
+            </div>`
+          : nothing}
+        ${segmentToggle({
+          options: c.options || [],
+          current: null,
+          locked: locked,
+          choiceKey: "ctrl:" + id + ":cmd",
+          onSelect: function (v) {
+            setControl(id, v);
+          },
+        })}
+      </div>
+    `;
+  }
+
   if (input === "int" || input === "float") {
     const step = c.step != null ? c.step : input === "float" ? 0.5 : 1;
     const num = parseFloat(val);
@@ -404,17 +445,20 @@ function inputWidget(c) {
   >`;
 }
 
-function hideBtn(id) {
-  const title = t("entity.hide", "Hide card");
+function hideBtn(id, restore) {
+  const title = restore
+    ? t("entity.unhide", "Show card")
+    : t("entity.hide", "Hide card");
   return html`
     <button
       type="button"
-      class="hide-btn"
+      class="hide-btn ${restore ? "restore" : ""}"
       title=${title}
       aria-label=${title}
       @click=${function (ev) {
         ev.stopPropagation();
-        hideEntity(id);
+        if (restore) unhideEntity(id);
+        else hideEntity(id);
       }}
     >
       ${icon("hide")}
@@ -431,9 +475,9 @@ function sensorDisplay(c) {
   return fmt(c.value);
 }
 
-function controlCard(c) {
+function controlCard(c, restore) {
   if (c.input === "sensor") {
-    if (c.status !== "ok") return nothing;
+    if (!restore && c.status !== "ok") return nothing;
     return html`
       <div class="ctrl-card sensor-card" data-card=${c.id}>
         <div class="ctrl-head">
@@ -444,7 +488,7 @@ function controlCard(c) {
               ? html`<p class="hint">${c.hint || c.description}</p>`
               : nothing}
           </div>
-          <div class="card-actions">${hideBtn(c.id)}</div>
+          <div class="card-actions">${hideBtn(c.id, restore)}</div>
         </div>
         <div class="ctrl-body">
           <div class="entity-value">
@@ -479,7 +523,10 @@ function controlCard(c) {
             : nothing}
         </div>
         <div class="card-actions">
-          ${hideBtn(c.id)}
+          ${hideBtn(c.id, restore)}
+          ${restore || c.writeOnly || c.input === "command"
+            ? nothing
+            : html`
           <button
             type="button"
             class="pin-btn ${pinned ? "active" : ""}"
@@ -498,22 +545,71 @@ function controlCard(c) {
             }}
           >
             ${icon("pin")}
-          </button>
+          </button>`}
         </div>
       </div>
       <div class="ctrl-body">
-        ${inputWidget(c)}
         ${c.stale
           ? html`<div class="lock-note">${t("status.cached", "Último conhecido")}</div>`
-          : nothing}
+          : locked && c.status && c.status !== "ok"
+            ? html`<div class="lock-note">${statusNote(c)}</div>`
+            : nothing}
+        ${inputWidget(c)}
       </div>
     </div>
   `;
 }
 
-export function entityGrid(items) {
+/** Page title row with optional hidden-cards toggle for entity groups. */
+export function pageHead(title, group, sub) {
+  const hidden = group ? hiddenEntitiesByGroup(group) : [];
+  const viewing = group ? isShowingHidden(group) : false;
+  const toggle =
+    group && hidden.length
+      ? html`<button
+          type="button"
+          class="btn ${viewing ? "" : "ghost"}"
+          aria-pressed=${viewing ? "true" : "false"}
+          @click=${function () {
+            patch({
+              showHiddenGroup: viewing ? null : group,
+            });
+          }}
+        >
+          ${icon("hide")}
+          ${viewing
+            ? t("entity.hidden.exit", "Show all")
+            : t("entity.hidden.title", "Hidden cards") +
+              " (" +
+              hidden.length +
+              ")"}
+        </button>`
+      : nothing;
+
+  return html`
+    <div class="section-head">
+      <h1>${title}</h1>
+      ${toggle}
+    </div>
+    ${sub ? html`<p class="sub">${sub}</p>` : nothing}
+    ${viewing
+      ? html`<p class="sub">${t("entity.hidden.viewing", "Showing hidden cards only")}</p>`
+      : nothing}
+  `;
+}
+
+/**
+ * @param {Array} items
+ * @param {{ restore?: boolean }} [opts]
+ */
+export function entityGrid(items, opts) {
+  const restore = !!(opts && opts.restore);
   if (!items || !items.length) {
-    return html`<p class="sub">${t("empty.controls", "Nenhum controle neste grupo")}</p>`;
+    return html`<p class="sub">
+      ${restore
+        ? t("entity.hidden.empty", "No hidden cards")
+        : t("empty.controls", "Nenhum controle neste grupo")}
+    </p>`;
   }
   return html`<div class="grid">
     ${repeat(
@@ -521,7 +617,9 @@ export function entityGrid(items) {
       function (c) {
         return c.id;
       },
-      controlCard,
+      function (c) {
+        return controlCard(c, restore);
+      },
     )}
   </div>`;
 }

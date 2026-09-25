@@ -103,6 +103,8 @@ object WellKnownProperties {
     val APPROACH_LIGHT = VehicleProperty(NS, "approach_light")
     val EXTERIOR_LIGHT = VehicleProperty(NS, "exterior_light")
     val HOME_SAFE_LIGHT = VehicleProperty(NS, "home_safe_light")
+    val REAR_FOG = VehicleProperty(NS, "rear_fog")
+    val HEADLIGHT_HEIGHT = VehicleProperty(NS, "headlight_height")
     val USB_MODE = VehicleProperty(NS, "usb_mode")
     val LANE_KEEPING = VehicleProperty(NS, "lane_keeping")
     val ELKA = VehicleProperty(NS, "elka")
@@ -118,6 +120,16 @@ object WellKnownProperties {
     val HUD_AR = VehicleProperty(NS, "hud_ar")
     val INFO_MODEL = VehicleProperty(NS, "info_model")
     val INFO_VIN = VehicleProperty(NS, "info_vin")
+    /** OEM voice-assistant activation (Antora VR_ACTIVATED). */
+    val VR_ACTIVATED = VehicleProperty(NS, "vr_activated")
     /** OEM steering-wheel custom-key function (Antora BCM_FUNC_CUSTOM_KEY). */
     val WHEEL_CUSTOM_KEY = VehicleProperty(NS, "wheel_custom_key")
+    /** Find-my-car reminder: lights / horn / both (AutoSettings Controles). */
+    val VEHICLE_LOCATOR_MODE = VehicleProperty(NS, "vehicle_locator_mode")
+    /** Power-liftgate max open height levels 1..5 → 60%..100%. */
+    val TRUNK_OPEN_HEIGHT = VehicleProperty(NS, "trunk_open_height")
+    /** Driver easy entry/exit seat slide. */
+    val EASY_INGRESS = VehicleProperty(NS, "easy_ingress")
+    /** Speed-compensated media volume (Off / Weak / Medium / Strong). */
+    val SPEED_VOLUME = VehicleProperty(NS, "speed_volume")
 }

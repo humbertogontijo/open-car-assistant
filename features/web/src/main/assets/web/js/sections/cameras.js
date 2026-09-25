@@ -1,81 +1,17 @@
 import { html, nothing } from "../lit.js";
-import { state, patch, notify } from "../store.js";
+import { state, patch } from "../store.js";
 import { t } from "../i18n.js";
 import { api } from "../api.js";
-import { prefCard, prefSegment } from "../ui/cards.js";
+import { prefCard, prefSegment, boolToggle } from "../ui/cards.js";
 import {
   cameraPlayerView,
+  cameraTimelineView,
   applyCameraPlayerSrc,
-  playRecording,
   stopRecordingPlayback,
   isRecordingPlayback,
-  canPlayRecording,
-  backToLive,
 } from "../ui/camera-player.js";
 
-/** Client-side recording clock (status only refreshes every ~3s). */
-let recSyncAt = 0;
-let recSyncElapsedMs = 0;
-/** @type {ReturnType<typeof setInterval>|null} */
-let recTickTimer = null;
-
-function stopRecTick() {
-  if (recTickTimer) {
-    clearInterval(recTickTimer);
-    recTickTimer = null;
-  }
-  recSyncAt = 0;
-  recSyncElapsedMs = 0;
-}
-
-function ensureRecTick() {
-  if (recTickTimer) return;
-  recTickTimer = setInterval(function () {
-    const sec = state.section;
-    const dvr = state.status && state.status.dvr;
-    if ((sec !== "cameras" && sec !== "dvr") || !dvr || !dvr.recording) {
-      stopRecTick();
-      notify();
-      return;
-    }
-    notify();
-  }, 1000);
-}
-
-/** Smooth session elapsed; resyncs from server when status arrives. */
-function recordingElapsedMs(dvr) {
-  if (!dvr || !dvr.recording) {
-    stopRecTick();
-    return 0;
-  }
-  const serverMs = Number(dvr.elapsedMs);
-  const serverOk = Number.isFinite(serverMs) && serverMs >= 0;
-  const fallback = Number(dvr.segmentElapsedMs) || 0;
-  const base = serverOk ? serverMs : fallback;
-  const now = Date.now();
-  if (!recSyncAt) {
-    recSyncAt = now;
-    recSyncElapsedMs = base;
-  } else {
-    const local = recSyncElapsedMs + (now - recSyncAt);
-    // Resync on poll when drift is noticeable (clock skew / late status).
-    if (serverOk && Math.abs(local - serverMs) > 1500) {
-      recSyncAt = now;
-      recSyncElapsedMs = serverMs;
-    }
-  }
-  ensureRecTick();
-  return recSyncElapsedMs + (Date.now() - recSyncAt);
-}
-function fmtTs(ts) {
-  const n = Number(ts);
-  if (!n) return "—";
-  try {
-    return new Date(n).toLocaleString();
-  } catch (e) {
-    return String(ts);
-  }
-}
+export { isTimelineBusy } from "../ui/camera-player.js";
 
 function fmtBytes(n) {
   const v = Number(n) || 0;
@@ -135,12 +71,20 @@ async function setCamMode(mode) {
   await loadRecordings();
 }
 
+/** Soft-refresh wall-clock DVR timeline (also used by app poll as loadRecordings). */
 export async function loadRecordings() {
   try {
-    const res = await api("/api/dvr/recordings");
-    patch({ recordings: (res && res.recordings) || [] });
+    const res = await api("/api/dvr/timeline");
+    patch({
+      dvrTimeline: {
+        segments: (res && res.segments) || [],
+        recording: !!(res && res.recording),
+      },
+    });
   } catch (e) {
-    patch({ recordings: [] });
+    patch({
+      dvrTimeline: { segments: [], recording: false },
+    });
   }
 }
 
@@ -166,6 +110,8 @@ export async function startCameraLive() {
       cameraPreviewError: "",
       cameraPlayerMode: "live",
       cameraPlayingName: "",
+      cameraPlayingKind: "",
+      cameraTimelineAtMs: Date.now(),
     });
   } catch (e) {
     patch({
@@ -185,6 +131,7 @@ export async function stopCameraLive() {
     cameraPreviewSrc: "",
     cameraPlayerMode: "live",
     cameraPlayingName: "",
+    cameraPlayingKind: "",
     cameraPreviewError: "",
   });
   try {
@@ -196,9 +143,7 @@ export { applyCameraPlayerSrc };
 
 export function sectionCameras() {
   const dvr = (state.status && state.status.dvr) || {};
-  const mode = dvr.mode || (dvr.recording ? "segment" : "off");
-  const segmentActive = mode === "segment" || (mode !== "dvr" && !!dvr.recording);
-  const dvrActive = mode === "dvr";
+  const dvrActive = dvr.mode === "dvr" || (!!dvr.recording && dvr.mode !== "off");
   const storages = dvr.storages || [];
   const storageId = dvr.storageId || "app";
   const selected =
@@ -241,21 +186,11 @@ export function sectionCameras() {
   const usageBytes = Number(dvr.usageBytes) || 0;
   const usageCount = Number(dvr.usageCount) || 0;
   const capBytes = maxTotalMb * 1024 * 1024;
-  const recordings = state.recordings || [];
-  const activeName = state.cameraPlayingName || "";
-  // Timer only on one-shot Record; DVR stays on across reloads so a session clock is misleading.
-  if (!segmentActive) stopRecTick();
-  const elapsedMs = segmentActive ? recordingElapsedMs(dvr) : 0;
-  const elapsedSec = Math.floor(elapsedMs / 1000);
-  const elapsedLabel =
-    elapsedSec > 0
-      ? Math.floor(elapsedSec / 60) + ":" + String(elapsedSec % 60).padStart(2, "0")
-      : "";
 
   return html`
     <h1>${t("section.cameras.title", "Câmeras")}</h1>
 
-    <div class="cameras-hero">
+    <div class="cameras-stage">
       ${cameraPlayerView({
         lastError: dvr.lastError || "",
         startLive: startCameraLive,
@@ -265,228 +200,88 @@ export function sectionCameras() {
       <div class="cameras-side">
         ${prefCard({
           icon: "camera",
-          title: t("cameras.record", "Record"),
-          body: html`
-            <p class="sub" style="margin:0 0 10px">
-              ${t(
-                "cameras.record.hint",
-                "One clip up to 5 min / 100 MB, then stops.",
-              )}
-            </p>
-            ${segmentActive
-              ? html`<button
-                    type="button"
-                    class="btn primary"
-                    style="width:100%"
-                    @click=${async function () {
-                      await setCamMode("off");
-                    }}
-                  >
-                    ${t("cameras.rec_stop", "Stop recording")}
-                    ${elapsedLabel ? " · " + elapsedLabel : ""}
-                  </button>`
-              : html`<button
-                    type="button"
-                    class="btn"
-                    style="width:100%"
-                    ?disabled=${dvrActive}
-                    @click=${async function () {
-                      await setCamMode("segment");
-                    }}
-                  >
-                    ${t("cameras.rec_start", "Start recording")}
-                  </button>`}
-            ${dvrActive
-              ? html`<p class="sub" style="margin:8px 0 0">
-                  ${t("cameras.record.dvr_blocks", "Disable DVR to record a single clip.")}
-                </p>`
-              : nothing}
-          `,
-        })}
-
-        ${prefCard({
-          icon: "camera",
           title: t("cameras.mode.dvr", "DVR"),
           body: html`
-            <p class="sub" style="margin:0 0 10px">
+            <p class="sub cameras-side-hint">
               ${t(
                 "cameras.mode.dvr.hint",
-                "Continuous recording. Starts on ACC/boot, stops on sleep.",
+                "Continuous recording. Starts on ACC/boot, stops on sleep. Scrub the day timeline and use Cut to download a clip.",
               )}
             </p>
-            ${dvrActive
-              ? html`<button
-                    type="button"
-                    class="btn primary"
-                    style="width:100%"
-                    @click=${async function () {
-                      await setCamMode("off");
-                    }}
-                  >
-                    ${t("cameras.dvr.disable", "Disable DVR")}
-                  </button>`
-              : html`<button
-                    type="button"
-                    class="btn"
-                    style="width:100%"
-                    ?disabled=${segmentActive}
-                    @click=${async function () {
-                      await setCamMode("dvr");
-                    }}
-                  >
-                    ${t("cameras.dvr.enable", "Enable DVR")}
-                  </button>`}
-            ${segmentActive
-              ? html`<p class="sub" style="margin:8px 0 0">
-                  ${t("cameras.dvr.segment_blocks", "Stop the clip first to enable DVR.")}
-                </p>`
+            ${boolToggle(dvrActive, async function (val) {
+              await setCamMode(val === "1" || val === true ? "dvr" : "off");
+            })}
+            <hr class="cameras-side-sep" />
+            <p class="sub" style="margin:0 0 6px">${t("cameras.storage", "Save to")}</p>
+            ${prefSegment("cam-storage", storageOpts, storageId)}
+            ${dvr.storageNote
+              ? html`<p class="sub" style="color:var(--warn);margin:8px 0 0">${dvr.storageNote}</p>`
               : nothing}
+            <div style="margin-top:12px">
+              ${spaceBar(usedB, totalB)}
+              <p class="sub" style="margin:6px 0 0">
+                ${t("cameras.storage.used_free", "{used} used · {free} free of {total}")
+                  .replace("{used}", fmtBytes(usedB))
+                  .replace("{free}", fmtBytes(freeB))
+                  .replace("{total}", fmtBytes(totalB))}
+              </p>
+              <p class="sub" style="margin:2px 0 0">
+                ${t("cameras.storage.clips", "Recordings: {used} in {count} files (cap {cap})")
+                  .replace("{used}", fmtBytes(usageBytes))
+                  .replace("{count}", String(usageCount))
+                  .replace("{cap}", fmtBytes(capBytes))}
+              </p>
+            </div>
+            <p class="sub" style="margin:14px 0 6px">${t("cameras.policy.max_size", "Max total size")}</p>
+            ${prefSegment("cam-retention-size", sizeOpts, String(maxTotalMb))}
+            <p class="sub" style="margin:10px 0 6px">${t("cameras.policy.max_age", "Max age")}</p>
+            ${prefSegment("cam-retention-age", ageOpts, String(maxAgeDays))}
+            <div style="margin-top:14px">
+              <button
+                type="button"
+                class="btn ghost"
+                style="width:100%"
+                ?disabled=${usageCount <= 0}
+                @click=${async function () {
+                  if (
+                    !confirm(
+                      t(
+                        "cameras.clear.confirm",
+                        "Delete all DVR recordings on this storage? This cannot be undone.",
+                      ),
+                    )
+                  ) {
+                    return;
+                  }
+                  try {
+                    await api("/api/dvr/clear", {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/x-www-form-urlencoded",
+                      },
+                      body: "includeLocked=1",
+                    });
+                    const s = await api("/api/status");
+                    patch({ status: s });
+                    await loadRecordings();
+                    const { backToLive } = await import("../ui/camera-player.js");
+                    await backToLive(startCameraLive);
+                  } catch (e) {
+                    patch({
+                      cameraPreviewError: String(e && e.message ? e.message : e),
+                    });
+                  }
+                }}
+              >
+                ${t("cameras.clear", "Clear recordings")}
+                ${usageCount > 0 ? " (" + String(usageCount) + ")" : ""}
+              </button>
+            </div>
           `,
         })}
       </div>
-    </div>
 
-    <div class="cameras-meta">
-      <div class="card">
-        <h2 style="margin:0 0 8px">${t("cameras.storage", "Salvar em")}</h2>
-        ${prefSegment("cam-storage", storageOpts, storageId)}
-        ${dvr.storageNote
-          ? html`<p class="sub" style="color:var(--warn);margin:8px 0 0">${dvr.storageNote}</p>`
-          : nothing}
-        <div style="margin-top:12px">
-          ${spaceBar(usedB, totalB)}
-          <p class="sub" style="margin:6px 0 0">
-            ${t("cameras.storage.used_free", "{used} used · {free} free of {total}")
-              .replace("{used}", fmtBytes(usedB))
-              .replace("{free}", fmtBytes(freeB))
-              .replace("{total}", fmtBytes(totalB))}
-          </p>
-          <p class="sub" style="margin:2px 0 0">
-            ${t("cameras.storage.clips", "Recordings: {used} in {count} files (cap {cap})")
-              .replace("{used}", fmtBytes(usageBytes))
-              .replace("{count}", String(usageCount))
-              .replace("{cap}", fmtBytes(capBytes))}
-          </p>
-        </div>
-      </div>
-      <div class="card">
-        <h2 style="margin:0 0 8px">${t("cameras.policy", "Retention")}</h2>
-        <p class="sub" style="margin:0 0 6px">${t("cameras.policy.max_size", "Max total size")}</p>
-        ${prefSegment("cam-retention-size", sizeOpts, String(maxTotalMb))}
-        <p class="sub" style="margin:10px 0 6px">${t("cameras.policy.max_age", "Max age")}</p>
-        ${prefSegment("cam-retention-age", ageOpts, String(maxAgeDays))}
-      </div>
-    </div>
-
-    <div class="card">
-      <div
-        class="row"
-        style="justify-content:space-between;align-items:center;margin:0 0 10px"
-      >
-        <h2 style="margin:0">${t("cameras.recordings", "Recordings")}</h2>
-        <button
-          type="button"
-          class="btn"
-          @click=${async function () {
-            await loadRecordings();
-          }}
-        >
-          ${t("cameras.recordings.refresh", "Refresh")}
-        </button>
-      </div>
-      ${recordings.length
-        ? html`<ul style="list-style:none;margin:0;padding:0">
-            ${recordings.map(function (r) {
-              const playable = canPlayRecording(r.name);
-              const isActive = activeName === r.name;
-              const locked = !!r.locked;
-              return html`<li
-                style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)"
-              >
-                <div style="min-width:0">
-                  <strong class="mono" style="word-break:break-all">${r.name}</strong>
-                  ${locked
-                    ? html` <span class="badge accent">${t("cameras.lock.badge", "Locked")}</span>`
-                    : nothing}
-                  <p class="sub" style="margin:2px 0 0">
-                    ${fmtTs(r.mtime)} · ${fmtBytes(r.size)}
-                  </p>
-                </div>
-                <div class="row" style="margin:0;gap:6px;flex-shrink:0;flex-wrap:wrap">
-                  ${playable
-                    ? html`<button
-                        type="button"
-                        class="btn ${isActive ? "primary" : ""}"
-                        ?disabled=${!!state.cameraPlaybackLoading && !isActive}
-                        @click=${async function () {
-                          if (isActive) {
-                            await backToLive(startCameraLive);
-                            return;
-                          }
-                          await playRecording(r.name, {
-                            durationMs: r.durationMs,
-                            frameCount: r.frameCount,
-                          });
-                        }}
-                      >
-                        ${isActive
-                          ? t("cameras.play.live", "Back to live")
-                          : t("cameras.play", "Play")}
-                      </button>`
-                    : nothing}
-                  <button
-                    type="button"
-                    class="btn ghost"
-                    @click=${async function () {
-                      await api(
-                        "/api/dvr/recordings/" + encodeURIComponent(r.name) + "/lock",
-                        {
-                          method: "POST",
-                          headers: {
-                            "Content-Type": "application/x-www-form-urlencoded",
-                          },
-                          body: "locked=" + (locked ? "0" : "1"),
-                        },
-                      );
-                      await loadRecordings();
-                    }}
-                  >
-                    ${locked
-                      ? t("cameras.unlock", "Unlock")
-                      : t("cameras.lock", "Lock")}
-                  </button>
-                  <a
-                    class="btn"
-                    href=${"/api/dvr/recordings/" + encodeURIComponent(r.name)}
-                    download=${r.name}
-                    >${t("cameras.download", "Download")}</a
-                  >
-                  <button
-                    type="button"
-                    class="btn ghost"
-                    @click=${async function () {
-                      if (
-                        !confirm(t("cameras.delete.confirm", "Delete this recording?"))
-                      )
-                        return;
-                      if (activeName === r.name) {
-                        await backToLive(startCameraLive);
-                      }
-                      await api("/api/dvr/recordings/" + encodeURIComponent(r.name), {
-                        method: "DELETE",
-                      });
-                      await loadRecordings();
-                    }}
-                  >
-                    ${t("cameras.delete", "Delete")}
-                  </button>
-                </div>
-              </li>`;
-            })}
-          </ul>`
-        : html`<p class="persist-note">
-            ${t("cameras.recordings.empty", "No recordings yet")}
-          </p>`}
+      ${cameraTimelineView({ startLive: startCameraLive })}
     </div>
   `;
 }

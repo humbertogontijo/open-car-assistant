@@ -104,6 +104,10 @@
 }
 .pin-btn:active:not(:disabled),
 .hide-btn:active:not(:disabled) { transform: scale(0.94); }
+.hide-btn.restore {
+  color: var(--accent, var(--text));
+  border-color: var(--border-strong);
+}
 .pin-btn.active {
   color: var(--pin-contrast);
   background: var(--pin);
@@ -225,6 +229,8 @@
 .toggle-seg:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 .toggle-group[data-count="4"] .toggle-seg { font-size: 0.95rem; padding: 0.5rem 0.35rem; }
 .toggle-group.unset .toggle-seg { opacity: 0.85; }
+.command-actions .toggle-group.unset .toggle-seg { opacity: 1; }
+.command-note { opacity: 0.9; }
 .stepper .val.unset { color: var(--text-muted); font-weight: 550; }
 
 /* Dropdown for >4 options — same surface / radius / pin language */
@@ -387,7 +393,13 @@
 .select-wrap.pin-diff select { border: 0; border-radius: 0; }
 .select-wrap.pin-diff .pin-chip { border-radius: 0; }
 
-.lock-note { font-size: 0.82rem; color: var(--warn); margin-top: 0.15rem; }
+.lock-note {
+  font-size: 0.82rem;
+  color: var(--warn);
+  text-align: right;
+  margin: 0 0 0.25rem;
+  line-height: 1.2;
+}
 .select-wrap select { width: 100%; min-height: var(--ctrl-touch, 3.5rem); }
 .toggle-row {
   display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;

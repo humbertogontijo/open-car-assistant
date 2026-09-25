@@ -1,42 +1,11 @@
 import { quickEntryCard } from "./shortcuts.js";
 import { prefCard, prefSegment } from "../ui/cards.js";
-import { unhideEntity } from "../actions.js";
 import { theme } from "../theme.js";
 import { html } from "../lit.js";
 import { state, patch } from "../store.js";
 import { t } from "../i18n.js";
 import { api } from "../api.js";
-import { unitPrefs, unitPreset, UNIT_CHOICES } from "../units.js";
-
-function hiddenCardsBody() {
-  const list = state.hiddenEntities || [];
-  if (!list.length) {
-    return html`<p class="persist-note" style="margin:0">
-      ${t("entity.hidden.empty", "No hidden cards")}
-    </p>`;
-  }
-  return html`<ul
-    class="hidden-entity-list"
-    style="list-style:none;margin:0;padding:0;width:100%"
-  >
-    ${list.map(function (e) {
-      return html`<li
-        style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"
-      >
-        <span>${e.label || e.id}</span>
-        <button
-          type="button"
-          class="btn ghost"
-          @click=${function () {
-            unhideEntity(e.id);
-          }}
-        >
-          ${t("entity.unhide", "Show card")}
-        </button>
-      </li>`;
-    })}
-  </ul>`;
-}
+import { unitPrefs, UNIT_CHOICES } from "../units.js";
 
 function unitChoiceOpts(dim) {
   return (UNIT_CHOICES[dim] || []).map(function (id) {
@@ -46,11 +15,6 @@ function unitChoiceOpts(dim) {
 
 function unitDimensionCards() {
   const prefs = unitPrefs();
-  const preset = unitPreset();
-  const presetOpts = [
-    { value: "metric", label: t("units.metric", "Metric") },
-    { value: "imperial", label: t("units.imperial", "Imperial") },
-  ];
   const dims = [
     {
       key: "temperature",
@@ -79,28 +43,15 @@ function unitDimensionCards() {
     },
   ];
 
-  return [
-    prefCard({
-      icon: "sensor",
-      title: t("prefs.units", "Units"),
-      sub: t("units.preset", "Preset"),
-      body: prefSegment(
-        "units_preset",
-        presetOpts,
-        preset === "custom" ? "" : preset,
-      ),
-    }),
-  ].concat(
-    dims.map(function (d) {
-      return prefCard({
-        icon: d.icon,
-        title: d.title,
-        body: prefSegment("unit_" + d.key, unitChoiceOpts(d.key), prefs[d.key], {
-          choiceKey: "unit:" + d.key,
-        }),
-      });
-    }),
-  );
+  return dims.map(function (d) {
+    return prefCard({
+      icon: d.icon,
+      title: d.title,
+      body: prefSegment("unit_" + d.key, unitChoiceOpts(d.key), prefs[d.key], {
+        choiceKey: "unit:" + d.key,
+      }),
+    });
+  });
 }
 
 export function sectionSettings() {
@@ -163,11 +114,6 @@ export function sectionSettings() {
             ${t("setup.reset", "Resetar setup")}
           </button>
         </div>`,
-      })}
-      ${prefCard({
-        icon: "hide",
-        title: t("entity.hidden.title", "Hidden cards"),
-        body: hiddenCardsBody(),
       })}
     </div>
   `;

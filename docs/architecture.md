@@ -87,6 +87,8 @@ Rendering is **lit-html** (vendored ESM under `web/js/vendor/`) driven by a smal
 
 Control cards are typed by `ControlDef.input` (`bool`, `choice`, `int`, `float`, `text`, `sensor`). Choice with ≤3 options renders as pills; more than three uses a styled dropdown. Each writable card can **pin** a boot value; live writes go to VHAL, persist writes go to DataStore only.
 
+`ControlDef.group` is the **OEM nav section id** (Início / Controles / Condução / Energia / Iluminação / ADAS / Assistente / Tela / Som / Conexão / Meu Veículo). `EntityType` remains the family subsection header inside a tab. Energia is capability-gated (`CHARGING` / `HYBRID_ENERGY`). Android Wi‑Fi/BT + ADB/storage cards live under Conexão. Assistente binds voice VHAL (`vr_activated`); more OEM voice props TBD via Lab.
+
 Numeric entities carry HA-style `deviceClass` + `unitOfMeasurement` (canonical platform ids from `:integration-api`). Cards convert to the user’s preferred unit per dimension (temperature, distance, speed, fuel economy, energy economy) via `web/js/units.js`, including L/100km ↔ km/L / mpg and kWh/100km ↔ km/kWh.
 
 ## Settings memory (boot / gear reapply)
@@ -109,7 +111,11 @@ A native **quick entry** (hosted by `AssistantService`) is provided by the match
 
 The shared dropdown (Open / Cameras / Shortcuts / Background / Exit + pinned slots) lives in `:feature-shortcuts` and is platform-agnostic. Config UI: web **Shortcuts** section (`/api/shortcuts`, `/api/apps`).
 
-Wake / `screen` triggers (`on` / `off`) listen for AOSP `ACTION_SCREEN_ON` / `USER_PRESENT` / display + interactive polls, plus optional platform [WakeSignals](../libs/api/src/main/java/cc/opencar/assistant/api/WakeSignals.kt) (Flyme: ECARX `ACC_ON` / `DISPLAY_ON` / `STR_RESUME` / … via `:integrations:platform:flyme`). **Manifest-registered** [FlymeWakeReceiver](../integrations/platform/flyme/src/main/java/cc/opencar/assistant/integrations/platform/flyme/FlymeWakeReceiver.kt) catches those when the process was dead during STR; pending edges are flushed once shortcuts start. Debounced ~5 s. Antora polls `WHEEL_HARD_KEY_*` for press edges and emits `VehicleEvent.WheelKeyPressed`. OEM `BCM_FUNC_CUSTOM_KEY` is exposed as cabin control `wheel_custom_key`. **Custom AVAS / lock sounds** live under app storage (`sounds/avas`, `sounds/lock`) via `/api/sounds`; preview/playback uses app `MediaPlayer`. OEM AVAS style/volume remain the VHAL ints `esm_sound` / `esm_volume` — there is no confirmed vendor wav drop-in path.
+Wake / `screen` triggers (`on` / `off`) listen for AOSP `ACTION_SCREEN_ON` / `USER_PRESENT` / display + interactive polls, plus optional platform [WakeSignals](../libs/api/src/main/java/cc/opencar/assistant/api/WakeSignals.kt) (Flyme: ECARX `ACC_ON` / `DISPLAY_ON` / `STR_RESUME` / … via `:integrations:platform:flyme`). **Manifest-registered** [FlymeWakeReceiver](../integrations/platform/flyme/src/main/java/cc/opencar/assistant/integrations/platform/flyme/FlymeWakeReceiver.kt) catches those when the process was dead during STR; pending edges are flushed once shortcuts start. Debounced ~5 s. Antora polls `WHEEL_HARD_KEY_*` for press edges and emits `VehicleEvent.WheelKeyPressed`. OEM `BCM_FUNC_CUSTOM_KEY` is exposed as Controles control `wheel_custom_key`. **Custom AVAS / lock sounds** live under the Som section (app storage `sounds/avas`, `sounds/lock`) via `/api/sounds`; preview/playback uses app `MediaPlayer`. OEM AVAS style/volume remain the VHAL ints `esm_sound` / `esm_volume` — there is no confirmed vendor wav drop-in path.
+
+## DVR / cameras
+
+One capture path: Camera → GLES mosaic → HW H.264 (`:feature-dvr`). Live clients and the DVR writer share [`SharedMosaicHub`](../features/dvr/src/main/java/cc/opencar/assistant/feature/dvr/SharedMosaicHub.kt) refcounts so stopping recording does not tear down HLS. Continuous mode persists as `mode=dvr`; ACC wake starts / sleep stops (debounced ~5 s, same as shortcuts). Rotating MP4 (~5 min / 100 MB) under `dvr/` with wall-clock meta in app-private `files/dvr-meta/`. Web: day-scoped scrubber + Cut remux (`/api/dvr/timeline`, `/play`, `/cut`, `/live.m3u8`). Pure helpers: `DvrTimelineMath` / `DvrStorageMath` (JVM unit tests) and `dvr-timeline.js`.
 
 ## Safety
 

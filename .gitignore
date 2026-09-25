@@ -13,6 +13,7 @@ captures/
 .cxx/
 *.hprof
 *.iml
+.local/
 
 # IDE
 .idea/

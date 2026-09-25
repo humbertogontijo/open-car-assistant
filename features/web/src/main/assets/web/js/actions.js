@@ -2,7 +2,7 @@ import { api } from "./api.js";
 import { state, patch, notify, findControl } from "./store.js";
 import { setTheme } from "./theme.js";
 import { setLocale, t } from "./i18n.js";
-import { presetUnits, unitPrefs } from "./units.js";
+import { unitPrefs } from "./units.js";
 
 async function saveUnitPrefs(unitsObj) {
   const json = JSON.stringify(unitsObj);
@@ -50,13 +50,30 @@ export async function setPersist(id, opts) {
   await reloadEntities();
 }
 
+async function refreshHiddenEntities() {
+  try {
+    const res = await api("/api/entities/hidden");
+    const list = (res && res.entities) || [];
+    const updates = { hiddenEntities: list };
+    if (state.showHiddenGroup) {
+      const still = list.some(function (e) {
+        return e.group === state.showHiddenGroup;
+      });
+      if (!still) updates.showHiddenGroup = null;
+    }
+    patch(updates);
+  } catch (e) {
+    notify();
+  }
+}
+
 export async function hideEntity(id) {
   await api("/api/entities/" + encodeURIComponent(id) + "/visibility", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: "hidden=1",
   });
-  await reloadEntities();
+  await Promise.all([reloadEntities(), refreshHiddenEntities()]);
 }
 
 export async function unhideEntity(id) {
@@ -65,12 +82,7 @@ export async function unhideEntity(id) {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: "hidden=0",
   });
-  try {
-    const res = await api("/api/entities/hidden");
-    patch({ hiddenEntities: (res && res.entities) || [] });
-  } catch (e) {
-    notify();
-  }
+  await Promise.all([reloadEntities(), refreshHiddenEntities()]);
 }
 
 /**
@@ -89,17 +101,6 @@ export async function runPref(pref, next, extra) {
   if (pref === "locale") {
     await setLocale(next);
     notify();
-    return;
-  }
-  if (pref === "units") {
-    // Legacy single toggle → preset
-    const nextPrefs = next === "imperial" ? presetUnits("imperial") : presetUnits("metric");
-    await saveUnitPrefs(nextPrefs);
-    return;
-  }
-  if (pref === "units_preset") {
-    if (next !== "metric" && next !== "imperial") return;
-    await saveUnitPrefs(presetUnits(next));
     return;
   }
   if (pref.indexOf("unit_") === 0) {
@@ -228,10 +229,10 @@ export async function runPref(pref, next, extra) {
     return;
   }
   if (pref === "cam-rec") {
-    // Legacy binary toggle → segment on / off
+    // Legacy binary toggle → DVR on / off
     const storage =
       (state.status && state.status.dvr && state.status.dvr.storageId) || "";
-    const mode = next === "1" ? "segment" : "off";
+    const mode = next === "1" ? "dvr" : "off";
     await api("/api/dvr/mode", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },

@@ -10,6 +10,7 @@ import {
   stopCameraLive,
   applyCameraPlayerSrc,
   ensureStoreLoaded,
+  isTimelineBusy,
 } from "./sections/index.js";
 import { loadShortcuts } from "./sections/shortcuts.js";
 import { shouldShowSetup, renderSetupOverlay } from "./ui/setup.js";
@@ -24,10 +25,30 @@ function updateNavActive(sec) {
   });
 }
 
+/** Hide nav items that require capabilities (e.g. Energia needs CHARGING|HYBRID_ENERGY). */
+function applyCapabilityNav() {
+  const caps = state.capabilities || [];
+  const has = function (name) {
+    return caps.indexOf(name) >= 0;
+  };
+  document.querySelectorAll(".nav-item[data-cap]").forEach(function (el) {
+    const needed = (el.getAttribute("data-cap") || "").split(",");
+    const ok = needed.some(function (c) {
+      return c && has(c.trim());
+    });
+    el.style.display = ok ? "" : "none";
+    if (!ok && state.section === el.getAttribute("data-sec")) {
+      patch({ section: "home" });
+      updateNavActive("home");
+    }
+  });
+}
+
 function shouldSkipSoftRender() {
   if (document.querySelector(".choice-select.open") || state.openChoiceId) return true;
   if (state.shortcutEdit) return true;
   if (state.pluginEditId) return true;
+  if (typeof isTimelineBusy === "function" && isTimelineBusy()) return true;
   const ae = document.activeElement;
   if (
     ae &&
@@ -52,12 +73,12 @@ function paint() {
   if (state.section === "store") ensureStoreLoaded();
 
   if (state.section === "cameras" || state.section === "dvr") {
-    if (state.cameraPlayerMode !== "recording") {
+    if (state.cameraPlayerMode !== "dvr") {
       Promise.resolve(startCameraLive()).then(function () {
         return applyCameraPlayerSrc();
       });
     }
-  } else if (state.cameraPreviewActive || state.cameraPlayerMode === "recording") {
+  } else if (state.cameraPreviewActive || state.cameraPlayerMode === "dvr") {
     stopCameraLive();
   }
 
@@ -161,17 +182,24 @@ export async function refresh() {
     lab: lab,
     token: token,
     prefs: updatesPrefs,
+    capabilities: (status && status.capabilities) || state.capabilities || [],
   };
   if (state._setupInit == null) {
     updates._setupInit = true;
     updates.showSetup = shouldShowSetup(setup);
   }
   Object.assign(state, updates);
+  applyCapabilityNav();
 
-  if (state.section === "history" && state.historySelected) {
-    await loadHistoryPoints();
+  if (state.section === "history") {
+    if (!state.historySelected && state.historyEntities && state.historyEntities.length) {
+      patch({ historySelected: state.historyEntities[0] });
+    }
+    if (state.historySelected) {
+      await loadHistoryPoints();
+    }
   }
-  if (state.section === "cabin" || !state._soundsLoaded) {
+  if (state.section === "sound" || !state._soundsLoaded) {
     state._soundsLoaded = true;
     await loadSounds();
   }
@@ -199,7 +227,7 @@ function goSection(sec) {
     stopCameraLive();
   }
 
-  const updates = { section: sec, openChoiceId: null };
+  const updates = { section: sec, openChoiceId: null, showHiddenGroup: null };
   if (sec === "store") updates._storeLoaded = false;
   patch(updates);
 
@@ -209,9 +237,10 @@ function goSection(sec) {
     });
   } else if (sec === "history") {
     if (!state.historySelected && state.historyEntities && state.historyEntities.length) {
-      state.historySelected = state.historyEntities[0];
+      patch({ historySelected: state.historyEntities[0], historyView: null });
+    } else {
+      patch({ historyView: null });
     }
-    state.historyView = null;
     loadHistoryPoints().then(function () {
       notify();
     });
@@ -221,13 +250,14 @@ function goSection(sec) {
       cameraPreviewSrc: "",
       cameraPlayerMode: "live",
       cameraPlayingName: "",
+      cameraPlayingKind: "",
       cameraPlaybackPaused: false,
       cameraPlaybackLoading: false,
     });
     loadRecordings().then(function () {
       notify();
     });
-  } else if (sec === "cabin") {
+  } else if (sec === "sound") {
     loadSounds().then(function () {
       notify();
     });
@@ -286,7 +316,14 @@ async function softRefresh() {
     const pair = await Promise.all([api("/api/entities"), api("/api/controls")]);
     state.entities = pair[0];
     state.controls = pair[1];
+    if (state.section === "cameras" || state.section === "dvr") {
+      try {
+        await loadRecordings();
+      } catch (e) {}
+    }
     if (shouldSkipSoftRender()) return;
+    // Timeline busy: still refresh timeline data above, but skip full paint.
+    if (typeof isTimelineBusy === "function" && isTimelineBusy()) return;
     // Remember scroll before notify so paint can restore within-section position.
     const main = $("main");
     if (main) rememberScroll(state.section, main.scrollTop);

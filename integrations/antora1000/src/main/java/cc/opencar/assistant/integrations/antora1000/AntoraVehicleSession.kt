@@ -144,6 +144,8 @@ class AntoraVehicleSession(
 
     override fun catalog(): List<CatalogEntry> = catalogEntries
 
+    override fun hasBinding(property: VehicleProperty): Boolean = resolve(property) != null
+
     override fun cameras(): List<CameraSource> {
         return try {
             val cm = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager

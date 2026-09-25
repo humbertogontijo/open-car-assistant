@@ -1,30 +1,35 @@
 import { html } from "../lit.js";
-import { t } from "../i18n.js";
-import { entitiesByGroup, groupByEntity } from "../store.js";
-import { entityGrid, entityLabel } from "../ui/cards.js";
+import {
+  entitiesByGroup,
+  groupByEntity,
+  hiddenEntitiesByGroup,
+  isShowingHidden,
+} from "../store.js";
+import { entityGrid, entityLabel, pageHead } from "../ui/cards.js";
 
 var FAMILY_ORDER = [
   "drive_mode",
   "regen",
   "steering",
   "brake",
+  "lock",
+  "window",
   "climate",
   "seat",
   "energy",
   "charging",
   "adas",
-  "lock",
   "light",
-  "window",
   "hud",
   "sensor",
   "android",
   "extra",
 ];
 
-export function familySections(items) {
+export function familySections(items, opts) {
+  opts = opts || {};
   if (!items || !items.length) {
-    return entityGrid(items);
+    return entityGrid(items, opts);
   }
   var buckets = groupByEntity(items);
   var keys = Object.keys(buckets);
@@ -39,15 +44,18 @@ export function familySections(items) {
   return keys.map(function (fam) {
     return html`
       <h2 class="section-label" style="margin:20px 0 10px">${entityLabel(fam)}</h2>
-      ${entityGrid(buckets[fam])}
+      ${entityGrid(buckets[fam], opts)}
     `;
   });
 }
 
 export function sectionGroup(title, sub, group) {
+  const viewing = isShowingHidden(group);
+  const items = viewing
+    ? hiddenEntitiesByGroup(group)
+    : entitiesByGroup(group);
   return html`
-    <h1>${title}</h1>
-    ${sub ? html`<p class="sub">${sub}</p>` : ""}
-    ${familySections(entitiesByGroup(group))}
+    ${pageHead(title, group, sub)}
+    ${familySections(items, viewing ? { restore: true } : null)}
   `;
 }

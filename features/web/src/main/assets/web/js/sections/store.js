@@ -115,19 +115,19 @@ export function sectionStore() {
         >
           ${t("store.back", "Voltar")}
         </button>
-        <div style="display:flex;gap:16px;margin-top:14px;align-items:flex-start">
+        <div class="row" style="gap:16px;margin-top:14px;align-items:flex-start;flex-wrap:wrap">
           ${detail.iconUrl
             ? html`<img
                 src=${detail.iconUrl}
                 alt=""
                 width="72"
                 height="72"
-                style="border-radius:16px;object-fit:cover;background:var(--surface-2)"
+                style="border-radius:16px;object-fit:cover;background:var(--surface-2);flex-shrink:0"
               />`
             : nothing}
-          <div style="flex:1">
+          <div style="flex:1;min-width:12rem">
             <h2 style="margin:0 0 6px">${detail.name || detail.packageName}</h2>
-            <p class="mono sub" style="margin:0 0 8px">${detail.packageName}</p>
+            <p class="mono sub" style="margin:0 0 8px;word-break:break-all">${detail.packageName}</p>
             <p class="sub">${detail.summary || ""}</p>
             ${!ready
               ? html`<p class="sub" style="color:var(--warn)">
@@ -170,13 +170,13 @@ export function sectionStore() {
     `;
   } else {
     body = html`
-      <div style="display:flex;gap:10px;margin-top:8px">
+      <div class="row" style="gap:10px;margin-top:8px;flex-wrap:wrap">
         <input
           class="field"
           type="search"
           placeholder=${t("store.search_ph", "Buscar apps")}
           .value=${q}
-          style="flex:1"
+          style="flex:1;min-width:10rem"
           @input=${function (ev) {
             state.storeQuery = ev.target.value;
           }}

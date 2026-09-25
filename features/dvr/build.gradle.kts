@@ -18,4 +18,5 @@ dependencies {
     api(project(":integration-api"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("androidx.core:core-ktx:1.15.0")
+    testImplementation("junit:junit:4.13.2")
 }

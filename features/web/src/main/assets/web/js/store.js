@@ -35,20 +35,27 @@ export const state = {
   historyRangeHours: 24,
   historyView: null,
   recordings: [],
+  dvrTimeline: { segments: [], recording: false },
+  /** Local calendar day for the DVR scrubber: "YYYY-MM-DD". null = today. */
+  dvrTimelineDay: null,
+  cameraTimelineAtMs: 0,
   cameraPreviewActive: false,
   /** Stable HLS URL while preview is active — avoid resetting video src on every render. */
   cameraPreviewSrc: "",
   cameraPreviewError: "",
-  /** Shared player: "live" HLS or "recording" clip playback. */
+  /** Shared player: "live" HLS or "dvr" clip playback. */
   cameraPlayerMode: "live",
   cameraPlayingName: "",
+  cameraPlayingKind: "",
   cameraPlaybackPaused: false,
+  /** Playback rate for live + DVR <video> (0.5–2). */
+  cameraPlaybackRate: 1,
   cameraPlaybackLoading: false,
-  cameraPlaybackIndex: 0,
-  cameraPlaybackCount: 0,
   cameraPlaybackDurationMs: 0,
   sounds: null,
   hiddenEntities: [],
+  /** When set to a group id, that page shows only its hidden cards. */
+  showHiddenGroup: null,
   labTab: "vhal",
   obd2: null,
   probeFilter: "",
@@ -97,6 +104,18 @@ export function entitiesByGroup(group) {
   return state.entities.filter(function (e) {
     return e.group === group;
   });
+}
+
+export function hiddenEntitiesByGroup(group) {
+  return (state.hiddenEntities || []).filter(function (e) {
+    return e.group === group;
+  });
+}
+
+export function isShowingHidden(group) {
+  return (
+    state.showHiddenGroup === group && hiddenEntitiesByGroup(group).length > 0
+  );
 }
 
 export function entitiesByType(type) {

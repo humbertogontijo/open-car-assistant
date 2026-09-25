@@ -63,7 +63,8 @@ export var UNIT_CHOICES = {
   energy_economy: ["kwh_100km", "km_kwh", "wh_km"],
 };
 
-var PRESET_METRIC = {
+/** Default / legacy metric map (also used when migrating old "metric" string prefs). */
+var DEFAULT_UNIT_PREFS = {
   temperature: "celsius",
   distance: "km",
   speed: "km_h",
@@ -71,7 +72,8 @@ var PRESET_METRIC = {
   energy_economy: "kwh_100km",
 };
 
-var PRESET_IMPERIAL = {
+/** Legacy imperial map for migrating old "imperial" string prefs. */
+var LEGACY_IMPERIAL_PREFS = {
   temperature: "fahrenheit",
   distance: "mi",
   speed: "mph",
@@ -80,7 +82,7 @@ var PRESET_IMPERIAL = {
 };
 
 export function defaultUnitPrefs() {
-  return Object.assign({}, PRESET_METRIC);
+  return Object.assign({}, DEFAULT_UNIT_PREFS);
 }
 
 /** Normalized per-dimension prefs object. */
@@ -88,8 +90,8 @@ export function unitPrefs() {
   var raw = (state.prefs && state.prefs.units) || {};
   if (typeof raw === "string") {
     return raw === "imperial"
-      ? Object.assign({}, PRESET_IMPERIAL)
-      : Object.assign({}, PRESET_METRIC);
+      ? Object.assign({}, LEGACY_IMPERIAL_PREFS)
+      : Object.assign({}, DEFAULT_UNIT_PREFS);
   }
   var out = defaultUnitPrefs();
   Object.keys(UNIT_CHOICES).forEach(function (dim) {
@@ -97,24 +99,6 @@ export function unitPrefs() {
     if (v && UNIT_CHOICES[dim].indexOf(v) >= 0) out[dim] = v;
   });
   return out;
-}
-
-/** Which preset matches current prefs (or null if mixed/custom). */
-export function unitPreset() {
-  var p = unitPrefs();
-  function match(preset) {
-    return Object.keys(preset).every(function (k) {
-      return p[k] === preset[k];
-    });
-  }
-  if (match(PRESET_METRIC)) return "metric";
-  if (match(PRESET_IMPERIAL)) return "imperial";
-  return "custom";
-}
-
-export function presetUnits(name) {
-  if (name === "imperial") return Object.assign({}, PRESET_IMPERIAL);
-  return Object.assign({}, PRESET_METRIC);
 }
 
 export function dimensionOf(unitId) {
@@ -253,10 +237,4 @@ export function formatDisplayNumber(canonicalUnitId, n, input) {
   var d = decimalsFor(disp, input);
   var factor = Math.pow(10, d);
   return String(Math.round(v * factor) / factor);
-}
-
-/** @deprecated Prefer unitPrefs / unitPreset */
-export function unitSystem() {
-  var p = unitPreset();
-  return p === "imperial" ? "imperial" : "metric";
 }

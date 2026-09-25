@@ -10,7 +10,7 @@ import cc.opencar.assistant.feature.memory.ExternalSettingsApplier
 import cc.opencar.assistant.support.I18nBundle
 
 /**
- * First-class Android radios (Wi‑Fi / Bluetooth) for the System → Android section.
+ * First-class Android radios (Wi‑Fi / Bluetooth) for the Conexão section.
  * Uses framework APIs — may need CHANGE_WIFI_STATE / BLUETOOTH_CONNECT on the HU.
  */
 class AndroidSettingsController(
@@ -78,7 +78,7 @@ class AndroidSettingsController(
         }
     }
 
-    fun entityMaps(
+        fun entityMaps(
         i18n: I18nBundle?,
         persist: Map<String, Map<String, Any?>>,
     ): List<Map<String, Any?>> {
@@ -123,7 +123,7 @@ class AndroidSettingsController(
         val pVal = pin?.get("value") as? String
         return mapOf(
             "id" to id,
-            "group" to "android",
+            "group" to "connect",
             "entity" to EntityType.ANDROID.id,
             "label" to label,
             "hint" to hint,
