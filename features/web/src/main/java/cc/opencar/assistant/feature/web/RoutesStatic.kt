@@ -10,6 +10,35 @@ import io.ktor.server.response.respondText
 import io.ktor.server.routing.Routing
 import io.ktor.server.routing.get
 
+/** Section path segments that serve the SPA shell (keep in sync with web/js/sections/ids.js). */
+private val SPA_SECTIONS = setOf(
+    "home",
+    "history",
+    "controls",
+    "drive",
+    "energy",
+    "lights",
+    "adas",
+    "assistant",
+    "display",
+    "sound",
+    "android",
+    "connect",
+    "vehicle",
+    "cameras",
+    "dvr",
+    "store",
+    "shortcuts",
+    "plugins",
+    "settings",
+    "system",
+    "climate",
+    "cabin",
+    "safety",
+    "lab",
+    "about",
+)
+
 internal fun Routing.registerStaticRoutes(deps: OcaWebDeps) {
     get("/") {
         call.response.headers.append(HttpHeaders.CacheControl, "no-store")
@@ -38,6 +67,22 @@ internal fun Routing.registerStaticRoutes(deps: OcaWebDeps) {
         }
         call.response.headers.append(HttpHeaders.CacheControl, "no-store")
         call.respondBytes(bytes, type)
+    }
+}
+
+/**
+ * SPA shell for known section paths. Register **after** API/debug routes so
+ * `/{section}` cannot shadow `/api`, `/debug`, etc.
+ */
+internal fun Routing.registerSpaFallbackRoutes(deps: OcaWebDeps) {
+    get("/{section}") {
+        val section = call.parameters["section"] ?: return@get
+        if (section !in SPA_SECTIONS) {
+            call.respond(HttpStatusCode.NotFound)
+            return@get
+        }
+        call.response.headers.append(HttpHeaders.CacheControl, "no-store")
+        call.respondText(deps.assetText("web/index.html"), ContentType.Text.Html)
     }
 }
 

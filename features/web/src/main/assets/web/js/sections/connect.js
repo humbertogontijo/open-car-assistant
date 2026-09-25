@@ -1,8 +1,8 @@
 import { html, nothing } from "../lit.js";
 import { t } from "../i18n.js";
-import { state, entitiesByGroup } from "../store.js";
+import { state, entitiesByGroup, hiddenEntitiesByGroup, isShowingHidden } from "../store.js";
 import { familySections } from "./group.js";
-import { prefCard, prefBool } from "../ui/cards.js";
+import { prefCard, prefBool, pageHead } from "../ui/cards.js";
 import { api } from "../api.js";
 
 function fmtBytes(n) {
@@ -27,19 +27,25 @@ function volumeLabel(v) {
   return t(v.labelKey || "cameras.storage.app", v.label || v.id || "");
 }
 
-export function sectionConnect() {
+/** Android / OS entities + helpers (not VHAL). Legacy `connect` deep-links here. */
+export function sectionAndroid() {
+  const group = "android";
+  const viewing = isShowingHidden(group);
+  const items = viewing
+    ? hiddenEntitiesByGroup(group)
+    : entitiesByGroup(group);
+
   const adb = state.adb || {};
   const volumes =
     (state.status && state.status.storage && state.status.storage.volumes) ||
     (state.status && state.status.dvr && state.status.dvr.storages) ||
     [];
+  const adbSub =
+    adb.enabled && adb.port
+      ? t("system.adb.port", "Porta") + " " + adb.port
+      : t("system.adb.sub", "TCP debugging on the head unit");
   const adbBody = html`
     ${prefBool("adb", adb.enabled)}
-    ${adb.enabled && adb.port
-      ? html`<p class="persist-note" style="margin:10px 0 0">
-          ${t("system.adb.port", "Porta")} ${adb.port}
-        </p>`
-      : nothing}
     ${adb.canToggle === false
       ? html`<p class="persist-note">
           ${t("system.adb.unavailable", "Toggle unavailable on this build")}
@@ -76,12 +82,19 @@ export function sectionConnect() {
     : html`<p class="persist-note">${t("android.storage.empty", "No volumes reported")}</p>`;
 
   return html`
-    <h1>${t("section.connect.title", "Conexão")}</h1>
-    ${familySections(entitiesByGroup("connect"))}
-    <div class="grid" style="margin-top:18px">
+    ${pageHead(
+      t("section.android.title", "Android"),
+      group,
+      t("section.android.sub", "Radios, media, brightness, and system helpers"),
+    )}
+    ${familySections(items, viewing ? { restore: true } : null)}
+    ${viewing
+      ? nothing
+      : html`<div class="grid" style="margin-top:18px">
       ${prefCard({
         icon: "usb",
         title: t("system.adb.title", "ADB sem fio"),
+        sub: adbSub,
         body: adbBody,
       })}
       ${prefCard({
@@ -102,6 +115,6 @@ export function sectionConnect() {
           ${t("system.android_settings", "Configurações do Android")}
         </button>`,
       })}
-    </div>
+    </div>`}
   `;
 }

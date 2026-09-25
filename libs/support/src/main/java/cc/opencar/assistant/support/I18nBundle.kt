@@ -105,6 +105,10 @@ class I18nBundle(
                         .getString(PREF_LOCALE, null)
                     ?: context.resources.configuration.locales[0]?.toLanguageTag(),
             )
+            val cacheKey = "$integrationId|$loc"
+            cached?.let { (key, bundle) ->
+                if (key == cacheKey) return bundle
+            }
             val strings = linkedMapOf<String, String>()
             val valueMaps = linkedMapOf<String, MutableMap<String, String>>()
 
@@ -115,7 +119,16 @@ class I18nBundle(
             if (loc != "en") mergePack(context, "i18n/$integrationId/$loc.json", strings, valueMaps)
 
             return I18nBundle(loc, integrationId, strings.toMap(), valueMaps.mapValues { it.value.toMap() })
+                .also { cached = cacheKey to it }
         }
+
+        /** Drop cached pack (e.g. after locale change). */
+        fun invalidateCache() {
+            cached = null
+        }
+
+        @Volatile
+        private var cached: Pair<String, I18nBundle>? = null
 
         private fun mergePack(
             context: Context,

@@ -204,10 +204,12 @@ class AssistantService : Service() {
             }
             shortcuts.attachOverlay(this@AssistantService)
             shortcuts.refreshOverlay()
-            updateEntryNotification(shortcuts.store.isOverlayEnabled())
+            // startForeground (not notify): initial onCreate posted an undecorated
+            // FGS notif before shortcuts existed; this reapplies Flyme status-icon extras.
+            publishEntryNotification(shortcuts.store.isOverlayEnabled())
             shortcuts.store.overlayEnabled
                 .distinctUntilChanged()
-                .collect { visible -> updateEntryNotification(visible) }
+                .collect { visible -> publishEntryNotification(visible) }
         }
     }
 
@@ -283,13 +285,12 @@ class AssistantService : Service() {
         return notification
     }
 
-    private fun updateEntryNotification(visible: Boolean) {
+    private fun publishEntryNotification(visible: Boolean) {
         try {
-            val mgr = getSystemService(NotificationManager::class.java)
-            mgr.notify(NOTIF_ID, buildNotification(entryVisible = visible))
-            Log.d(TAG, "quick entry notification updated visible=$visible")
+            startForeground(NOTIF_ID, buildNotification(entryVisible = visible))
+            Log.d(TAG, "quick entry notification published visible=$visible")
         } catch (t: Throwable) {
-            Log.w(TAG, "quick entry notification update failed: ${t.message}")
+            Log.w(TAG, "quick entry notification publish failed: ${t.message}")
         }
     }
 

@@ -11,16 +11,16 @@ import kotlinx.coroutines.flow.first
 /**
  * First-run readiness for the product shell.
  *
- * Default path is an unprivileged `/data` install:
- * Antora uses VenusVehicleServer gRPC for VHAL, so formal vendor/climate
- * grants are optional. Privileged (priv-app) switches to CarPropertyManager.
+ * Install model is user-space `/data` only. Antora uses VenusVehicleServer
+ * gRPC for VHAL. Platforms that need CarPropertyManager do that in their
+ * integration (`CarPropertyBackend`); core setup never elevates to priv-app.
  */
 object SetupStatus {
     data class PermCheck(
         val id: String,
         val label: String,
         val granted: Boolean,
-        val kind: String, // runtime | install | privileged
+        val kind: String, // runtime | install
         val hint: String,
     )
 
@@ -31,8 +31,6 @@ object SetupStatus {
         Triple("android.car.permission.CAR_ENERGY", "setup.perm.energy", "runtime"),
         Triple("android.car.permission.CAR_INFO", "setup.perm.info", "install"),
         Triple("android.car.permission.CAR_POWERTRAIN", "setup.perm.powertrain", "install"),
-        Triple("android.car.permission.CAR_VENDOR_EXTENSION", "setup.perm.vendor", "privileged"),
-        Triple("android.car.permission.CONTROL_CAR_CLIMATE", "setup.perm.climate", "privileged"),
     )
 
     suspend fun snapshot(
@@ -50,19 +48,16 @@ object SetupStatus {
                 kind = kind,
                 hint = when (kind) {
                     "runtime" -> i18n.t("setup.hint.runtime")
-                    "install" -> i18n.t("setup.hint.install")
-                    else -> i18n.t("setup.hint.privileged")
+                    else -> i18n.t("setup.hint.install")
                 },
             )
         }
         val runtimeOk = permissions.filter { it.kind == "runtime" }.all { it.granted }
-        val privilegedOk = permissions.filter { it.kind == "privileged" }.all { it.granted }
         val installOk = permissions.filter { it.kind == "install" }.all { it.granted }
         val telemetry = session.telemetry().first()
         val hasBasicTelemetry =
             telemetry.gear != null || telemetry.speedKmh != null || telemetry.evBatteryPercent != null
         val dismissed = prefs.getBoolean("setup_dismissed", false)
-        // Unprivileged-first: finish setup when runtime + telemetry work.
         val complete = (runtimeOk && hasBasicTelemetry) || dismissed
         val needsSetup = !complete
 
@@ -71,7 +66,6 @@ object SetupStatus {
             "needsSetup" to needsSetup,
             "runtimeOk" to runtimeOk,
             "installOk" to installOk,
-            "privilegedOk" to privilegedOk,
             "hasBasicTelemetry" to hasBasicTelemetry,
             "dismissed" to dismissed,
             "bridge" to (telemetry.extras["bridge"] ?: "unknown"),
@@ -102,28 +96,17 @@ object SetupStatus {
                     "done" to hasBasicTelemetry,
                     "detail" to i18n.t("setup.step.telemetry.detail"),
                 ),
-                mapOf(
-                    "id" to "privileged",
-                    "title" to i18n.t("setup.step.privileged"),
-                    "done" to privilegedOk,
-                    "optional" to true,
-                    "detail" to i18n.t("setup.step.privileged.detail"),
-                ),
             ),
             "actions" to mapOf(
                 "grant" to i18n.t("setup.action.grant"),
-                "elevate" to i18n.t("setup.action.elevate"),
                 "host" to i18n.t("setup.action.host"),
-                "reboot" to i18n.t("setup.action.reboot"),
                 "refresh" to i18n.t("setup.action.refresh"),
             ),
             "adbHints" to listOf(
                 "./tools/oca-setup -i ${session.integrationId} -H <ip> setup",
-                "./tools/oca-setup -i ${session.integrationId} -H <ip> setup --privileged",
                 "adb shell pm grant --user 11 ${context.packageName} android.car.permission.CAR_SPEED",
                 "adb shell pm grant --user 11 ${context.packageName} android.car.permission.CAR_ENERGY",
             ),
-            "elevate" to PrivilegeElevator(context, session.integrationId).status(),
         )
     }
 }

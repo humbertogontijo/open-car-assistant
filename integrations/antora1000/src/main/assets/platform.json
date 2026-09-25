@@ -2,167 +2,6038 @@
   "id": "antora1000",
   "displayName": "Antora 1000 (SE1000)",
   "backend": "vhal",
-  "match": ["antora1000", "se1000", "antora"],
+  "extends": [
+    "aosp",
+    "android"
+  ],
+  "match": [
+    "antora1000",
+    "se1000",
+    "antora"
+  ],
   "capabilities": [
-    "READ_TELEMETRY", "WRITE_SETTINGS", "DRIVE_MODES", "HVAC", "CHARGING",
-    "ADAS_TOGGLES", "LOCK_PROXIMITY", "WINDOWS_SUNROOF", "CAMERAS_DVR",
-    "GEAR_EVENTS", "IGNITION_EVENTS"
+    "READ_TELEMETRY",
+    "WRITE_SETTINGS",
+    "DRIVE_MODES",
+    "HVAC",
+    "CHARGING",
+    "ADAS_TOGGLES",
+    "LOCK_PROXIMITY",
+    "WINDOWS_SUNROOF",
+    "CAMERAS_DVR",
+    "GEAR_EVENTS",
+    "IGNITION_EVENTS"
   ],
   "dvr": {
     "fps": 5,
     "mosaicHeight": 720
   },
   "variants": [
-    { "id": "phev", "label": "PHEV / EM-i", "extraCapabilities": ["HYBRID_ENERGY"], "detect": "fuel_or_hybrid_soc" },
-    { "id": "bev", "label": "Battery electric", "extraCapabilities": [] },
-    { "id": "default", "label": "Antora default", "extraCapabilities": [] }
+    {
+      "id": "phev",
+      "label": "PHEV / EM-i",
+      "extraCapabilities": [
+        "HYBRID_ENERGY"
+      ],
+      "detect": "fuel_or_hybrid_soc"
+    },
+    {
+      "id": "bev",
+      "label": "Battery electric",
+      "extraCapabilities": []
+    },
+    {
+      "id": "default",
+      "label": "Antora default",
+      "extraCapabilities": []
+    }
   ],
   "driveModeEnum": {
     "5": "opt.drive_mode.1",
     "6": "opt.drive_mode.2",
     "7": "opt.drive_mode.3"
   },
-  "bindings": {
-    "gear": { "nativeId": "0x11400400", "areaId": 0 },
-    "speed_kmh": { "nativeId": "0x11600207", "areaId": 0 },
-    "ev_battery_level_raw": { "nativeId": "0x11600309", "areaId": 0 },
-    "ev_battery_percent": { "nativeId": "0x2160730e", "areaId": 0 },
-    "fuel_capacity": { "nativeId": "0x11600104", "areaId": 0 },
-    "fuel_percent": { "nativeId": "0x21607313", "areaId": 0 },
-    "range_km": { "nativeId": "0x11600308", "areaId": 0 },
-    "range_ev_km": { "nativeId": "0x216072da", "areaId": 0 },
-    "range_fuel_km": { "nativeId": "0x216072d9", "areaId": 0 },
-    "odometer_km": { "nativeId": "0x11600204", "areaId": 0 },
-    "temp_ambient_c": { "nativeId": "0x216072cc", "areaId": 0 },
-    "temp_indoor_c": { "nativeId": "0x216072cd", "areaId": 0 },
-    "battery_temp_c": { "nativeId": "0x21607653", "areaId": 0 },
-    "hvac_power": { "nativeId": "0x15200510", "areaId": 5 },
-    "hvac_temp_c": { "nativeId": "0x15600503", "areaId": 1 },
-    "hvac_fan": { "nativeId": "0x15400500", "areaId": 5 },
-    "hvac_fan_direction": { "nativeId": "0x15400501", "areaId": 1 },
-    "hvac_ac": { "nativeId": "0x15200505", "areaId": 117 },
-    "hvac_auto": { "nativeId": "0x1520050a", "areaId": 1 },
-    "hvac_recirc": { "nativeId": "0x15200508", "areaId": 117 },
-    "hvac_max_defrost": { "nativeId": "0x15200507", "areaId": 117 },
-    "hvac_max_ac": { "nativeId": "0x15200506", "areaId": 117 },
-    "hvac_seat_vent": { "nativeId": "0x15400513", "areaId": 1 },
-    "hvac_eco": { "nativeId": "0x252070b0", "areaId": 117 },
-    "hybrid_soc": { "nativeId": "0x21607176", "areaId": 0 },
-    "charge_current": { "nativeId": "0x21607272", "areaId": 0 },
-    "charge_limit": { "nativeId": "0x21607273", "areaId": 0 },
-    "charge_plug": { "nativeId": "0x21407289", "areaId": 0 },
-    "charge_v2l": { "nativeId": "0x21207282", "areaId": 0 },
-    "charge_v2v": { "nativeId": "0x21207281", "areaId": 0 },
-    "charge_parking": { "nativeId": "0x21207359", "areaId": 0 },
-    "charge_soc_max": { "nativeId": "0x2160726f", "areaId": 0 },
-    "charge_soc_min": { "nativeId": "0x21607270", "areaId": 0 },
-    "charge_estimated_time": { "nativeId": "0x2160728d", "areaId": 0 },
-    "charge_energy": { "nativeId": "0x2160728f", "areaId": 0 },
-    "charge_work_current": { "nativeId": "0x2160728c", "areaId": 0 },
-    "charge_work_voltage": { "nativeId": "0x2160728b", "areaId": 0 },
-    "charge_discharge_soc": { "nativeId": "0x21607283", "areaId": 0 },
-    "avg_energy_kwh_100km": { "nativeId": "0x2160765f", "areaId": 0 },
-    "avg_fuel_l_100km": { "nativeId": "0x2160768a", "areaId": 0 },
-    "energy_flow_driving": { "nativeId": "0x216074e9", "areaId": 0 },
-    "energy_flow_battery": { "nativeId": "0x216074eb", "areaId": 0 },
-    "energy_flow_climate": { "nativeId": "0x216074ea", "areaId": 0 },
-    "maintenance_mileage_km": { "nativeId": "0x2160730a", "areaId": 0 },
-    "since_maintenance_km": { "nativeId": "0x2160767b", "areaId": 0 },
-    "drive_mode": { "nativeId": "0x214070f9", "areaId": 0 },
-    "drive_pure": { "nativeId": "0x2120733b", "areaId": 0 },
-    "drive_hybrid": { "nativeId": "0x2120733c", "areaId": 0 },
-    "drive_power": { "nativeId": "0x2120733d", "areaId": 0 },
-    "regen": { "nativeId": "0x21407008", "areaId": 0 },
-    "ignition": { "nativeId": "0x11400409", "areaId": 0 },
-    "brake_pedal_mode": { "nativeId": "0x21407502", "areaId": 0 },
-    "esc_sport": { "nativeId": "0x21207006", "areaId": 0 },
-    "auto_hold": { "nativeId": "0x21207018", "areaId": 0 },
-    "hdc": { "nativeId": "0x2120717c", "areaId": 0 },
-    "steer_heavy": { "nativeId": "0x2120748d", "areaId": 0 },
-    "steer_medium": { "nativeId": "0x2120748e", "areaId": 0 },
-    "steer_soft": { "nativeId": "0x2120748f", "areaId": 0 },
-    "cst": { "nativeId": "0x212073a2", "areaId": 0 },
-    "intelligent_steer": { "nativeId": "0x21207614", "areaId": 0 },
-    "speed_limit_warn": { "nativeId": "0x2140719c", "areaId": 0 },
-    "speed_limit_max": { "nativeId": "0x21407427", "areaId": 0 },
-    "lane_change_warn": { "nativeId": "0x21407181", "areaId": 0 },
-    "ldw": { "nativeId": "0x21407182", "areaId": 0 },
-    "fcda": { "nativeId": "0x21207644", "areaId": 0 },
-    "idas_mode": { "nativeId": "0x214073cd", "areaId": 0 },
-    "dow": { "nativeId": "0x26207192", "areaId": 0 },
-    "dms": { "nativeId": "0x21207505", "areaId": 0 },
-    "day_mode": { "nativeId": "0x214071e8", "areaId": 0 },
-    "night_mode": { "nativeId": "0x2120764a", "areaId": 0 },
-    "esm_volume": { "nativeId": "0x21407053", "areaId": 0 },
-    "esm_sound": { "nativeId": "0x21407622", "areaId": 0 },
-    "media_volume": { "nativeId": "0x21407689", "areaId": 0 },
-    "ambience_main_color": { "nativeId": "0x21407027", "areaId": 0 },
-    "ambience_intensity": { "nativeId": "0x254071c3", "areaId": 5 },
-    "parking_comfort": { "nativeId": "0x21207626", "areaId": 0 },
-    "nap_mode": { "nativeId": "0x212072b9", "areaId": 0 },
-    "space_capsule": { "nativeId": "0x21207513", "areaId": 0 },
-    "sunroof_tilt": { "nativeId": "0x23207156", "areaId": 65536 },
-    "approach_unlock": { "nativeId": "0x21207253", "areaId": 0 },
-    "away_lock": { "nativeId": "0x21207255", "areaId": 0 },
-    "central_lock": { "nativeId": "0x21207040", "areaId": 0 },
-    "audible_lock": { "nativeId": "0x2120703a", "areaId": 0 },
-    "keyless_unlock": { "nativeId": "0x2140703b", "areaId": 0 },
-    "twostep_unlock": { "nativeId": "0x21207041", "areaId": 0 },
-    "p_gear_unlock": { "nativeId": "0x2620725f", "areaId": 0 },
-    "mirror_auto_fold": { "nativeId": "0x24207024", "areaId": 0 },
-    "auto_close_window": { "nativeId": "0x2120701f", "areaId": 0 },
-    "courtesy_light": { "nativeId": "0x21207010", "areaId": 0 },
-    "approach_light": { "nativeId": "0x21207013", "areaId": 0 },
-    "exterior_light": { "nativeId": "0x21407016", "areaId": 0 },
-    "home_safe_light": { "nativeId": "0x21407011", "areaId": 0 },
-    "rear_fog": { "nativeId": "0x11400e12", "areaId": 0 },
-    "headlight_height": { "nativeId": "0x21407220", "areaId": 0 },
-    "usb_mode": { "nativeId": "0x21407628", "areaId": 0 },
-    "lane_keeping": { "nativeId": "0x2120717d", "areaId": 0 },
-    "elka": { "nativeId": "0x21207183", "areaId": 0 },
-    "aeb": { "nativeId": "0x2120718b", "areaId": 0 },
-    "fcw": { "nativeId": "0x21407191", "areaId": 0 },
-    "rcta": { "nativeId": "0x21207187", "areaId": 0 },
-    "rcw": { "nativeId": "0x2120718d", "areaId": 0 },
-    "battery_hold": { "nativeId": "0x21207175", "areaId": 0 },
-    "battery_save": { "nativeId": "0x21207174", "areaId": 0 },
-    "battery_mode": { "nativeId": "0x214075b4", "areaId": 0 },
-    "hud_active": { "nativeId": "0x21207042", "areaId": 0 },
-    "hud_snow": { "nativeId": "0x2120720d", "areaId": 0 },
-    "hud_ar": { "nativeId": "0x2120720e", "areaId": 0 },
-    "info_model": { "nativeId": "0x11100102", "areaId": 0 },
-    "info_vin": { "nativeId": "0x11100100", "areaId": 0 },
-    "vr_activated": { "nativeId": "0x21407537", "areaId": 0 },
-    "wheel_custom_key": { "nativeId": "0x21407171", "areaId": 0 },
-    "hvac_auto_dry": { "nativeId": "0x212075c8", "areaId": 0 },
-    "hvac_rapid_cool": { "nativeId": "0x21207677", "areaId": 0 },
-    "hvac_rapid_heat": { "nativeId": "0x21207678", "areaId": 0 },
-    "charge_pre_now": { "nativeId": "0x21207376", "areaId": 0 },
-    "vehicle_locator_mode": { "nativeId": "0x21407049", "areaId": 0 },
-    "trunk_open_height": { "nativeId": "0x2640725b", "areaId": 0 },
-    "easy_ingress": { "nativeId": "0x25207227", "areaId": 0 },
-    "speed_volume": { "nativeId": "0x21407416", "areaId": 0 }
+  "android": {
+    "volumeGroups": [
+      {
+        "groupId": 0,
+        "settingsKey": "android.car.VOLUME_GROUP/0",
+        "entity": "cabin_vol_media",
+        "access": "rw",
+        "writeVia": "media_keyevent"
+      },
+      {
+        "groupId": 2,
+        "settingsKey": "android.car.VOLUME_GROUP/2",
+        "entity": "cabin_vol_navigation",
+        "access": "r"
+      },
+      {
+        "groupId": 6,
+        "settingsKey": "android.car.VOLUME_GROUP/6",
+        "entity": "cabin_vol_voice",
+        "access": "r"
+      },
+      {
+        "groupId": 3,
+        "settingsKey": "android.car.VOLUME_GROUP/3",
+        "entity": "cabin_vol_call",
+        "access": "r"
+      },
+      {
+        "groupId": 7,
+        "settingsKey": "android.car.VOLUME_GROUP/7",
+        "entity": "cabin_vol_ring",
+        "access": "r"
+      }
+    ]
   },
-  "writableAllowlist": [
-    "0x21407008", "0x214070f9",
-    "0x21207006", "0x21207018", "0x2120717c", "0x2120748d", "0x2120748e", "0x2120748f",
-    "0x21407502", "0x21207174", "0x21207175", "0x214075b4", "0x21607272",
-    "0x21207282", "0x21207281", "0x21207359", "0x21207253", "0x21207255",
-    "0x21207040", "0x2120703a", "0x2120701f", "0x21207010", "0x21207013",
-    "0x21407628", "0x2120717d", "0x21207183", "0x2120718b", "0x21407191",
-    "0x21207187", "0x2120718d", "0x21207042", "0x2120720d", "0x2120720e",
-    "0x15200510", "0x15400500", "0x15400501", "0x15600503", "0x15200505",
-    "0x1520050a", "0x15200508", "0x15200507", "0x15200506", "0x15400513",
-    "0x252070b0", "0x212073a2", "0x2140719c", "0x21407181",
-    "0x21207505", "0x2160726f", "0x21607270", "0x21607273", "0x21607283", "0x214071e8", "0x2120764a",
-    "0x21407053", "0x21407622", "0x21407027", "0x254071c3", "0x21207626",
-    "0x23207156", "0x21407171",
-    "0x21407182", "0x21207644", "0x214073cd", "0x26207192",
-    "0x21407016", "0x21407011", "0x212072b9", "0x21207513",
-    "0x2140703b", "0x21207041", "0x2620725f", "0x24207024",
-    "0x212075c8", "0x21207677", "0x21207678", "0x21207614",
-    "0x21407689", "0x21207376",
-    "0x21407537",
-    "0x11400e12", "0x21407220", "0x21407049", "0x2640725b", "0x25207227", "0x21407416"
+  "properties": [
+    {
+      "id": "0x11100100",
+      "key": "INFO_VIN",
+      "access": "r",
+      "changeMode": "static",
+      "areas": [
+        0
+      ],
+      "entity": "info_vin"
+    },
+    {
+      "id": "0x11100101",
+      "key": "INFO_MAKE",
+      "access": "r",
+      "changeMode": "static",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11100102",
+      "key": "INFO_MODEL",
+      "access": "r",
+      "changeMode": "static",
+      "areas": [
+        0
+      ],
+      "entity": "info_model"
+    },
+    {
+      "id": "0x11200308",
+      "key": "FUEL_DOOR_OPEN",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x1120030a",
+      "key": "EV_CHARGE_PORT_OPEN",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x1120030b",
+      "key": "EV_CHARGE_PORT_CONNECTED",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11200402",
+      "key": "PARKING_BRAKE_ON",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11200405",
+      "key": "FUEL_LEVEL_LOW",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11200407",
+      "key": "NIGHT_MODE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x1120040a",
+      "key": "ABS_ACTIVE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x1120040b",
+      "key": "TRACTION_CONTROL_ACTIVE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11200b45",
+      "key": "MIRROR_FOLD",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11200f05",
+      "key": "SUPPORT_CUSTOMIZE_VENDOR_PERMISSION",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11400103",
+      "key": "INFO_MODEL_YEAR",
+      "access": "r",
+      "changeMode": "static",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11400108",
+      "key": "INFO_FUEL_DOOR_LOCATION",
+      "access": "r",
+      "changeMode": "static",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11400109",
+      "key": "INFO_EV_PORT_LOCATION",
+      "access": "r",
+      "changeMode": "static",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11400303",
+      "key": "ENGINE_OIL_LEVEL",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11400400",
+      "key": "GEAR_SELECTION",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "gear"
+    },
+    {
+      "id": "0x11400401",
+      "key": "CURRENT_GEAR",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11400408",
+      "key": "TURN_SIGNAL_STATE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11400409",
+      "key": "IGNITION_STATE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "ignition"
+    },
+    {
+      "id": "0x1140050e",
+      "key": "HVAC_TEMPERATURE_DISPLAY_UNITS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11400600",
+      "key": "DISTANCE_DISPLAY_UNITS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11400602",
+      "key": "TIRE_PRESSURE_DISPLAY_UNITS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11400605",
+      "key": "VEHICLE_SPEED_DISPLAY_UNITS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11400a03",
+      "key": "DISPLAY_BRIGHTNESS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11400e00",
+      "key": "HEADLIGHTS_STATE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11400e01",
+      "key": "HIGH_BEAM_LIGHTS_STATE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11400e02",
+      "key": "FOG_LIGHTS_STATE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11400e03",
+      "key": "HAZARD_LIGHTS_STATE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11400e10",
+      "key": "HEADLIGHTS_SWITCH",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11400e11",
+      "key": "HIGH_BEAM_LIGHTS_SWITCH",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11400e12",
+      "key": "FOG_LIGHTS_SWITCH",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "rear_fog"
+    },
+    {
+      "id": "0x11400e13",
+      "key": "HAZARD_LIGHTS_SWITCH",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11410105",
+      "key": "INFO_FUEL_TYPE",
+      "access": "r",
+      "changeMode": "static",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11410107",
+      "key": "INFO_EV_CONNECTOR_TYPE",
+      "access": "r",
+      "changeMode": "static",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x1141010b",
+      "key": "INFO_EXTERIOR_DIMENSIONS",
+      "access": "r",
+      "changeMode": "static",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x1141010c",
+      "key": "INFO_MULTI_EV_PORT_LOCATIONS",
+      "access": "r",
+      "changeMode": "static",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11410a00",
+      "key": "AP_POWER_STATE_REQ",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11410a01",
+      "key": "AP_POWER_STATE_REPORT",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11410a10",
+      "key": "HW_KEY_INPUT",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11410a20",
+      "key": "HW_ROTARY_INPUT",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11510306",
+      "key": "WHEEL_TICK",
+      "access": "r",
+      "changeMode": "continuous",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11600104",
+      "key": "INFO_FUEL_CAPACITY",
+      "access": "r",
+      "changeMode": "static",
+      "areas": [
+        0
+      ],
+      "entity": "fuel_capacity"
+    },
+    {
+      "id": "0x11600106",
+      "key": "INFO_EV_BATTERY_CAPACITY",
+      "access": "r",
+      "changeMode": "static",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11600204",
+      "key": "PERF_ODOMETER",
+      "access": "r",
+      "changeMode": "continuous",
+      "areas": [
+        0
+      ],
+      "entity": "odometer_km"
+    },
+    {
+      "id": "0x11600207",
+      "key": "PERF_VEHICLE_SPEED",
+      "access": "r",
+      "changeMode": "continuous",
+      "areas": [
+        0
+      ],
+      "entity": "speed_kmh"
+    },
+    {
+      "id": "0x11600208",
+      "key": "PERF_VEHICLE_SPEED_DISPLAY",
+      "access": "r",
+      "changeMode": "continuous",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11600209",
+      "key": "PERF_STEERING_ANGLE",
+      "access": "r",
+      "changeMode": "continuous",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11600210",
+      "key": "PERF_REAR_STEERING_ANGLE",
+      "access": "r",
+      "changeMode": "continuous",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11600304",
+      "key": "ENGINE_OIL_TEMP",
+      "access": "r",
+      "changeMode": "continuous",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11600305",
+      "key": "ENGINE_RPM",
+      "access": "r",
+      "changeMode": "continuous",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11600307",
+      "key": "FUEL_LEVEL",
+      "access": "r",
+      "changeMode": "continuous",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11600308",
+      "key": "RANGE_REMAINING",
+      "access": "r",
+      "changeMode": "continuous",
+      "areas": [
+        0
+      ],
+      "entity": "range_km"
+    },
+    {
+      "id": "0x11600309",
+      "key": "EV_BATTERY_LEVEL",
+      "access": "r",
+      "changeMode": "continuous",
+      "areas": [
+        0
+      ],
+      "entity": "ev_battery_level_raw"
+    },
+    {
+      "id": "0x1160030c",
+      "key": "EV_BATTERY_INSTANTANEOUS_CHARGE_RATE",
+      "access": "r",
+      "changeMode": "continuous",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11600703",
+      "key": "ENV_OUTSIDE_TEMPERATURE",
+      "access": "r",
+      "changeMode": "continuous",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11e00c00",
+      "key": "VEHICLE_MAP_SERVICE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11e00d00",
+      "key": "OBD2_LIVE_FRAME",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11e00d01",
+      "key": "OBD2_FREEZE_FRAME",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11e00d02",
+      "key": "OBD2_FREEZE_FRAME_INFO",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11e00d03",
+      "key": "OBD2_FREEZE_FRAME_CLEAR",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11e00f07",
+      "key": "INITIAL_USER_INFO",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11e00f08",
+      "key": "SWITCH_USER",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11e00f09",
+      "key": "CREATE_USER",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11e00f0a",
+      "key": "REMOVE_USER",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x11e00f0b",
+      "key": "USER_IDENTIFICATION_ASSOCIATION",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x13200514",
+      "key": "HVAC_ELECTRIC_DEFROSTER_ON",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        2
+      ]
+    },
+    {
+      "id": "0x13200bc4",
+      "key": "WINDOW_LOCK",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1344
+      ]
+    },
+    {
+      "id": "0x13400bc0",
+      "key": "WINDOW_POS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        16,
+        64,
+        256,
+        1024,
+        65536,
+        131072
+      ]
+    },
+    {
+      "id": "0x13400bc1",
+      "key": "WINDOW_MOVE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        65536,
+        131072
+      ]
+    },
+    {
+      "id": "0x15200505",
+      "key": "HVAC_AC_ON",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        117
+      ],
+      "entity": "hvac_ac"
+    },
+    {
+      "id": "0x15200506",
+      "key": "HVAC_MAX_AC_ON",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        117
+      ],
+      "entity": "hvac_max_ac"
+    },
+    {
+      "id": "0x15200507",
+      "key": "HVAC_MAX_DEFROST_ON",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        117
+      ],
+      "entity": "hvac_max_defrost"
+    },
+    {
+      "id": "0x15200508",
+      "key": "HVAC_RECIRC_ON",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        117
+      ],
+      "entity": "hvac_recirc"
+    },
+    {
+      "id": "0x1520050a",
+      "key": "HVAC_AUTO_ON",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        1
+      ],
+      "entity": "hvac_auto"
+    },
+    {
+      "id": "0x15200510",
+      "key": "HVAC_POWER_ON",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        5
+      ],
+      "entity": "hvac_power"
+    },
+    {
+      "id": "0x15200512",
+      "key": "HVAC_AUTO_RECIRC_ON",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        117
+      ]
+    },
+    {
+      "id": "0x1540010a",
+      "key": "INFO_DRIVER_SEAT",
+      "access": "r",
+      "changeMode": "static",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x15400500",
+      "key": "HVAC_FAN_SPEED",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        5,
+        117
+      ],
+      "entity": "hvac_fan"
+    },
+    {
+      "id": "0x15400501",
+      "key": "HVAC_FAN_DIRECTION",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        1
+      ],
+      "entity": "hvac_fan_direction"
+    },
+    {
+      "id": "0x15400513",
+      "key": "HVAC_SEAT_VENTILATION",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        4
+      ],
+      "entity": "hvac_seat_vent"
+    },
+    {
+      "id": "0x15400b85",
+      "key": "SEAT_FORE_AFT_POS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1
+      ]
+    },
+    {
+      "id": "0x15400b86",
+      "key": "SEAT_FORE_AFT_MOVE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1
+      ]
+    },
+    {
+      "id": "0x15400b87",
+      "key": "SEAT_BACKREST_ANGLE_1_POS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1
+      ]
+    },
+    {
+      "id": "0x15400b88",
+      "key": "SEAT_BACKREST_ANGLE_1_MOVE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1
+      ]
+    },
+    {
+      "id": "0x15400b8b",
+      "key": "SEAT_HEIGHT_POS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1
+      ]
+    },
+    {
+      "id": "0x15400b8c",
+      "key": "SEAT_HEIGHT_MOVE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1
+      ]
+    },
+    {
+      "id": "0x15400f04",
+      "key": "READING_LIGHTS_SWITCH",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        2,
+        4,
+        16,
+        64
+      ]
+    },
+    {
+      "id": "0x15410511",
+      "key": "HVAC_FAN_DIRECTION_AVAILABLE",
+      "access": "r",
+      "changeMode": "static",
+      "areas": [
+        117
+      ]
+    },
+    {
+      "id": "0x15600503",
+      "key": "HVAC_TEMPERATURE_SET",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        1
+      ],
+      "entity": "hvac_temp_c"
+    },
+    {
+      "id": "0x16200b02",
+      "key": "DOOR_LOCK",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        4,
+        16,
+        64
+      ]
+    },
+    {
+      "id": "0x16400b00",
+      "key": "DOOR_POS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        4,
+        16,
+        64,
+        536870912
+      ]
+    },
+    {
+      "id": "0x16400b01",
+      "key": "DOOR_MOVE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        536870912
+      ]
+    },
+    {
+      "id": "0x17600309",
+      "key": "TIRE_PRESSURE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        2,
+        4,
+        8
+      ]
+    },
+    {
+      "id": "0x21100104",
+      "key": "0x21100104",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x211073c0",
+      "key": "DEVICE_IHUID",
+      "access": "r",
+      "changeMode": "static",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x211073c1",
+      "key": "DEVICE_XDSN",
+      "access": "r",
+      "changeMode": "static",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x211073c2",
+      "key": "DEVICE_VER_MCU_FIRMWARE",
+      "access": "r",
+      "changeMode": "static",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x211073c3",
+      "key": "DEVICE_VER_MCU_HARDWARE",
+      "access": "r",
+      "changeMode": "static",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x211073cb",
+      "key": "DEVICE_VEHICLE_TYPE_CONFIG",
+      "access": "r",
+      "changeMode": "static",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x211073f3",
+      "key": "INIT_PROFILE_INFO",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2110747c",
+      "key": "PN_MASTER_CP",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2110747e",
+      "key": "PN_MCU",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x211074e0",
+      "key": "DEVICE_PROJECT_CODE",
+      "access": "r",
+      "changeMode": "static",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x211074e1",
+      "key": "DEVICE_SUPPLIER_CODE",
+      "access": "r",
+      "changeMode": "static",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2110765d",
+      "key": "CONFIG_INFO_TARGET_MARKET",
+      "access": "r",
+      "changeMode": "static",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21108015",
+      "key": "PA_VIN_V",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21108016",
+      "key": "PA_VP_V",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2110801f",
+      "key": "PA_M",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21200000",
+      "key": "0x21200000",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207006",
+      "key": "SETTING_FUNC_ESC_SPORT_MODE",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "esc_sport"
+    },
+    {
+      "id": "0x21207010",
+      "key": "SETTING_FUNC_LAMP_AUTOMATIC_COURTESY_LIGHT",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "courtesy_light"
+    },
+    {
+      "id": "0x21207013",
+      "key": "SETTING_FUNC_LAMP_APPROACH_LIGHT",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "approach_light"
+    },
+    {
+      "id": "0x21207018",
+      "key": "SETTING_FUNC_AUTO_HOLD",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "auto_hold"
+    },
+    {
+      "id": "0x2120701a",
+      "key": "SETTING_FUNC_PBC_DOUBLE_EPB_SWITCH",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2120701f",
+      "key": "SETTING_FUNC_AUTO_CLOSE_WINDOW",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "auto_close_window"
+    },
+    {
+      "id": "0x2120703a",
+      "key": "SETTING_FUNC_AUDIBLE_LOCKING_FEEDBACK",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "audible_lock"
+    },
+    {
+      "id": "0x21207040",
+      "key": "SETTING_FUNC_CENTRAL_LOCK",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "central_lock"
+    },
+    {
+      "id": "0x21207041",
+      "key": "SETTING_FUNC_TWOSTEP_UNLOCKING",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "twostep_unlock"
+    },
+    {
+      "id": "0x21207042",
+      "key": "SETTING_FUNC_HUD_ACTIVE",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "hud_active"
+    },
+    {
+      "id": "0x21207043",
+      "key": "SETTING_FUNC_HUD_CALIBRATION",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207046",
+      "key": "SETTING_FUNC_CAR_LOCATOR",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2120704b",
+      "key": "SETTING_FUNC_TCAM_RESET",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207107",
+      "key": "DM_FUNC_STEERING_WHEEL_FEEL_SYNC_DRIVEMODE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207164",
+      "key": "BCM_FUNC_LIGHT_ATMOSPHERE_LAMPS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2120716f",
+      "key": "BCM_FUNC_POWER_ONOFF",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207170",
+      "key": "BCM_FUNC_DISPLAY_ONOFF",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207174",
+      "key": "HYBRID_FUNC_BATTERY_SAVE_MODE",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "battery_save"
+    },
+    {
+      "id": "0x21207175",
+      "key": "HYBRID_FUNC_BATTERY_CHARGE_MODE",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "battery_hold"
+    },
+    {
+      "id": "0x2120717c",
+      "key": "SETTING_FUNC_HDC_SWITCH",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "hdc"
+    },
+    {
+      "id": "0x2120717d",
+      "key": "SETTING_FUNC_LANE_KEEPING_AID",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "lane_keeping"
+    },
+    {
+      "id": "0x21207183",
+      "key": "SETTING_FUNC_EMGY_LANE_KEEP_AID",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "elka"
+    },
+    {
+      "id": "0x21207187",
+      "key": "SETTING_FUNC_REAR_CROSS_TRAFFIC_ALERT",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "rcta"
+    },
+    {
+      "id": "0x2120718b",
+      "key": "SETTING_FUNC_AUTONOMOUS_EMERGENCY_BRAKING",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "aeb"
+    },
+    {
+      "id": "0x2120718d",
+      "key": "SETTING_FUNC_REAR_COLLISION_WARNING",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "rcw"
+    },
+    {
+      "id": "0x212071cf",
+      "key": "SETTING_FUNC_AMBIENCE_LIGHT_ENDURANCE_MIL_REMINDER",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x212071d0",
+      "key": "SETTING_FUNC_AMBIENCE_LIGHT_PHONE_CALL_REMINDER",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x212071d3",
+      "key": "SETTING_FUNC_AMBIENCE_LIGHT_WELCOME_SHOW_MODE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x212071d6",
+      "key": "SETTING_FUNC_AMBIENCE_LIGHT_VOICE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x212071e0",
+      "key": "SETTING_FUNC_AMBIENCE_LIGHT_CLIMATE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x212071ef",
+      "key": "SETTING_FUNC_BACKLIGHT_LINKAGE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2120720b",
+      "key": "SETTING_FUNC_HUD_ANGLE_ADJUST",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2120720c",
+      "key": "SETTING_FUNC_HUD_ANGLE_RESET",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2120720d",
+      "key": "SETTING_FUNC_HUD_SNOW_MODE",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "hud_snow"
+    },
+    {
+      "id": "0x2120720e",
+      "key": "SETTING_FUNC_HUD_AR_ENGINE",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "hud_ar"
+    },
+    {
+      "id": "0x21207253",
+      "key": "SETTING_FUNC_APPROACH_UNLOCK",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "approach_unlock"
+    },
+    {
+      "id": "0x21207255",
+      "key": "SETTING_FUNC_AWAY_LOCK",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "away_lock"
+    },
+    {
+      "id": "0x2120727c",
+      "key": "CHARGE_FUNC_EXTERNAL_CHARGING_LIGHT",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207281",
+      "key": "CHARGE_FUNC_DISCHARGING_SWITCH_V2V",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "charge_v2v"
+    },
+    {
+      "id": "0x21207282",
+      "key": "CHARGE_FUNC_DISCHARGING_SWITCH_V2L",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "charge_v2l"
+    },
+    {
+      "id": "0x212072a8",
+      "key": "TRIP_FUNC_RESET",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x212072b9",
+      "key": "SCENE_FUNC_NAP_MODE",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "nap_mode"
+    },
+    {
+      "id": "0x2120733b",
+      "key": "DRIVE_MODE_SELECTION_PURE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "drive_pure"
+    },
+    {
+      "id": "0x2120733c",
+      "key": "DRIVE_MODE_SELECTION_HYBRID",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "drive_hybrid"
+    },
+    {
+      "id": "0x2120733d",
+      "key": "DRIVE_MODE_SELECTION_POWER",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "drive_power"
+    },
+    {
+      "id": "0x2120734b",
+      "key": "LAMP_EXTERIOR_LIGHT_CONTROL_POS_LIGHT",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2120734c",
+      "key": "LAMP_EXTERIOR_LIGHT_CONTROL_LOWBEAM",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2120734d",
+      "key": "LAMP_EXTERIOR_LIGHT_CONTROL_AUTOMATIC",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207359",
+      "key": "CHARGE_FUNC_PARKING",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "charge_parking"
+    },
+    {
+      "id": "0x21207376",
+      "key": "CHARGE_FUNC_PRE_CHARGING_IMMEDIATELY",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "charge_pre_now"
+    },
+    {
+      "id": "0x2120739f",
+      "key": "BCM_FUNC_POWER_OFF_NOTICE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x212073a2",
+      "key": "SETTING_FUNC_CST_SWITCH",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "cst"
+    },
+    {
+      "id": "0x212073bb",
+      "key": "LAMP_EXTERIOR_LIGHT_CONTROL_OFF",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207418",
+      "key": "SETTING_FUNC_AUDIO_2D_SURROUND_SHOUND_EFFECT_SWITCH",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2120741f",
+      "key": "SETTING_FUNC_AUDIO_HEAD_PILLOW",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207443",
+      "key": "TYPE_JOY_LIMIT_SWITCH",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2120747f",
+      "key": "SETTING_FUNC_BRIGHTNESS_AUTO_ADJUST",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2120748d",
+      "key": "SETTING_FUNC_STEERING_ASSISTANCE_LEVEL_HEAVY",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "steer_heavy"
+    },
+    {
+      "id": "0x2120748e",
+      "key": "SETTING_FUNC_STEERING_ASSISTANCE_LEVEL_MEDIUM",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "steer_medium"
+    },
+    {
+      "id": "0x2120748f",
+      "key": "SETTING_FUNC_STEERING_ASSISTANCE_LEVEL_SOFT",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "steer_soft"
+    },
+    {
+      "id": "0x212074a7",
+      "key": "PROFILE_DRVR_SEAT_ADJUST",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x212074ab",
+      "key": "PROFILE_HUD_ADJUST",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x212074e2",
+      "key": "CHARGE_FUNC_DISCHARGING_NOTIFICATION_FINISHED",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207505",
+      "key": "DMS_DPS_SWITCH",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "dms"
+    },
+    {
+      "id": "0x21207513",
+      "key": "SETTING_SPACE_CAPSULE_SWITCH",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "space_capsule"
+    },
+    {
+      "id": "0x21207526",
+      "key": "SETTING_FUNC_AUDIO_KTV_MODE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2120757a",
+      "key": "HVAC_FUNC_AUTO_STATUS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207588",
+      "key": "SETTING_FUNC_HUD_LYRICS_DISPLAY_SWITCH",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x212075c8",
+      "key": "HVAC_FUNC_AUTO_DRY",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "hvac_auto_dry"
+    },
+    {
+      "id": "0x21207607",
+      "key": "SETTING_FUNC_WADING_PROTECTION_SWITCH",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207609",
+      "key": "SETTING_FUNC_ONE_CLICK_TRAILER",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2120760a",
+      "key": "SETTING_FUNC_ONE_CLICK_TRAILER_POP",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207613",
+      "key": "CHARGE_FUNC_DISCHARGING_ENGINE_SWITCH",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207614",
+      "key": "SETTING_FUNC_INTELLIGENT_STEERING_SWITCH",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "intelligent_steer"
+    },
+    {
+      "id": "0x21207623",
+      "key": "SETTING_FUNC_AUTO_SHOW_MODE_HVAC_CONTROL",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207626",
+      "key": "SCENE_FUNC_PARKING_COMFORT_SWITCH",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "parking_comfort"
+    },
+    {
+      "id": "0x21207644",
+      "key": "SETTING_FUNC_FCDA_STATUS",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "fcda"
+    },
+    {
+      "id": "0x21207649",
+      "key": "SETTING_FUNC_AUDIO_OPEN_DOOR_SUPPRESS_MEDIA_SOUND_SWITCH",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2120764a",
+      "key": "SETTING_FUNC_NIGHTMODE",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "night_mode"
+    },
+    {
+      "id": "0x2120764f",
+      "key": "KEY_FUNC_REQUEST_SEARCH_KEY",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207651",
+      "key": "SETTING_FUNC_BOOT_COMPLETED",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207660",
+      "key": "SETTING_FUNC_TCAM_IPACTIVITY_STATUS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207662",
+      "key": "RESET_FACTORY_TRIGGER",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207667",
+      "key": "SETTING_FUNC_PANORAMIC_SOUND",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2120766d",
+      "key": "SETTING_FUNC_CAR_LOCATOR_BEFORE_HIBERNATE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207670",
+      "key": "BUSINESS_SERVICES_STATUS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207674",
+      "key": "HVAC_PREVENTS_ICING",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207675",
+      "key": "HVAC_PREVENTS_COLD",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207676",
+      "key": "HVAC_PREVENTS_HEAT",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207677",
+      "key": "HVAC_RAPID_COOLING",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "hvac_rapid_cool"
+    },
+    {
+      "id": "0x21207678",
+      "key": "HVAC_RAPID_HEATING",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "hvac_rapid_heat"
+    },
+    {
+      "id": "0x21207681",
+      "key": "FILL_LIGHT_REQ",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21207686",
+      "key": "SETTING_FUNC_AUDIO_EOC_ACTIVE_SWITCH",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2120ffff",
+      "key": "0x2120ffff",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407008",
+      "key": "SETTING_FUNC_ENERGY_REGENERATION",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "regen"
+    },
+    {
+      "id": "0x21407011",
+      "key": "SETTING_FUNC_LAMP_HOME_SAFE_LIGHT",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "home_safe_light"
+    },
+    {
+      "id": "0x21407016",
+      "key": "SETTING_FUNC_LAMP_EXTERIOR_LIGHT_CONTROL",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "exterior_light"
+    },
+    {
+      "id": "0x21407027",
+      "key": "SETTING_FUNC_AMBIENCE_LIGHT_MAINCOLOR",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "ambience_main_color"
+    },
+    {
+      "id": "0x2140703b",
+      "key": "SETTING_FUNC_KEYLESS_UNLOCKING",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "keyless_unlock"
+    },
+    {
+      "id": "0x21407049",
+      "key": "SETTING_FUNC_CAR_LOCATOR_REMINDER_MODE",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "vehicle_locator_mode"
+    },
+    {
+      "id": "0x21407053",
+      "key": "SETTING_FUNC_ESM_VOLUME",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "esm_volume"
+    },
+    {
+      "id": "0x2140705c",
+      "key": "SETTING_FUNC_PCM_TIMER",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407061",
+      "key": "SETTING_FUNC_SOUND_WARNING_VOLUME",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214070f9",
+      "key": "DM_FUNC_DRIVE_MODE_SELECT",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "drive_mode"
+    },
+    {
+      "id": "0x21407149",
+      "key": "PAS_FUNC_RCTA_WARNING_VOLUME",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407171",
+      "key": "BCM_FUNC_CUSTOM_KEY",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "wheel_custom_key"
+    },
+    {
+      "id": "0x21407181",
+      "key": "SETTING_FUNC_LANE_CHANGE_WARNING_MODE",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "lane_change_warn"
+    },
+    {
+      "id": "0x21407182",
+      "key": "SETTING_FUNC_LANE_KEEPING_AID_WARNING",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "ldw"
+    },
+    {
+      "id": "0x21407185",
+      "key": "SETTING_FUNC_STEERING_ASSISTANCE_LEVEL",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407191",
+      "key": "SETTING_FUNC_FORWARD_COLLISION_WARN_SNVTY",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "fcw"
+    },
+    {
+      "id": "0x2140719c",
+      "key": "SETTING_FUNC_SPEED_LIMIT_WARNING_MODE",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "speed_limit_warn"
+    },
+    {
+      "id": "0x214071d4",
+      "key": "SETTING_FUNC_AMBIENCE_LIGHT_MUSIC_SHOW_MODE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214071e8",
+      "key": "SETTING_FUNC_DAYMODE_SETTING",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "day_mode"
+    },
+    {
+      "id": "0x214071ea",
+      "key": "SETTING_FUNC_BRIGHTNESS_DAY",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214071eb",
+      "key": "SETTING_FUNC_BRIGHTNESS_NIGHT",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214071ec",
+      "key": "SETTING_FUNC_BRIGHTNESS_MAX",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214071ed",
+      "key": "SETTING_FUNC_BRIGHTNESS_MIN",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214071ee",
+      "key": "SETTING_FUNC_BRIGHTNESS_STEP",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214071f0",
+      "key": "SETTING_FUNC_BRIGHTNESS_BACKLIGHT",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214071f1",
+      "key": "SETTING_FUNC_BRIGHTNESS_BACKLIGHT_MAX",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214071f2",
+      "key": "SETTING_FUNC_BRIGHTNESS_BACKLIGHT_MIN",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214071f4",
+      "key": "SETTING_FUNC_BRIGHTNESS_DIM",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407201",
+      "key": "SETTING_FUNC_CUSTOM_DAY_TIME",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407202",
+      "key": "SETTING_FUNC_CUSTOM_NIGHT_TIME",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407204",
+      "key": "SETTING_FUNC_SUN_TIME",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407220",
+      "key": "SETTING_FUNC_LAMP_LOW_BEAM_VERTICAL_LEVEL",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "headlight_height"
+    },
+    {
+      "id": "0x21407228",
+      "key": "SETTING_FUNC_EASY_INGRESS_EGRESS_MODE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1
+      ]
+    },
+    {
+      "id": "0x21407289",
+      "key": "CHARGE_FUNC_CHARGING_PLUG_STATE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "charge_plug"
+    },
+    {
+      "id": "0x214072a6",
+      "key": "CHARGE_FUNC_CHARGE_PHEV_BATTERY_COLOR",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214072a9",
+      "key": "TRIP_FUNC_AUTO_RESET_OPTION",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214072e3",
+      "key": "SENSOR_TYPE_CAR_MODE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214072f8",
+      "key": "SENSOR_TYPE_WARN_EV_BATTERY_LOW",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407334",
+      "key": "DEVICE_MODE_ENTERTAINMENT",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407335",
+      "key": "DEVICE_MODE_INFOTAINMENT",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407351",
+      "key": "SETTING_FUNC_DRIVE_MODE_AUDIO_FEEDBACK",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407369",
+      "key": "SETTING_FUNC_AUDIO_FREQENCY_LOW",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140736a",
+      "key": "SETTING_FUNC_AUDIO_FREQENCY_MID",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140736b",
+      "key": "SETTING_FUNC_AUDIO_FREQENCY_HIGH",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140737e",
+      "key": "CHARGE_FUNC_CHARGING_DISCHARGING_STATE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140739d",
+      "key": "FUNC_UNIT_TIME_INDICATION",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214073a0",
+      "key": "FUNC_UNIT_LANGUAGE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214073bc",
+      "key": "BCM_FUNC_TRUNK_DOOR_STATUS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214073cd",
+      "key": "SETTING_INTELLIGENT_DRIVING_ASSISTANCE_MODE",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "idas_mode"
+    },
+    {
+      "id": "0x21407416",
+      "key": "SETTING_FUNC_AUDIO_COMPENSATION_LEVEL",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "speed_volume"
+    },
+    {
+      "id": "0x21407417",
+      "key": "SETTING_FUNC_AUDIO_SEAT_SOUND_OPTIMIZE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140741a",
+      "key": "SETTING_FUNC_AUDIO_SOUND_OPTIMIZE_BALANCE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140741b",
+      "key": "SETTING_FUNC_AUDIO_SOUND_OPTIMIZE_FADER",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140741c",
+      "key": "SETTING_FUNC_SOFT_BUTTON_SOUND_TYPE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140741e",
+      "key": "SETTING_FUNC_AUDIO_NAVI_MIX_MODE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407420",
+      "key": "SETTING_FUNC_AUDIO_HEAD_PILLOW_AUTO_MODE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407421",
+      "key": "SETTING_FUNC_VOICE_BROADCAST_MODE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407425",
+      "key": "SETTING_FUNC_HUD_DIAGNOSIS_ID",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407427",
+      "key": "SETTING_FUNC_SPEED_WARNING_MAX",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "speed_limit_max"
+    },
+    {
+      "id": "0x2140742c",
+      "key": "TYPE_JOY_LIMIT_STATE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407432",
+      "key": "WHEEL_HARD_KEY_TOP",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407433",
+      "key": "WHEEL_HARD_KEY_LEFT",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407434",
+      "key": "WHEEL_HARD_KEY_RIGHT",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407435",
+      "key": "WHEEL_HARD_KEY_BOTTOM",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407436",
+      "key": "WHEEL_HARD_KEY_VR",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407437",
+      "key": "WHEEL_HARD_KEY_CUSTOM",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407438",
+      "key": "WHEEL_HARD_KEY_MENU",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407439",
+      "key": "WHEEL_HARD_KEY_CONFIRM",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140743e",
+      "key": "SETTING_FUNC_HUD_POSITION_TRANSMIT",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140743f",
+      "key": "SETTING_FUNC_HUD_BRIGHTNESS_TRANSMIT",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407453",
+      "key": "SETTING_FUNC_AUTO_SHOW_MODE_ENTER_CONDITIONS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407454",
+      "key": "SETTING_FUNC_AUTO_SHOW_MODE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140745d",
+      "key": "CURRENT_PROFILE_ID",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140746d",
+      "key": "SUSPENSION_HEIGHT_ADJUST_LEVEL_HIGH_1",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407477",
+      "key": "SETTING_FUNC_DIM_DISPLAY_MODE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407492",
+      "key": "BCM_FUNC_RESET_FACTORY_STATE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214074f1",
+      "key": "SENSOR_ACDC_COVER",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214074f2",
+      "key": "SENSOR_FUEL_FILLER_CAP",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214074f6",
+      "key": "REVERSE_LIGHT_STATE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214074f8",
+      "key": "FRONT_POSTITION_STATUS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214074f9",
+      "key": "AFTER_POSTITION_STATUS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214074fa",
+      "key": "DAYTIME_LIGHT_STATUS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214074fe",
+      "key": "DOUBLE_FLASH",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407502",
+      "key": "SETTING_BRAKE_PEDAL_STATUS",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "brake_pedal_mode"
+    },
+    {
+      "id": "0x21407510",
+      "key": "PARKING_COMFORT_MODE_DOOR_NOTICE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140751c",
+      "key": "SENSOR_TYPE_USG_MODE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140752d",
+      "key": "CUSTOM_KEY_TYPE_NONE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140752e",
+      "key": "CUSTOM_KEY_TYPE_360_PANORAMA",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407531",
+      "key": "CUSTOM_KEY_TYPE_UNLOCK_TRUNK",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407532",
+      "key": "CUSTOM_KEY_TYPE_CHANGE_DVRMOD",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407534",
+      "key": "CUSTOM_KEY_TYPE_SOUND_SWITCH",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407535",
+      "key": "CUSTOM_KEY_TYPE_REAR_MIRROR_ADJUST",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407537",
+      "key": "VR_ACTIVATED",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "vr_activated"
+    },
+    {
+      "id": "0x21407558",
+      "key": "SETTING_FUNC_SCENE_MODE_DIM_BRIGHTNESS_STATE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407559",
+      "key": "SETTING_FUNC_AUDIO_FOCUS_CAN_BE_OCCUPIED",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140755a",
+      "key": "SETTING_FUNC_TCAM_RESET_STATE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140755b",
+      "key": "DIAG_AVAS_AUDIO_OUTPUT",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407565",
+      "key": "WHEEL_HARD_KEY_MUTE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407568",
+      "key": "SETTING_FUNC_FAULT_ALARM_ZONE_A",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407569",
+      "key": "SETTING_FUNC_FAULT_ALARM_ZONE_B",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407570",
+      "key": "SETTING_FUNC_AUDIO_WARNING_RING_STATE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214075b2",
+      "key": "TYPE_FUEL_WARNING_COLOR",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214075b4",
+      "key": "HYBRID_FUNC_BATTERY_MODE",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "battery_mode"
+    },
+    {
+      "id": "0x214075bf",
+      "key": "FACTORY_DIAGNOSIS_6058_PRIVACY",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214075c0",
+      "key": "FACTORY_DIAGNOSIS_7023_CAR_DATA",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214075c7",
+      "key": "BCM_FUNC_RAIN_SENSOR_SENSITIVITY_VALUE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214075f5",
+      "key": "FUNC_UNIT_AVG_FUEL",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407608",
+      "key": "SETTING_FUNC_WADING_PROTECTION_NOTITYPE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407622",
+      "key": "SETTING_FUNC_ESM_SOUND_TYPE",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "esm_sound"
+    },
+    {
+      "id": "0x21407628",
+      "key": "SETTING_FUNC_USB_SWITCH",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "usb_mode"
+    },
+    {
+      "id": "0x21407643",
+      "key": "SETTING_FUNC_HUD_DISPLAY_MODE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407646",
+      "key": "POWER_OTA_UPDATE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140764b",
+      "key": "EVENT_FUNC_AUDIO_SOURCE_TYPE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140764d",
+      "key": "EHP_V2_STATUS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140764e",
+      "key": "TRANSMIT_USAGE_MODE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407650",
+      "key": "KEY_FUNC_KEY_SEARCHING_STATE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407655",
+      "key": "SETTING_FUNC_WLANWORK_SHOP_MODE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140765e",
+      "key": "SETTING_FUNC_SPEED_LIMIT_UPDATE_REMINDER",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407661",
+      "key": "SETTING_FUNC_STR_SWITCH",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407668",
+      "key": "SETTING_FUNC_UNIT_DATE_INDICATION",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407669",
+      "key": "SETTING_FUNC_RVS_SWITCH",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140766a",
+      "key": "POWER_XCALLSTATUS_UPDATE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140766b",
+      "key": "CHARGE_FUNC_AC_CHARGING",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140766c",
+      "key": "CHARGE_FUNC_DC_CHARGING",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140766e",
+      "key": "SETTING_FUNC_TCAM_LOG_ACTION",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407679",
+      "key": "SETTING_FUNC_AMBIENCE_RHYTHM_RATE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140767f",
+      "key": "TYPE_ENGINE_OIL_DURATION",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407682",
+      "key": "DID_DAY_VALUE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407683",
+      "key": "DID_NIGHT_VALUE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407687",
+      "key": "CSD_BRIGHTNESS_MAX_PWM",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21407689",
+      "key": "SETTING_FUNC_AUDIO_MEDIA_VOLUME",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "media_volume"
+    },
+    {
+      "id": "0x2140768f",
+      "key": "SETTING_FUNC_OTA_WIFI_CONNECT_CONTINUE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408001",
+      "key": "CB_P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408002",
+      "key": "CB_P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408003",
+      "key": "CB_P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408004",
+      "key": "CB_P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408005",
+      "key": "CB_P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408006",
+      "key": "CB_P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408007",
+      "key": "CB_P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408008",
+      "key": "CB_P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408009",
+      "key": "CB_P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140800a",
+      "key": "CB_P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140800b",
+      "key": "CB_P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140800c",
+      "key": "CB_P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140800d",
+      "key": "CB_P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140800e",
+      "key": "CB_P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140800f",
+      "key": "CB_P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408010",
+      "key": "CB_P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408011",
+      "key": "CB_VFC_IPW",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408012",
+      "key": "PA_VFC_IPW",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408013",
+      "key": "CB_VFC_S",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408014",
+      "key": "PA_VFC_S",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408017",
+      "key": "PA_VIND",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408018",
+      "key": "CB_S",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408019",
+      "key": "CB_S",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140801a",
+      "key": "CB_S",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140801b",
+      "key": "CB_S",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140801c",
+      "key": "CB_S",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140801d",
+      "key": "CB_S",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140801e",
+      "key": "CB_S",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408020",
+      "key": "CB_L",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408021",
+      "key": "B",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408022",
+      "key": "CB_AR_W",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408023",
+      "key": "D",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408024",
+      "key": "H",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408028",
+      "key": "T",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408029",
+      "key": "T",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140802a",
+      "key": "T",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140802b",
+      "key": "T",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140802c",
+      "key": "T",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140802d",
+      "key": "T",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140802e",
+      "key": "T",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140802f",
+      "key": "V",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408030",
+      "key": "V",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408031",
+      "key": "V",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408032",
+      "key": "V",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408033",
+      "key": "L",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408034",
+      "key": "L",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408036",
+      "key": "S",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408037",
+      "key": "ADC",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408038",
+      "key": "D",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140803f",
+      "key": "S",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408040",
+      "key": "D",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408041",
+      "key": "D",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408045",
+      "key": "C",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408046",
+      "key": "V",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408047",
+      "key": "C",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408048",
+      "key": "CB_AR_E",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408049",
+      "key": "S",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140804a",
+      "key": "V",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140804b",
+      "key": "V",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140804d",
+      "key": "P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140804e",
+      "key": "O",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140804f",
+      "key": "C",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408050",
+      "key": "P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408051",
+      "key": "IHU",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408052",
+      "key": "P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408053",
+      "key": "V",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408054",
+      "key": "S",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408055",
+      "key": "D",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408056",
+      "key": "V",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408058",
+      "key": "M",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408059",
+      "key": "C",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140805a",
+      "key": "F",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140805c",
+      "key": "V",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140805d",
+      "key": "G",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140805e",
+      "key": "T",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140805f",
+      "key": "T",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408060",
+      "key": "T",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408061",
+      "key": "F",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408062",
+      "key": "V",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408063",
+      "key": "T",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408064",
+      "key": "S",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408065",
+      "key": "T",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408066",
+      "key": "O",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408067",
+      "key": "P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408068",
+      "key": "P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408069",
+      "key": "D",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140806a",
+      "key": "P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140806b",
+      "key": "P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140806c",
+      "key": "R",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140806d",
+      "key": "R",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140806e",
+      "key": "R",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140806f",
+      "key": "R",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408070",
+      "key": "R",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408071",
+      "key": "R",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408072",
+      "key": "P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408073",
+      "key": "A",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408074",
+      "key": "S",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408075",
+      "key": "I",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408076",
+      "key": "I",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408077",
+      "key": "I",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408078",
+      "key": "I",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140807a",
+      "key": "LSDAF",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140807b",
+      "key": "O",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140807c",
+      "key": "I",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140807d",
+      "key": "I",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140807e",
+      "key": "O",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140807f",
+      "key": "V",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408080",
+      "key": "CB_C",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408082",
+      "key": "O",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408083",
+      "key": "O",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408084",
+      "key": "O",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408085",
+      "key": "S",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408086",
+      "key": "I",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408087",
+      "key": "I",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408088",
+      "key": "I",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408089",
+      "key": "I",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140808a",
+      "key": "I",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140808b",
+      "key": "P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140808c",
+      "key": "PA_C",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140808d",
+      "key": "A",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140808e",
+      "key": "A",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140808f",
+      "key": "A",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408090",
+      "key": "A",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408091",
+      "key": "A",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408092",
+      "key": "A",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408093",
+      "key": "A",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408094",
+      "key": "A",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408095",
+      "key": "C",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408096",
+      "key": "A",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408097",
+      "key": "A",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408098",
+      "key": "C",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21408099",
+      "key": "A",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140809a",
+      "key": "D",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140809b",
+      "key": "P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140809c",
+      "key": "P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140809d",
+      "key": "P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140809e",
+      "key": "D",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2140809f",
+      "key": "P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214080a0",
+      "key": "R",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214080a1",
+      "key": "N",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214080a2",
+      "key": "A",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214080a3",
+      "key": "H",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214080ac",
+      "key": "V",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214080ad",
+      "key": "TBAF",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214173ce",
+      "key": "NOTIFY_INFO",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214174a3",
+      "key": "PAS_FUNC_HPA_CAR_CONFIG_HMI_CAR_STATE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x214175ae",
+      "key": "FUNC_FAN_TEMPERATURE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21417647",
+      "key": "SETTING_FUNC_FAULT_ALARM_LIST",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2141764c",
+      "key": "HVAC_FUNC_CLIAMTE_EVENT",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2141767a",
+      "key": "SETTING_FUNC_AMBIENCE_MODE_COLOR",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21417685",
+      "key": "SETTING_FUNC_BRIGHTNESS_DIM_WITH_FLAG",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21507364",
+      "key": "CHARGE_FUNC_CHARGING_WORK_TIME",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2150765c",
+      "key": "SETTING_FUNC_PCM_TIMER_TIME_STAMP",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21607176",
+      "key": "HYBRID_FUNC_BATTERY_SOC",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "hybrid_soc"
+    },
+    {
+      "id": "0x2160726f",
+      "key": "CHARGE_FUNC_CHARGING_SOC_MAX",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "charge_soc_max"
+    },
+    {
+      "id": "0x21607270",
+      "key": "CHARGE_FUNC_CHARGING_SOC_MIN",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "charge_soc_min"
+    },
+    {
+      "id": "0x21607271",
+      "key": "CHARGE_FUNC_CHARGING_SOC_STEP",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21607272",
+      "key": "CHARGE_FUNC_CHARGING_CURRENT",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "charge_current"
+    },
+    {
+      "id": "0x21607273",
+      "key": "CHARGE_FUNC_CHARGING_CURRENT_MAX",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "charge_limit"
+    },
+    {
+      "id": "0x21607274",
+      "key": "CHARGE_FUNC_CHARGING_CURRENT_MIN",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21607275",
+      "key": "CHARGE_FUNC_CHARGING_CURRENT_STEP",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21607283",
+      "key": "CHARGE_FUNC_DISCHARGING_SOC",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "charge_discharge_soc"
+    },
+    {
+      "id": "0x2160728b",
+      "key": "CHARGE_FUNC_CHARGING_WORK_VOLTAGE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "charge_work_voltage"
+    },
+    {
+      "id": "0x2160728c",
+      "key": "CHARGE_FUNC_CHARGING_WORK_CURRENT",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "charge_work_current"
+    },
+    {
+      "id": "0x2160728d",
+      "key": "CHARGE_FUNC_CHARGING_ESTIMATED_TIME",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "charge_estimated_time"
+    },
+    {
+      "id": "0x2160728e",
+      "key": "CHARGE_FUNC_CHARGING_SPEED",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2160728f",
+      "key": "CHARGE_FUNC_CHARGING_ENERGY",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "charge_energy"
+    },
+    {
+      "id": "0x21607290",
+      "key": "CHARGE_FUNC_DISCHARGING_WORK_VOLTAGE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21607291",
+      "key": "CHARGE_FUNC_DISCHARGING_WORK_CURRENT",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21607293",
+      "key": "CHARGE_FUNC_DISCHARGING_ENETGY",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x216072cc",
+      "key": "SENSOR_TYPE_TEMPERATURE_AMBIENT",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "temp_ambient_c"
+    },
+    {
+      "id": "0x216072cd",
+      "key": "SENSOR_TYPE_TEMPERATURE_INDOOR",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "temp_indoor_c"
+    },
+    {
+      "id": "0x216072d9",
+      "key": "SENSOR_TYPE_ENDURANCE_MILEAGE_FUEL",
+      "access": "r",
+      "changeMode": "continuous",
+      "areas": [
+        0
+      ],
+      "entity": "range_fuel_km"
+    },
+    {
+      "id": "0x216072da",
+      "key": "SENSOR_TYPE_ENDURANCE_MILEAGE_EV",
+      "access": "r",
+      "changeMode": "continuous",
+      "areas": [
+        0
+      ],
+      "entity": "range_ev_km"
+    },
+    {
+      "id": "0x2160730a",
+      "key": "TYPE_MAINTENANCE_MILEAGE",
+      "access": "r",
+      "changeMode": "continuous",
+      "areas": [
+        0
+      ],
+      "entity": "maintenance_mileage_km"
+    },
+    {
+      "id": "0x2160730b",
+      "key": "TYPE_MAINTENANCE_TIME",
+      "access": "r",
+      "changeMode": "continuous",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2160730e",
+      "key": "TYPE_EV_BATTERY_PERCENTAGE",
+      "access": "r",
+      "changeMode": "continuous",
+      "areas": [
+        0
+      ],
+      "entity": "ev_battery_percent"
+    },
+    {
+      "id": "0x2160730f",
+      "key": "TYPE_CHARGING_ENDURANCE_MILEAGE",
+      "access": "r",
+      "changeMode": "continuous",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21607310",
+      "key": "TYPE_DISCHARGING_ENDURANCE_MILEAGE",
+      "access": "r",
+      "changeMode": "continuous",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21607313",
+      "key": "TYPE_FUEL_PERCENTAGE",
+      "access": "r",
+      "changeMode": "continuous",
+      "areas": [
+        0
+      ],
+      "entity": "fuel_percent"
+    },
+    {
+      "id": "0x21607353",
+      "key": "CHARGE_FUNC_DISTANCE_PROTECTION",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2160735d",
+      "key": "CHARGE_FUNC_DC_CHARGING_POWER",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21607363",
+      "key": "CHARGE_FUNC_BATTERY_CHARGING_CURRENT_POWER",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21607366",
+      "key": "CHARGE_FUNC_BATTERY_DISCHARGING_CURRENT_POWER",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2160737b",
+      "key": "CHARGE_FUNC_DISCHARGING_WORK_TOTAL",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21607415",
+      "key": "SETTING_FUNC_HUD_ANGLE_TRANSMIT",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2160743d",
+      "key": "SENSOR_TYPE_TEMPERATURE_GYROSCOPE",
+      "access": "r",
+      "changeMode": "continuous",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x216074e9",
+      "key": "TRIP_ED_DRIVING_ENERGY_FLOW",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "energy_flow_driving"
+    },
+    {
+      "id": "0x216074ea",
+      "key": "TRIP_ED_CLIMATE_ENERGY_FLOW",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "energy_flow_climate"
+    },
+    {
+      "id": "0x216074eb",
+      "key": "TRIP_ED_BATTERY_ENERGY_FLOW",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "energy_flow_battery"
+    },
+    {
+      "id": "0x216074ec",
+      "key": "TRIP_ED_OTHER_ENERGY_FLOW",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2160755e",
+      "key": "TRIP_DOT_INTERVAL",
+      "access": "r",
+      "changeMode": "static",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21607616",
+      "key": "TRIP_DOT_INTERVAL1",
+      "access": "r",
+      "changeMode": "static",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2160762a",
+      "key": "SETTING_FUNC_ESTIMD_PWR_SAVE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2160762b",
+      "key": "SETTING_FUNC_TOT_PWR_SAVE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21607653",
+      "key": "SENSOR_TYPE_EV_BATTERY_TEMP",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "battery_temp_c"
+    },
+    {
+      "id": "0x2160765f",
+      "key": "TRIP_DI_AVG_ELC_CONSUMPTION",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "avg_energy_kwh_100km"
+    },
+    {
+      "id": "0x2160767b",
+      "key": "TYPE_SINCE_MAINTENANCE_TOTAL_MILEAGE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "since_maintenance_km"
+    },
+    {
+      "id": "0x2160767c",
+      "key": "TYPE_SINCE_MAINTENANCE_EV_MILEAGE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2160767d",
+      "key": "TYPE_SINCE_MAINTENANCE_FUEL_MILEAGE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2160767e",
+      "key": "TYPE_ENGINE_OIL_HEALTH",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2160768a",
+      "key": "TRIP_DI_AVG_FUEL_CONSUMPTION",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "avg_fuel_l_100km"
+    },
+    {
+      "id": "0x21608035",
+      "key": "S",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21608057",
+      "key": "D",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2160805b",
+      "key": "V",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2170744a",
+      "key": "VENDOR_MEDIA_PLAY_INFO",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2170744b",
+      "key": "VENDOR_MEDIA_STATUS_INFO",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2170744c",
+      "key": "VENDOR_MEDIA_COVER_INFO",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2170744d",
+      "key": "VENDOR_BT_CALL_INFO",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2170744e",
+      "key": "VENDOR_BT_CALL_COVER_INFO",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2170744f",
+      "key": "VENDOR_NAVI_TBT_INFO",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21707450",
+      "key": "VENDOR_NAVI_TBT_NEXT_INFO",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21707451",
+      "key": "VENDOR_NAVI_ETA_INFO",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21707452",
+      "key": "VENDOR_NAVI_LANE_INFO",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21707509",
+      "key": "VENDOR_VOLUME_LEVEL_INFO",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2170750a",
+      "key": "VENDOR_TIME_SYNC_INFO",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2170750d",
+      "key": "VENDOR_PROJECTION_SCREEN_REQ",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2170750e",
+      "key": "VENDOR_PROJECTION_SCREEN_INFO",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2170751a",
+      "key": "VENDOR_BOOK_CHARGING_TIME_INFO",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x217075a7",
+      "key": "CARCONFIG_LESS_THAN_1000",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x217075a8",
+      "key": "CARCONFIG_GREATER_THAN_1000",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2170766f",
+      "key": "SETTING_FUNC_TCAM_LOG_INFO",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21708000",
+      "key": "PA_P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21708025",
+      "key": "I",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21708026",
+      "key": "S",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21708027",
+      "key": "T",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21708039",
+      "key": "E",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2170803a",
+      "key": "H",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2170803b",
+      "key": "H",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2170803c",
+      "key": "E",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2170803d",
+      "key": "E",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2170803e",
+      "key": "E",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21708042",
+      "key": "H",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21708043",
+      "key": "H",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21708044",
+      "key": "E",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2170804c",
+      "key": "P",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21708081",
+      "key": "CB_C",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x217080a4",
+      "key": "H",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x217080a5",
+      "key": "H",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x217080a6",
+      "key": "H",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x217080a7",
+      "key": "H",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x217080a8",
+      "key": "H",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x217080a9",
+      "key": "H",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x217080aa",
+      "key": "H",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x217080ab",
+      "key": "H",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21e00666",
+      "key": "0x21e00666",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21e01111",
+      "key": "0x21e01111",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21e01112",
+      "key": "0x21e01112",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21e01113",
+      "key": "0x21e01113",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21e01114",
+      "key": "0x21e01114",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21e073f5",
+      "key": "CREATE_PROFILE_ACTION",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21e073f6",
+      "key": "REMOVE_PROFILE_ACTION",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21e073f7",
+      "key": "SWITCH_PROFILE_ACTION",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21e073f8",
+      "key": "APPLY_PROFILE_ACTION",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x21e073f9",
+      "key": "BIND_PROFILE_ACTION",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ]
+    },
+    {
+      "id": "0x2320702f",
+      "key": "SETTING_FUNC_WINDSCREEN_SERVICE_POSITION",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "0x23207030",
+      "key": "SETTING_FUNC_AUTO_REAR_WIPING",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        2
+      ]
+    },
+    {
+      "id": "0x23207156",
+      "key": "BCM_FUNC_SUNROOF_TILT",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        65536
+      ],
+      "entity": "sunroof_tilt"
+    },
+    {
+      "id": "0x23400103",
+      "key": "0x23400103",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        2,
+        65536
+      ]
+    },
+    {
+      "id": "0x24207024",
+      "key": "SETTING_FUNC_MIRROR_AUTO_FOLDING",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0,
+        3
+      ],
+      "entity": "mirror_auto_fold"
+    },
+    {
+      "id": "0x2420716d",
+      "key": "BCM_FUNC_REAR_MIRROR_ADJUST",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "0x24407386",
+      "key": "TRIP_DI_TOTAL_DURATION",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "0x2440757b",
+      "key": "TRIP_GRAPH_RANGE_OPTION",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1
+      ]
+    },
+    {
+      "id": "0x24607306",
+      "key": "TYPE_AVG_FUEL_CONSUMPTION",
+      "access": "r",
+      "changeMode": "continuous",
+      "areas": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "0x24607309",
+      "key": "TYPE_AVG_ENERGY_CONSUMPTION",
+      "access": "r",
+      "changeMode": "continuous",
+      "areas": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "0x24607384",
+      "key": "TRIP_DI_AVG_SPEED",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "0x24607385",
+      "key": "TRIP_DI_TOTAL_DISTANCE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "0x24617381",
+      "key": "TRIP_DI_AVG_ELC_CONSUMPTION_ARRAY",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1
+      ]
+    },
+    {
+      "id": "0x24617382",
+      "key": "TRIP_DI_AVG_FUEL_CONSUMPTION_ARRAY",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1
+      ]
+    },
+    {
+      "id": "0x25207001",
+      "key": "WPC_FUNC_WORK_MODE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        5
+      ]
+    },
+    {
+      "id": "0x252070b0",
+      "key": "HVAC_FUNC_ECO_SWITCH",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        117
+      ],
+      "entity": "hvac_eco"
+    },
+    {
+      "id": "0x25207227",
+      "key": "SETTING_FUNC_EASY_INGRESS_EGRESS",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0,
+        1
+      ],
+      "entity": "easy_ingress"
+    },
+    {
+      "id": "0x25207524",
+      "key": "SETTING_FUNC_ASD_SCREEN_BACKLIGHT_SWITCH",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        16,
+        64
+      ]
+    },
+    {
+      "id": "0x2520756f",
+      "key": "SETTING_FUNC_RSD_SCREEN_BACKLIGHT_SWITCH",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        256,
+        1024
+      ]
+    },
+    {
+      "id": "0x2520763c",
+      "key": "HVAC_FUNC_AUTO_SEAT_VENTILATION_ICON",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        4
+      ]
+    },
+    {
+      "id": "0x25207657",
+      "key": "PROFILE_MEM_ADJUST_STATE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        4
+      ]
+    },
+    {
+      "id": "0x25407002",
+      "key": "WPC_FUNC_CHARGE_STATES",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        5
+      ]
+    },
+    {
+      "id": "0x254070b5",
+      "key": "HVAC_FUNC_AUTO_SEAT_VENTILATION",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        4
+      ]
+    },
+    {
+      "id": "0x254071c3",
+      "key": "SETTING_FUNC_AMBIENCE_LIGHT_INTENSITY_SET",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        5
+      ],
+      "entity": "ambience_intensity"
+    },
+    {
+      "id": "0x2540723c",
+      "key": "SETTING_FUNC_SEAT_LEG_SUPPORT_HEIGHT",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1
+      ]
+    },
+    {
+      "id": "0x2540723d",
+      "key": "SETTING_FUNC_SEAT_LEG_SUPPORT_LENGTH",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1
+      ]
+    },
+    {
+      "id": "0x254074ee",
+      "key": "SENSOR_SEAT_BELT",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        4,
+        16,
+        32,
+        64
+      ]
+    },
+    {
+      "id": "0x25407500",
+      "key": "SETTING_SEAT_OCCUPANCY_STATUS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        4
+      ]
+    },
+    {
+      "id": "0x2540750c",
+      "key": "SETTING_FUNC_BRIGHTNESS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        2
+      ]
+    },
+    {
+      "id": "0x2540756a",
+      "key": "SETTING_FUNC_SEAT_BACKREST_ANGLE_1_POS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        4
+      ]
+    },
+    {
+      "id": "0x2540760e",
+      "key": "PROFILE_MEM_SAVE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1
+      ]
+    },
+    {
+      "id": "0x2540760f",
+      "key": "PROFILE_MEM_RESTORE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1
+      ]
+    },
+    {
+      "id": "0x25407611",
+      "key": "HVAC_FUNC_HEAT_VENTILATION_POP",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        4
+      ]
+    },
+    {
+      "id": "0x2540763a",
+      "key": "SETTING_FUNC_PROFILE_PREFERENCE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        4,
+        16,
+        64
+      ]
+    },
+    {
+      "id": "0x2540763f",
+      "key": "PROFILE_RESET_TO_DEFAULT_PREFERENCE",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        4,
+        16,
+        64
+      ]
+    },
+    {
+      "id": "0x25407645",
+      "key": "CURRENT_SEAT_POSN",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        4,
+        16,
+        64
+      ]
+    },
+    {
+      "id": "0x25407673",
+      "key": "HVAC_RECIRC_ON_AUTO",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1
+      ]
+    },
+    {
+      "id": "0x25600102",
+      "key": "0x25600102",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        49,
+        68
+      ]
+    },
+    {
+      "id": "0x2560722d",
+      "key": "SETTING_FUNC_SEAT_LENGTH_POS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        4
+      ]
+    },
+    {
+      "id": "0x2560722e",
+      "key": "SETTING_FUNC_SEAT_HEIGHT_POS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        4
+      ]
+    },
+    {
+      "id": "0x25607231",
+      "key": "SETTING_FUNC_SEAT_CUSHION_TILT_POS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        4
+      ]
+    },
+    {
+      "id": "0x2560723e",
+      "key": "SETTING_FUNC_SEAT_LEG_SUPPORT_HEIGHT_POS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1
+      ]
+    },
+    {
+      "id": "0x2560723f",
+      "key": "SETTING_FUNC_SEAT_LEG_SUPPORT_LENGTH_POS",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1
+      ]
+    },
+    {
+      "id": "0x26200101",
+      "key": "0x26200101",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        4,
+        16,
+        64
+      ]
+    },
+    {
+      "id": "0x26207192",
+      "key": "SETTING_FUNC_DOOR_OPEN_WARN_ACTIVE",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0
+      ],
+      "entity": "dow"
+    },
+    {
+      "id": "0x2620725f",
+      "key": "SETTING_FUNC_P_GEAR_UNLOCK",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0,
+        85
+      ],
+      "entity": "p_gear_unlock"
+    },
+    {
+      "id": "0x2640725b",
+      "key": "SETTING_FUNC_TRUNK_OPENING_POSITION",
+      "access": "rw",
+      "changeMode": "on_change",
+      "areas": [
+        0,
+        536870912
+      ],
+      "entity": "trunk_open_height"
+    },
+    {
+      "id": "0x27407449",
+      "key": "TIRE_WARNING",
+      "access": "r",
+      "changeMode": "on_change",
+      "areas": [
+        1,
+        2,
+        4,
+        8
+      ]
+    }
   ]
 }

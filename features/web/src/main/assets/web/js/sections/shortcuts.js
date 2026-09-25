@@ -2,11 +2,11 @@ import { html, nothing } from "../lit.js";
 import { live } from "../lit.js";
 import { repeat } from "../lit.js";
 import { api } from "../api.js";
-import { state, notify } from "../store.js";
+import { state, notify, findControl } from "../store.js";
 import { prefCard, segmentToggle, choiceSelect, boolToggle, prefSegment } from "../ui/cards.js";
 import { runPref } from "../actions.js";
 import { t } from "../i18n.js";
-import { sceneEditorCard, saveScene, blankScene } from "../ui/scene-editor.js";
+import { sceneEditorCard, saveScene, blankScene, entityValueField, valueOptionsForControl } from "../ui/scene-editor.js";
 
 var ignoreTypeClicksUntil = 0;
 
@@ -310,6 +310,279 @@ function gearOptions() {
   ];
 }
 
+/** Readable entities for condition / entity_state pickers (includes sensors & trackers). */
+function readableEntities() {
+  const byId = {};
+  (state.entities || []).forEach(function (e) {
+    if (e && e.id) byId[e.id] = e;
+  });
+  (state.controls || []).forEach(function (c) {
+    if (c && c.id && !byId[c.id]) byId[c.id] = c;
+  });
+  return Object.keys(byId)
+    .sort()
+    .map(function (id) {
+      return byId[id];
+    });
+}
+
+function entityById(id) {
+  return id ? findControl(id) || null : null;
+}
+
+function pickDefaultValue(entity, current) {
+  const opts = valueOptionsForControl(entity);
+  if (!opts || !opts.length) return current != null ? current : "";
+  const cur = current != null ? String(current) : "";
+  if (cur && opts.some(function (o) { return String(o.value) === cur; })) {
+    return cur;
+  }
+  return String(opts[0].value);
+}
+
+function conditionEditDraft() {
+  if (state.shortcutsTab === "routines" && state.routineEdit) return state.routineEdit;
+  if (state.shortcutEdit) return state.shortcutEdit;
+  if (state.routineEdit) return state.routineEdit;
+  return null;
+}
+
+function normalizeCondition(c) {
+  if (!c || !c.type) return { type: "entity_equals", entityId: "", value: "" };
+  if (c.type === "entity_equals") {
+    return {
+      type: "entity_equals",
+      entityId: c.entityId || "",
+      value: c.value != null ? String(c.value) : "",
+    };
+  }
+  if (c.type === "gear_equals") {
+    return { type: "gear_equals", gear: c.gear != null ? Number(c.gear) : 4 };
+  }
+  if (c.type === "wifi_ssid") {
+    return {
+      type: "wifi_ssid",
+      ssid: c.ssid || "",
+      contains: !!c.contains,
+    };
+  }
+  return c;
+}
+
+function conditionTypeOptions() {
+  return [
+    {
+      value: "entity_equals",
+      label: t("shortcuts.condition.entity_equals", "Entity equals"),
+    },
+    {
+      value: "gear_equals",
+      label: t("shortcuts.condition.gear_equals", "Gear equals"),
+    },
+    {
+      value: "wifi_ssid",
+      label: t("shortcuts.condition.wifi_ssid", "Wi‑Fi SSID"),
+    },
+  ];
+}
+
+function blankConditionForType(next) {
+  if (next === "gear_equals") return { type: "gear_equals", gear: 4 };
+  if (next === "wifi_ssid") return { type: "wifi_ssid", ssid: "", contains: false };
+  return { type: "entity_equals", entityId: "", value: "" };
+}
+
+function conditionLabel(c) {
+  c = normalizeCondition(c);
+  if (c.type === "entity_equals") {
+    return (
+      (c.entityId || "?") +
+      "=" +
+      (c.value != null && c.value !== "" ? c.value : "?")
+    );
+  }
+  if (c.type === "gear_equals") {
+    const g = c.gear;
+    const name =
+      g === 4 ? "P" : g === 2 ? "R" : g === 1 ? "N" : g === 8 ? "D" : g != null ? String(g) : "?";
+    return t("shortcuts.trigger.gear", "Gear") + "=" + name;
+  }
+  if (c.type === "wifi_ssid") {
+    return (
+      t("shortcuts.trigger.wifi", "Wi‑Fi SSID") +
+      (c.contains ? " ~" : " =") +
+      (c.ssid || "?")
+    );
+  }
+  return c.type || "";
+}
+
+function conditionRow(c, i, entities) {
+  c = normalizeCondition(c);
+  var extra = nothing;
+  if (c.type === "entity_equals") {
+    const ent = entityById(c.entityId);
+    extra = html`
+      <div style="margin-top:8px">
+        ${choiceSelect({
+          options: entities.map(function (e) {
+            return { value: e.id, label: e.label || e.id };
+          }),
+          current: c.entityId || "",
+          choiceKey: "sc-cond-entity-" + i,
+          searchable: true,
+          onSelect: function (next) {
+            const edit = conditionEditDraft();
+            if (!edit || !edit.conditions[i]) return;
+            edit.conditions[i].type = "entity_equals";
+            edit.conditions[i].entityId = next;
+            edit.conditions[i].value = pickDefaultValue(
+              entityById(next),
+              edit.conditions[i].value,
+            );
+            ignoreTypeClicksUntil = Date.now() + 500;
+            notify();
+          },
+        })}
+      </div>
+      <div style="margin-top:8px">
+        ${entityValueField({
+          entity: ent,
+          current: c.value || "",
+          choiceKey: "sc-cond-value-" + i,
+          placeholder: t("shortcuts.condition.value", "Value (e.g. home)"),
+          onSelect: function (next) {
+            const edit = conditionEditDraft();
+            if (!edit || !edit.conditions[i]) return;
+            edit.conditions[i].value = next;
+            notify();
+          },
+        })}
+      </div>
+    `;
+  } else if (c.type === "gear_equals") {
+    extra = html`
+      <div style="margin-top:8px">
+        ${choiceSelect({
+          options: gearOptions(),
+          current: String(c.gear != null ? c.gear : 4),
+          choiceKey: "sc-cond-gear-" + i,
+          onSelect: function (next) {
+            const edit = conditionEditDraft();
+            if (!edit || !edit.conditions[i]) return;
+            edit.conditions[i].type = "gear_equals";
+            edit.conditions[i].gear = parseInt(next, 10);
+            ignoreTypeClicksUntil = Date.now() + 500;
+            notify();
+          },
+        })}
+      </div>
+    `;
+  } else if (c.type === "wifi_ssid") {
+    extra = html`
+      <div style="margin-top:8px">
+        <input
+          class="field"
+          placeholder=${t("shortcuts.trigger.wifi.hint", "SSID (blank = any)")}
+          style="width:100%"
+          .value=${live(c.ssid || "")}
+          @input=${function (ev) {
+            const edit = conditionEditDraft();
+            if (!edit || !edit.conditions[i]) return;
+            edit.conditions[i].ssid = ev.target.value;
+          }}
+        />
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:8px">
+        <input
+          type="checkbox"
+          .checked=${live(!!c.contains)}
+          @change=${function (ev) {
+            const edit = conditionEditDraft();
+            if (!edit || !edit.conditions[i]) return;
+            edit.conditions[i].contains = ev.target.checked;
+          }}
+        />
+        ${t("shortcuts.condition.contains", "Contains")}
+      </label>
+    `;
+  }
+  return html`
+    <div class="sc-row" style="margin-bottom:12px;padding:12px;border:1px solid var(--border, #333);border-radius:8px">
+      ${segmentToggle({
+        options: conditionTypeOptions(),
+        current: c.type || "entity_equals",
+        onSelect: function (next) {
+          if (Date.now() < ignoreTypeClicksUntil) return;
+          const edit = conditionEditDraft();
+          if (!edit || !edit.conditions[i]) return;
+          if (edit.conditions[i].type === next) return;
+          edit.conditions[i] = blankConditionForType(next);
+          notify();
+        },
+      })}
+      ${extra}
+      <button
+        class="btn ghost"
+        type="button"
+        style="margin-top:8px"
+        @click=${function () {
+          const edit = conditionEditDraft();
+          if (!edit) return;
+          edit.conditions.splice(i, 1);
+          notify();
+        }}
+      >
+        ×
+      </button>
+    </div>
+  `;
+}
+
+function conditionsEditorBlock(edit, opts) {
+  opts = opts || {};
+  const entities = readableEntities();
+  const conditions = (edit.conditions || []).map(normalizeCondition);
+  const headingMargin = opts.first ? "0 0 8px" : "16px 0 8px";
+  return html`
+    <h3 style="margin:${headingMargin};font-size:1rem">
+      ${t("shortcuts.conditions", "Conditions")}
+    </h3>
+    <p class="hint">
+      ${t(
+        "shortcuts.conditions.hint",
+        "All conditions must pass (AND). Empty = always run.",
+      )}
+    </p>
+    <div>
+      ${repeat(
+        conditions,
+        function (_, idx) {
+          return "c-" + idx;
+        },
+        function (raw, i) {
+          return conditionRow(raw, i, entities);
+        },
+      )}
+    </div>
+    <button
+      class="btn"
+      type="button"
+      style="margin-top:4px"
+      @click=${function () {
+        const draft = conditionEditDraft();
+        if (!draft) return;
+        draft.conditions = (draft.conditions || []).concat([
+          blankConditionForType("entity_equals"),
+        ]);
+        notify();
+      }}
+    >
+      ${t("shortcuts.add_condition", "Add condition")}
+    </button>
+  `;
+}
+
 function actionTypeOptions() {
   const opts = [
     { value: "set_control", label: t("shortcuts.action.set_control", "Set control") },
@@ -460,6 +733,7 @@ function actionRow(a, i, controls, apps) {
   a = normalizeAction(a);
   var mid = nothing;
   if (a.type === "set_control") {
+    const ent = entityById(a.entityId);
     mid = html`
       ${choiceSelect({
         options: controls.map(function (c) {
@@ -467,26 +741,35 @@ function actionRow(a, i, controls, apps) {
         }),
         current: a.entityId || "",
         choiceKey: "sc-action-entity-" + i,
+        searchable: true,
         onSelect: function (next) {
           const edit = actionEditDraft();
           if (!edit || !edit.actions[i]) return;
           edit.actions[i].type = "set_control";
           edit.actions[i].entityId = next;
-          if (edit.actions[i].value == null) edit.actions[i].value = "";
+          edit.actions[i].value = pickDefaultValue(
+            entityById(next),
+            edit.actions[i].value,
+          );
           ignoreTypeClicksUntil = Date.now() + 500;
           notify();
         },
       })}
-      <input
-        class="field sc-value"
-        style="width:88px;margin-top:8px"
-        placeholder="value"
-        .value=${live(a.value || "")}
-        @input=${function (ev) {
-          const edit = actionEditDraft();
-          if (edit && edit.actions[i]) edit.actions[i].value = ev.target.value;
-        }}
-      />
+      <div style="margin-top:8px">
+        ${entityValueField({
+          entity: ent,
+          current: a.value || "",
+          choiceKey: "sc-action-value-" + i,
+          placeholder: "value",
+          onSelect: function (next) {
+            const edit = actionEditDraft();
+            if (edit && edit.actions[i]) {
+              edit.actions[i].value = next;
+              notify();
+            }
+          },
+        })}
+      </div>
     `;
   } else if (a.type === "set_scene") {
     const scenes = state.scenes || [];
@@ -746,14 +1029,17 @@ function triggerRow(tr, i, controls) {
       </div>
     `;
   } else if (tr.type === "entity_state") {
+    const ents = readableEntities();
+    const ent = entityById(tr.entityId);
     extra = html`
       <div style="margin-top:8px">
         ${choiceSelect({
-          options: controls.map(function (c) {
+          options: ents.map(function (c) {
             return { value: c.id, label: c.label || c.id };
           }),
           current: tr.entityId || "",
           choiceKey: "sc-trig-entity-" + i,
+          searchable: true,
           onSelect: function (next) {
               const edit = state.shortcutEdit;
               if (!edit || !edit.triggers[i]) return;
@@ -766,17 +1052,18 @@ function triggerRow(tr, i, controls) {
         )}
       </div>
       <div style="margin-top:8px">
-        <input
-          class="field sc-entity-val"
-          placeholder=${t("shortcuts.trigger.entity_value", "Value (optional)")}
-          style="width:100%"
-          .value=${live(tr.value || "")}
-          @input=${function (ev) {
+        ${entityValueField({
+          entity: ent,
+          current: tr.value || "",
+          choiceKey: "sc-trig-value-" + i,
+          placeholder: t("shortcuts.trigger.entity_value", "Value (optional)"),
+          onSelect: function (next) {
             if (state.shortcutEdit && state.shortcutEdit.triggers[i]) {
-              state.shortcutEdit.triggers[i].value = ev.target.value;
+              state.shortcutEdit.triggers[i].value = next;
+              notify();
             }
-          }}
-        />
+          },
+        })}
       </div>
     `;
   } else if (tr.type === "gear") {
@@ -959,7 +1246,34 @@ function editorCard(edit) {
           notify();
         })}
       </div>
-      <h3 style="margin:0 0 8px;font-size:1rem">${t("shortcuts.actions", "Actions")}</h3>
+      <h3 style="margin:0 0 8px;font-size:1rem">${t("shortcuts.triggers", "Triggers")}</h3>
+      <div id="scTriggers">
+        ${repeat(
+          triggers,
+          function (_, idx) {
+            return "t-" + idx;
+          },
+          function (raw, i) {
+            return triggerRow(raw, i, controls);
+          },
+        )}
+      </div>
+      <button
+        class="btn"
+        id="scAddTrigger"
+        type="button"
+        style="margin-top:4px"
+        @click=${function () {
+          const edit = state.shortcutEdit;
+          if (!edit) return;
+          edit.triggers = (edit.triggers || []).concat([{ type: "boot" }]);
+          notify();
+        }}
+      >
+        ${t("shortcuts.add_trigger", "Add trigger")}
+      </button>
+      ${conditionsEditorBlock(edit)}
+      <h3 style="margin:16px 0 8px;font-size:1rem">${t("shortcuts.actions", "Actions")}</h3>
       <p class="hint">${t("shortcuts.actions.hint", "Use Set scene / Run routine to compose reusable blocks.")}</p>
       <div id="scActions">
         ${repeat(
@@ -987,32 +1301,6 @@ function editorCard(edit) {
         }}
       >
         ${t("shortcuts.add_action", "Add action")}
-      </button>
-      <h3 style="margin:16px 0 8px;font-size:1rem">${t("shortcuts.triggers", "Triggers")}</h3>
-      <div id="scTriggers">
-        ${repeat(
-          triggers,
-          function (_, idx) {
-            return "t-" + idx;
-          },
-          function (raw, i) {
-            return triggerRow(raw, i, controls);
-          },
-        )}
-      </div>
-      <button
-        class="btn"
-        id="scAddTrigger"
-        type="button"
-        style="margin-top:4px"
-        @click=${function () {
-          const edit = state.shortcutEdit;
-          if (!edit) return;
-          edit.triggers = (edit.triggers || []).concat([{ type: "boot" }]);
-          notify();
-        }}
-      >
-        ${t("shortcuts.add_trigger", "Add trigger")}
       </button>
       <div class="row" style="gap:8px;margin-top:16px;width:100%">
         <button
@@ -1259,6 +1547,9 @@ function openEditShortcut(id) {
   state.shortcutEdit = JSON.parse(JSON.stringify(s));
   state.shortcutEdit.actions = (state.shortcutEdit.actions || []).map(normalizeAction);
   state.shortcutEdit.triggers = (state.shortcutEdit.triggers || []).map(normalizeTrigger);
+  state.shortcutEdit.conditions = (state.shortcutEdit.conditions || []).map(
+    normalizeCondition,
+  );
   notify();
   scrollToEditor();
 }
@@ -1272,6 +1563,7 @@ function openEditRoutine(id) {
       enabled: true,
       icon: "drive",
       actions: [{ type: "set_control", entityId: "", value: "" }],
+      conditions: [],
     };
     notify();
     scrollToEditor();
@@ -1286,10 +1578,14 @@ function openEditRoutine(id) {
       enabled: true,
       icon: "drive",
       actions: [{ type: "delay_ms", ms: 0 }],
+      conditions: [],
     };
   } else {
     state.routineEdit = JSON.parse(JSON.stringify(r));
     state.routineEdit.actions = (state.routineEdit.actions || []).map(normalizeAction);
+    state.routineEdit.conditions = (state.routineEdit.conditions || []).map(
+      normalizeCondition,
+    );
   }
   notify();
   scrollToEditor();
@@ -1402,7 +1698,8 @@ function routineEditorCard(edit) {
           notify();
         })}
       </div>
-      <h3 style="margin:0 0 8px;font-size:1rem">${t("shortcuts.actions", "Actions")}</h3>
+      ${conditionsEditorBlock(edit, { first: true })}
+      <h3 style="margin:16px 0 8px;font-size:1rem">${t("shortcuts.actions", "Actions")}</h3>
       <div>
         ${repeat(
           actions,
@@ -1466,9 +1763,9 @@ async function saveRoutine() {
     icon: edit.icon || "drive",
     enabled: edit.enabled !== false,
     actions: (edit.actions || []).slice(0, 10),
+    conditions: (edit.conditions || []).map(normalizeCondition),
   });
   delete body.triggers;
-  delete body.conditions;
   try {
     const res = await api("/api/routines", {
       method: "POST",
@@ -1634,6 +1931,7 @@ function flowsTab() {
             enabled: true,
             actions: [{ type: "run_routine", routineId: "" }],
             triggers: [],
+            conditions: [],
           };
           notify();
           scrollToEditor();

@@ -2,14 +2,10 @@
 # Permission check / grant helpers (sourced). Compatible with macOS Bash 3.2.
 
 OCA_RUNTIME_PERMS_DEFAULT="android.permission.CAMERA android.permission.RECORD_AUDIO android.car.permission.CAR_SPEED android.car.permission.CAR_ENERGY"
-OCA_PRIVILEGED_PERMS_DEFAULT="android.car.permission.CAR_VENDOR_EXTENSION android.car.permission.CONTROL_CAR_CLIMATE"
 OCA_INSTALL_PERMS_DEFAULT="android.car.permission.CAR_INFO android.car.permission.CAR_POWERTRAIN"
 
 _runtime_perms() {
   if [[ -n "${OCA_RUNTIME_PERMS:-}" ]]; then echo "$OCA_RUNTIME_PERMS"; else echo "$OCA_RUNTIME_PERMS_DEFAULT"; fi
-}
-_privileged_perms() {
-  if [[ -n "${OCA_PRIVILEGED_PERMS:-}" ]]; then echo "$OCA_PRIVILEGED_PERMS"; else echo "$OCA_PRIVILEGED_PERMS_DEFAULT"; fi
 }
 _install_perms() {
   if [[ -n "${OCA_INSTALL_PERMS:-}" ]]; then echo "$OCA_INSTALL_PERMS"; else echo "$OCA_INSTALL_PERMS_DEFAULT"; fi
@@ -57,11 +53,11 @@ oca_check() {
   fi
   echo "  $path (user $OCA_ANDROID_USER)"
   adb_s shell dumpsys package "$OCA_PACKAGE" 2>/dev/null | tr -d '\r' \
-    | grep -E 'codePath=|pkgFlags=|flags=\[|PRIVILEGED' | head -8 | sed 's/^/  /'
+    | grep -E 'codePath=|pkgFlags=|flags=\[' | head -8 | sed 's/^/  /'
   if echo "$path" | grep -qE '/system|/system_ext|/product|/vendor'; then
-    ok "Installed on system partition (privileged candidate)"
+    warn "Installed on system partition — reinstall with oca-setup setup for /data"
   else
-    ok "Installed under /data (default unprivileged path)"
+    ok "Installed under /data (user-space)"
   fi
 
   echo
@@ -78,13 +74,6 @@ oca_check() {
   done
 
   echo
-  echo "=== Privileged (optional — formal VHAL / HVAC) ==="
-  local priv_ok=1
-  for p in $(_privileged_perms); do
-    if oca_perm_granted "$p"; then ok "$p"; else warn "not granted: $p"; priv_ok=0; fi
-  done
-
-  echo
   echo "=== Overlay (float chip) ==="
   local ops
   ops="$(adb_s shell appops get "$OCA_PACKAGE" SYSTEM_ALERT_WINDOW 2>/dev/null | tr -d '\r' | head -1)"
@@ -94,21 +83,11 @@ oca_check() {
     warn "SYSTEM_ALERT_WINDOW: ${ops:-unknown} (float chip needs allow)"
   fi
 
-  echo
-  if [[ "$priv_ok" -eq 1 ]]; then
-    ok "Formal vendor/HVAC privileges present"
-  else
-    ok "Running unprivileged (default). Vendor props often still work on Antora;"
-    echo "    elevate only if Climate/vendor writes are denied:"
-    echo "    ./tools/oca-setup -i ${INTEGRATION:-antora1000} -H $OCA_HOST setup --privileged"
-    echo "    (see docs/safety.md)"
-  fi
-
   if curl -sf --max-time 2 "http://${OCA_HOST}:8787/api/setup" >/dev/null 2>&1; then
     echo
     echo "=== Live /api/setup ==="
     curl -s "http://${OCA_HOST}:8787/api/setup" \
-      | python3 -c 'import json,sys; d=json.load(sys.stdin); print("  complete=%s runtimeOk=%s privilegedOk=%s hasBasicTelemetry=%s" % (d.get("complete"), d.get("runtimeOk"), d.get("privilegedOk"), d.get("hasBasicTelemetry")))' \
+      | python3 -c 'import json,sys; d=json.load(sys.stdin); print("  complete=%s runtimeOk=%s hasBasicTelemetry=%s accessMode=%s" % (d.get("complete"), d.get("runtimeOk"), d.get("hasBasicTelemetry"), d.get("accessMode")))' \
       2>/dev/null || true
   fi
   return 0

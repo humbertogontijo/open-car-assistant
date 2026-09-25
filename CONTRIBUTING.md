@@ -27,11 +27,11 @@ export OCA_HOST=CAR_IP   # or pass -H every time
 
 `oca-setup` force-stops the app, **pushes** the APK, then runs `pm install` on-device. Avoid plain `adb install` over wireless ADB on Antora — streamed install often hangs at “Performing Streamed Install” and drops the device offline (worse when DVR holds cameras open).
 
-See [README.md](README.md) and [docs/safety.md](docs/safety.md). Default install is unprivileged `/data`. Optional priv-app (`setup --privileged`) is only for formal vendor/HVAC grants on hardware you own.
+See [README.md](README.md) and [docs/safety.md](docs/safety.md). Install is user-space `/data` only. Platforms that need formal privileged grants handle that in their integration (shared `CarPropertyBackend` is available; core tooling does not elevate).
 
 ## Adding a platform integration
 
-Follow [docs/adding-an-integration.md](docs/adding-an-integration.md): add `integrations/<id>/` with `host.sh`, `platform.json`, ServiceLoader entry, and optional Kotlin bridge. No core registry edits. Use **`ihu629g`** as the simple CarProperty-only reference; `antora1000` is the heavier dual-backend example.
+Follow [docs/adding-an-integration.md](docs/adding-an-integration.md): add `integrations/<id>/` with `host.sh`, `platform.json`, ServiceLoader entry, and optional Kotlin bridge. No core registry edits. Use **`ihu629g`** as the simple CarProperty reference; `antora1000` is the gRPC (user-space) example.
 
 ## Adding a plugin
 

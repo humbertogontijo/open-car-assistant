@@ -28,6 +28,7 @@ internal data class OcaWebDeps(
     val port: Int,
     val prefs: SharedPreferences,
     val androidSettings: AndroidSettingsController? = null,
+    val locationTracker: LocationTrackerController? = null,
     val history: EntityHistoryRecorder? = null,
     val shortcuts: ShortcutsController? = null,
     val plugins: PluginRegistry? = null,

@@ -1,11 +1,27 @@
 import { quickEntryCard } from "./shortcuts.js";
 import { prefCard, prefSegment } from "../ui/cards.js";
 import { theme } from "../theme.js";
-import { html } from "../lit.js";
+import { html, live } from "../lit.js";
 import { state, patch } from "../store.js";
 import { t } from "../i18n.js";
 import { api } from "../api.js";
 import { unitPrefs, UNIT_CHOICES } from "../units.js";
+
+async function updatePrefs(body) {
+  const res = await api("/api/prefs", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body,
+  });
+  patch({
+    prefs: Object.assign({}, state.prefs || {}, {
+      homeLat: res.homeLat,
+      homeLon: res.homeLon,
+      homeRadiusM: res.homeRadiusM != null ? res.homeRadiusM : state.prefs && state.prefs.homeRadiusM,
+    }),
+  });
+  return res;
+}
 
 function unitChoiceOpts(dim) {
   return (UNIT_CHOICES[dim] || []).map(function (id) {
@@ -58,6 +74,11 @@ export function sectionSettings() {
   const th = theme();
   const locale = (state.i18n && state.i18n.locale) || "pt-BR";
   const locales = (state.i18n && state.i18n.locales) || ["pt-BR", "en"];
+  const prefs = state.prefs || {};
+  const homeLat = prefs.homeLat;
+  const homeLon = prefs.homeLon;
+  const homeRadius = prefs.homeRadiusM != null ? prefs.homeRadiusM : 100;
+  const homeConfigured = homeLat != null && homeLon != null;
 
   const themeOpts = [
     { value: "dark", label: t("theme.dark", "Dark") },
@@ -86,6 +107,84 @@ export function sectionSettings() {
         body: prefSegment("locale", localeOpts, locale),
       })}
       ${unitDimensionCards()}
+      ${prefCard({
+        icon: "drive",
+        title: t("prefs.home", "Home location"),
+        body: html`
+          <p class="hint">
+            ${homeConfigured
+              ? t("prefs.home.coords", "Lat {lat}, Lon {lon}")
+                  .replace("{lat}", Number(homeLat).toFixed(5))
+                  .replace("{lon}", Number(homeLon).toFixed(5))
+              : t("prefs.home.unset", "Not set — use current location")}
+          </p>
+          <label class="hint" style="display:block;margin-top:8px"
+            >${t("prefs.home.radius", "Radius (m)")}</label
+          >
+          <input
+            class="field"
+            type="number"
+            min="20"
+            max="5000"
+            step="10"
+            style="width:100%;margin:4px 0 8px"
+            .value=${live(String(homeRadius))}
+            @change=${async function (ev) {
+              const r = parseFloat(ev.target.value);
+              if (isNaN(r)) return;
+              try {
+                await updatePrefs("homeRadiusM=" + encodeURIComponent(String(r)));
+              } catch (e) {}
+            }}
+          />
+          <div class="row" style="width:100%;margin:0;gap:8px">
+            <button
+              class="btn primary"
+              style="flex:1"
+              @click=${async function () {
+                try {
+                  const res = await api("/api/location/home/here", {
+                    method: "POST",
+                  });
+                  if (res && res.ok === false) {
+                    patch({
+                      shortcutMessage:
+                        res.error ||
+                        t("prefs.home.failed", "Could not read GPS"),
+                    });
+                    return;
+                  }
+                  patch({
+                    prefs: Object.assign({}, state.prefs || {}, {
+                      homeLat: res.homeLat,
+                      homeLon: res.homeLon,
+                      homeRadiusM: res.homeRadiusM,
+                    }),
+                  });
+                } catch (e) {
+                  patch({
+                    shortcutMessage: String(e && e.message ? e.message : e),
+                  });
+                }
+              }}
+            >
+              ${t("prefs.home.here", "Use current location")}
+            </button>
+            <button
+              class="btn ghost"
+              style="flex:1"
+              ?disabled=${!homeConfigured}
+              @click=${async function () {
+                try {
+                  await updatePrefs("clearHome=1");
+                } catch (e) {}
+              }}
+            >
+              ${t("prefs.home.clear", "Clear")}
+            </button>
+          </div>
+        `,
+      })}
       ${prefCard({
         icon: "system",
         title: t("prefs.setup", "Setup"),

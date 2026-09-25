@@ -1,0 +1,10 @@
+{
+  "android": {
+    "settings": [
+      { "settingsKey": "wifi_on", "entity": "android_wifi", "access": "rw" },
+      { "settingsKey": "bluetooth_on", "entity": "android_bluetooth", "access": "rw" },
+      { "settingsKey": "screen_brightness", "entity": "android_brightness", "access": "rw" }
+    ],
+    "volumeGroups": []
+  }
+}

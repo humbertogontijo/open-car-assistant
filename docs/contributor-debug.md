@@ -20,7 +20,7 @@ OCA debug is app-level and works with package-install rights only.
 
 ## 2. Contributor mode (Lab)
 
-Open the product UI → **Lab** tab (`/?section=lab`).
+Open the product UI → **Lab** tab (`/lab`).
 
 1. Toggle **Contributor mode** on. On `userdebug` / test-keys HUs this defaults on; on stock `user` builds you must enable it here.
 2. The short LAN **token** appears next to the toggle (also on `/debug` HTML and `GET /api/lab`).
@@ -66,6 +66,20 @@ Base: `http://CAR_IP:8787`
 | `GET /debug/adb-hint` | Wi‑Fi IP + suggested `adb connect` |
 
 Token is required when Contributor mode is on. Without Contributor mode, write/debug routes refuse (probe summary may still run for Lab re-probe when mode is off).
+
+### VHAL catalog vs product entities
+
+Lab → **VHAL catalog** lists every property from `platform.json` → `properties` (after `extends` merge). Each row may show an **Entity** id when that native id has an `entity` field.
+
+| Filter | Meaning |
+|--------|---------|
+| **All** | Full HU / platform catalog |
+| **Bound (cards)** | Props already mapped to a product control (`entity`) |
+| **Missing** | On the car / in `properties`, but not yet a card |
+
+**Product entities** (cards) stay curated: add a human description in i18n (`control.<id>` / hint), a `ControlDef` in [ControlCatalog.kt](../features/web/src/main/java/cc/opencar/assistant/feature/web/ControlCatalog.kt), a `WellKnownProperties` entry, and a `platform.json` property with `entity` (+ `access: "rw"` if writable). See [adding-a-feature.md](adding-a-feature.md) “New product controls”.
+
+Probe summary includes `boundEntities` / `unbound` counts. Re-probe after updating `platform.json` (`force=1`).
 
 ## 4. Build types
 

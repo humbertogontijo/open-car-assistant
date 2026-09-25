@@ -5,7 +5,7 @@ import { sectionEnergy, loadEnergyDash } from "./energy.js";
 import { sectionControls } from "./controls.js";
 import { sectionDrive } from "./drive.js";
 import { sectionSound, loadSounds } from "./sound.js";
-import { sectionConnect } from "./connect.js";
+import { sectionAndroid } from "./connect.js";
 import { sectionAssistant } from "./assistant.js";
 import { sectionCameras, loadRecordings, startCameraLive, stopCameraLive, applyCameraPlayerSrc, isTimelineBusy } from "./cameras.js";
 import { sectionHistory, loadHistoryPoints } from "./history.js";
@@ -23,7 +23,7 @@ export {
   sectionControls,
   sectionDrive,
   sectionSound,
-  sectionConnect,
+  sectionAndroid,
   sectionAssistant,
   sectionCameras,
   sectionHistory,
@@ -62,7 +62,9 @@ export function sectionView(section) {
       return sectionGroup(t("section.display.title", "Tela"), "", "display");
     },
     sound: sectionSound,
-    connect: sectionConnect,
+    android: sectionAndroid,
+    // Legacy nav / deep-link id
+    connect: sectionAndroid,
     vehicle: function () {
       return sectionGroup(t("section.vehicle.title", "Meu Veículo"), "", "vehicle");
     },
@@ -79,7 +81,6 @@ export function sectionView(section) {
     safety: function () {
       return sectionGroup(t("section.adas.title", "ADAS"), "", "adas");
     },
-    android: sectionConnect,
     lab: sectionLab,
     about: sectionAbout,
   };

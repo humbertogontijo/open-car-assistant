@@ -80,3 +80,19 @@ data class DvrStreamConfig(
         val DEFAULT = DvrStreamConfig()
     }
 }
+
+/**
+ * Cabin [CarVolumeGroup] declared in `platform.json` → `android.volumeGroups`.
+ * Shared Android settings stay in `platform/android.json`; OEM group maps overlay per integration.
+ */
+data class AndroidVolumeGroup(
+    val groupId: Int,
+    val entityId: String,
+    val settingsKey: String = "android.car.VOLUME_GROUP/$groupId",
+    val access: String = "r",
+    val writeVia: String? = null,
+) {
+    /** Unprivileged key inject can write this group (typically media). */
+    val keyWritable: Boolean
+        get() = writeVia == "media_keyevent" || access == "rw" || access == "w"
+}

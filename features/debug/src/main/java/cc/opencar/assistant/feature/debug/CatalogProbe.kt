@@ -28,6 +28,8 @@ class CatalogProbe(
         val areaId: Int? = null,
         val value: String? = null,
         val message: String? = null,
+        /** Product entity / control id when this prop is bound in platform.json. */
+        val entity: String? = null,
     )
 
     data class ProbeReport(
@@ -38,6 +40,7 @@ class CatalogProbe(
     ) {
         fun summary(): Map<String, Any> {
             val byStatus = results.groupingBy { it.status }.eachCount()
+            val bound = results.count { it.entity != null }
             val byFamily = results.groupBy { it.family }.mapValues { (_, list) ->
                 mapOf(
                     "total" to list.size,
@@ -45,6 +48,7 @@ class CatalogProbe(
                     "denied" to list.count { it.status == "denied" },
                     "unavailable" to list.count { it.status == "unavailable" },
                     "failed" to list.count { it.status == "failed" },
+                    "bound" to list.count { it.entity != null },
                 )
             }
             return mapOf(
@@ -52,6 +56,8 @@ class CatalogProbe(
                 "integrationId" to integrationId,
                 "catalogSize" to catalogSize,
                 "counts" to byStatus,
+                "boundEntities" to bound,
+                "unbound" to (results.size - bound),
                 "families" to byFamily,
             )
         }
@@ -70,7 +76,8 @@ class CatalogProbe(
                         .put("permission", r.permission)
                         .put("areaId", r.areaId)
                         .put("value", r.value)
-                        .put("message", r.message),
+                        .put("message", r.message)
+                        .put("entity", r.entity),
                 )
             }
             return arr
@@ -106,6 +113,8 @@ class CatalogProbe(
 
     private suspend fun probeOne(entry: CatalogEntry): PropResult {
         val family = familyOf(entry.name)
+        val nativeId = entry.property.nativeId
+        val entity = nativeId?.let { session.entityBindings()[it] }
         val outcome = session.diagnose(entry.property)
         return when (outcome) {
             is ReadOutcome.Ok -> PropResult(
@@ -117,6 +126,7 @@ class CatalogProbe(
                 status = "ok",
                 areaId = outcome.areaId,
                 value = outcome.value?.display()?.let { redact(entry.name, it) },
+                entity = entity,
             )
             is ReadOutcome.Denied -> PropResult(
                 name = entry.name,
@@ -128,6 +138,7 @@ class CatalogProbe(
                 permission = outcome.permission,
                 areaId = outcome.areaId,
                 message = outcome.message,
+                entity = entity,
             )
             is ReadOutcome.Failed -> PropResult(
                 name = entry.name,
@@ -138,6 +149,7 @@ class CatalogProbe(
                 status = "failed",
                 areaId = outcome.areaId,
                 message = outcome.message,
+                entity = entity,
             )
             is ReadOutcome.Unavailable -> PropResult(
                 name = entry.name,
@@ -147,6 +159,7 @@ class CatalogProbe(
                 writable = entry.writable,
                 status = "unavailable",
                 areaId = outcome.areaId,
+                entity = entity,
             )
         }
     }
@@ -183,6 +196,7 @@ class CatalogProbe(
                     areaId = if (o.has("areaId") && !o.isNull("areaId")) o.getInt("areaId") else null,
                     value = o.optString("value").ifBlank { null },
                     message = o.optString("message").ifBlank { null },
+                    entity = o.optString("entity").ifBlank { null },
                 )
             }
             ProbeReport(
@@ -215,7 +229,7 @@ class CatalogProbe(
                 n.contains("HUD") -> "hud"
                 n.contains("AMBIENCE") -> "ambience"
                 n.contains("BRIGHTNESS") || n.contains("BACKLIGHT") -> "brightness"
-                n.contains("SEAT") -> "seat"
+                n.contains("SEAT") || n.contains("BELT") || n.contains("OCCUPANCY") -> "seat"
                 n.contains("MIRROR") -> "mirror"
                 n.startsWith("HYBRID_") -> "hybrid"
                 n.startsWith("CHARGE_") -> "charge"

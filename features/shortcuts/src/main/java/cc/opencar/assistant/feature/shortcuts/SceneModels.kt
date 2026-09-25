@@ -138,6 +138,8 @@ data class Routine(
     val icon: String = "drive",
     val enabled: Boolean = true,
     val actions: List<ShortcutAction> = emptyList(),
+    /** AND conditions evaluated before actions on every run. Empty = always pass. */
+    val conditions: List<ShortcutCondition> = emptyList(),
     val uiCard: UiCardSpec? = null,
 ) {
     fun toMap(): Map<String, Any?> = mapOf(
@@ -146,6 +148,7 @@ data class Routine(
         "icon" to icon,
         "enabled" to enabled,
         "actions" to actions.map { it.toMap() },
+        "conditions" to conditions.map { it.toMap() },
         "uiCard" to uiCard?.toMap(),
     )
 
@@ -159,8 +162,11 @@ data class Routine(
             val actionsRaw = m["actions"] as? List<Map<*, *>> ?: emptyList()
             val actions = actionsRaw.mapNotNull { ShortcutAction.fromMap(it) }
                 .take(ShortcutAction.MAX_ACTIONS)
+            @Suppress("UNCHECKED_CAST")
+            val conditionsRaw = m["conditions"] as? List<Map<*, *>> ?: emptyList()
+            val conditions = conditionsRaw.mapNotNull { ShortcutCondition.fromMap(it) }
             val uiCard = UiCardSpec.fromAny(m["uiCard"])
-            return Routine(id, name, icon, enabled, actions, uiCard)
+            return Routine(id, name, icon, enabled, actions, conditions, uiCard)
         }
     }
 }

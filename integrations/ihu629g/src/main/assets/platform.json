@@ -2,45 +2,217 @@
   "id": "ihu629g",
   "displayName": "IHU629G (EX2 / Geometry E)",
   "backend": "vhal",
-  "match": ["ihu629", "IHU629", "ihu629g", "geometry"],
+  "extends": [
+    "aosp",
+    "android"
+  ],
+  "match": [
+    "ihu629",
+    "IHU629",
+    "ihu629g",
+    "geometry"
+  ],
   "capabilities": [
-    "READ_TELEMETRY", "WRITE_SETTINGS", "DRIVE_MODES", "HVAC", "CHARGING",
-    "GEAR_EVENTS", "IGNITION_EVENTS"
+    "READ_TELEMETRY",
+    "WRITE_SETTINGS",
+    "DRIVE_MODES",
+    "HVAC",
+    "CHARGING",
+    "GEAR_EVENTS",
+    "IGNITION_EVENTS"
   ],
   "variants": [
-    { "id": "default", "label": "EX2 / Geometry E", "extraCapabilities": [] }
-  ],
-  "bindings": {
-    "gear": { "nativeId": "0x11400401", "areaId": 0 },
-    "speed_kmh": { "nativeId": "0x11600207", "areaId": 0 },
-    "ev_battery_percent": { "nativeId": 557885165, "areaId": 0 },
-    "range_km": { "nativeId": 289407752, "areaId": 0 },
-    "drive_mode": { "nativeId": 570491136, "areaId": 0 },
-    "regen": { "nativeId": 537003264, "areaId": 0 },
-    "ignition": { "nativeId": "0x11400409", "areaId": 0 },
-    "charge_plug": { "nativeId": 557887621, "areaId": 0 },
-    "charge_current": { "nativeId": 605291008, "areaId": 0 },
-    "charge_limit": { "nativeId": 605029888, "areaId": 0 },
-    "charge_switch": { "nativeId": 605028608, "areaId": 0 },
-    "hvac_power": { "nativeId": "0x15200510", "areaId": 0 },
-    "hvac_ac": { "nativeId": "0x15200505", "areaId": 0 },
-    "hvac_temp_c": { "nativeId": "0x15600503", "areaId": 1 },
-    "hvac_fan": { "nativeId": 356517120, "areaId": 75 },
-    "hvac_fan_direction": { "nativeId": 557846560, "areaId": 0 },
-    "hvac_recirc": { "nativeId": "0x15200508", "areaId": 0 },
-    "parking_comfort": { "nativeId": 557885463, "areaId": 0 },
-    "ambience_main_color": { "nativeId": 537528576, "areaId": 5 },
-    "ambience_intensity": { "nativeId": 704708864, "areaId": 0 }
-  },
-  "writableAllowlist": [
-    570491136, 537003264,
-    605029888, 605028608,
-    "0x15200510", "0x15200505", "0x15600503", 356517120, 557846560, "0x15200508",
-    557885463, 537528576, 704708864
+    {
+      "id": "default",
+      "label": "EX2 / Geometry E",
+      "extraCapabilities": []
+    }
   ],
   "driveModeEnum": {
     "570491137": "drive_mode.eco",
     "570491138": "drive_mode.comfort",
     "570491139": "drive_mode.sport"
-  }
+  },
+  "properties": [
+    {
+      "id": "0x11400401",
+      "key": "CURRENT_GEAR",
+      "access": "r",
+      "areas": [
+        0
+      ],
+      "entity": "gear"
+    },
+    {
+      "id": "0x11600207",
+      "key": "PERF_VEHICLE_SPEED",
+      "access": "r",
+      "areas": [
+        0
+      ],
+      "entity": "speed_kmh"
+    },
+    {
+      "id": 557885165,
+      "key": "ev_battery_percent",
+      "access": "r",
+      "areas": [
+        0
+      ],
+      "entity": "ev_battery_percent"
+    },
+    {
+      "id": 289407752,
+      "key": "range_km",
+      "access": "r",
+      "areas": [
+        0
+      ],
+      "entity": "range_km"
+    },
+    {
+      "id": 570491136,
+      "key": "drive_mode",
+      "access": "rw",
+      "areas": [
+        0
+      ],
+      "entity": "drive_mode"
+    },
+    {
+      "id": 537003264,
+      "key": "regen",
+      "access": "rw",
+      "areas": [
+        0
+      ],
+      "entity": "regen"
+    },
+    {
+      "id": "0x11400409",
+      "key": "IGNITION_STATE",
+      "access": "r",
+      "areas": [
+        0
+      ],
+      "entity": "ignition"
+    },
+    {
+      "id": 557887621,
+      "key": "charge_plug",
+      "access": "r",
+      "areas": [
+        0
+      ],
+      "entity": "charge_plug"
+    },
+    {
+      "id": 605291008,
+      "key": "charge_current",
+      "access": "r",
+      "areas": [
+        0
+      ],
+      "entity": "charge_current"
+    },
+    {
+      "id": 605029888,
+      "key": "charge_limit",
+      "access": "rw",
+      "areas": [
+        0
+      ],
+      "entity": "charge_limit"
+    },
+    {
+      "id": 605028608,
+      "key": "charge_switch",
+      "access": "rw",
+      "areas": [
+        0
+      ],
+      "entity": "charge_switch"
+    },
+    {
+      "id": "0x15200510",
+      "key": "HVAC_POWER_ON",
+      "access": "rw",
+      "areas": [
+        0
+      ],
+      "entity": "hvac_power"
+    },
+    {
+      "id": "0x15200505",
+      "key": "HVAC_AC_ON",
+      "access": "rw",
+      "areas": [
+        0
+      ],
+      "entity": "hvac_ac"
+    },
+    {
+      "id": "0x15600503",
+      "key": "HVAC_TEMPERATURE_SET",
+      "access": "rw",
+      "areas": [
+        1
+      ],
+      "entity": "hvac_temp_c"
+    },
+    {
+      "id": 356517120,
+      "key": "HVAC_FAN_SPEED",
+      "access": "rw",
+      "areas": [
+        75
+      ],
+      "entity": "hvac_fan"
+    },
+    {
+      "id": 557846560,
+      "key": "hvac_fan_direction",
+      "access": "rw",
+      "areas": [
+        0
+      ],
+      "entity": "hvac_fan_direction"
+    },
+    {
+      "id": "0x15200508",
+      "key": "HVAC_RECIRC_ON",
+      "access": "rw",
+      "areas": [
+        0
+      ],
+      "entity": "hvac_recirc"
+    },
+    {
+      "id": 557885463,
+      "key": "parking_comfort",
+      "access": "rw",
+      "areas": [
+        0
+      ],
+      "entity": "parking_comfort"
+    },
+    {
+      "id": 537528576,
+      "key": "ambience_main_color",
+      "access": "rw",
+      "areas": [
+        5
+      ],
+      "entity": "ambience_main_color"
+    },
+    {
+      "id": 704708864,
+      "key": "ambience_intensity",
+      "access": "rw",
+      "areas": [
+        0
+      ],
+      "entity": "ambience_intensity"
+    }
+  ]
 }

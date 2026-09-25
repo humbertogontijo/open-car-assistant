@@ -1,8 +1,13 @@
 package cc.opencar.assistant.integrations.common
 
+import kotlinx.coroutines.flow.Flow
+
 /**
  * Property read/write facade for AAOS vehicle properties.
- * Integrations pick a transport (CarPropertyManager, gRPC, …) per install mode.
+ * Integrations pick a transport (CarPropertyManager, gRPC, …).
+ *
+ * Push transports implement [observe]; poll-only transports leave it null and
+ * the [cc.opencar.assistant.api.VehicleSession] runs its own loop.
  */
 interface VehiclePropertyBackend : AutoCloseable {
     val mode: PropertyAccessMode
@@ -14,6 +19,13 @@ interface VehiclePropertyBackend : AutoCloseable {
     fun writeFloat(propId: Int, areaId: Int, value: Float): Boolean
     fun writeBoolean(propId: Int, areaId: Int, value: Boolean): Boolean
 
+    /**
+     * Hot stream of property changes when the transport can push.
+     * @param propIds optional interest set (CarProperty); null/empty = all (gRPC) or unavailable (CarProperty).
+     * @return null when the session must poll via [read].
+     */
+    fun observe(propIds: IntArray? = null): Flow<PropertyUpdate>? = null
+
     sealed class DetailedRead {
         data class Ok(val value: Any?) : DetailedRead()
         data class Denied(val permission: String?, val message: String?) : DetailedRead()
@@ -23,11 +35,18 @@ interface VehiclePropertyBackend : AutoCloseable {
     }
 }
 
+data class PropertyUpdate(
+    val propId: Int,
+    val areaId: Int,
+    val value: Any?,
+    val timestampMs: Long = System.currentTimeMillis(),
+)
+
 /**
  * How a session talks to VHAL.
  *
- * - [CAR_PROPERTY]: [android.car.CarPropertyManager] (typically privileged / priv-app)
- * - [GRPC]: platform-specific unprivileged transport (e.g. Antora VenusVehicleServer)
+ * - [CAR_PROPERTY]: [android.car.CarPropertyManager]
+ * - [GRPC]: platform-specific user-space transport (e.g. Antora VenusVehicleServer)
  */
 enum class PropertyAccessMode(val wireName: String) {
     CAR_PROPERTY("car_property"),

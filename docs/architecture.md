@@ -36,6 +36,15 @@ interface VehicleIntegration {
 
 Features never hardcode VHAL hex IDs. They use `WellKnownProperties` / `VehicleProperty(namespace, key)`. The integration maps those to native IDs.
 
+### Poll vs push (vehicle state)
+
+`VehiclePropertyBackend.observe()` is optional:
+
+- **Push** — return a hot `Flow<PropertyUpdate>` (Antora `GrpcVhalBackend` from Venus `StartPropertyValuesStream`; `CarPropertyBackend` when `registerCallback` works). The session collects updates, publishes distinct `telemetry()`, and emits `VehicleEvent.EntityValueChanged` / gear / ignition edges. No 1s session poll.
+- **Poll** — leave `observe()` null (or CarProperty registration fails). The session owns a ~1s `readSnapshot()` loop and still fans out entity events so the UI/WebSocket stay event-driven.
+
+The web UI never polls vehicle state: Ktor `/api/events` fans out session telemetry + events (and `catalog` after writes). Camera HLS stays on its own path.
+
 ## Plugin SPI
 
 External bridges (not HU platforms) implement `OcaPlugin` under `cc.opencar.assistant.api.plugin`. See [plugins.md](plugins.md).
@@ -53,10 +62,12 @@ Vehicle integrations and plugins are **folder-discovered**:
 
 Detects via `ro.product.device` / `ro.hardware` / fingerprint containing `antora1000` or `se1000`.
 
-VHAL access (auto-selected):
+VHAL access (user-space `/data` install):
 
-- **Unprivileged** — `GrpcVhalBackend` → VenusVehicleServer `127.0.0.1:40004`
-- **Privileged** (`CAR_VENDOR_EXTENSION` granted) — `CarPropertyBackend` → `CarPropertyManager`
+- **Default** — `GrpcVhalBackend` → VenusVehicleServer `127.0.0.1:40004`
+- **Fallback** — `CarPropertyBackend` only if gRPC is unreachable (reads may be denied)
+
+Shared `CarPropertyBackend` remains available for platforms that talk to `CarPropertyManager` directly (see `ihu629g`).
 
 Variants:
 
@@ -68,7 +79,7 @@ Known badges (docs only): EX5, EX5 EM-i, Starray, Starship 7, Proton e.Mas 7, Ga
 
 ## Second platform: `ihu629g`
 
-Detects via fingerprint match for `ihu629` / `geometry`. Uses **CarPropertyManager only** (no VenusVehicleServer). Property IDs and writable allowlist come from `platform.json` / `Ihu629gVhalIds`. Shared AOSP HVAC/speed IDs live in `AospVehicleIds` under `:integrations:platform:common`.
+Detects via fingerprint match for `ihu629` / `geometry`. Uses **CarPropertyManager only** (no VenusVehicleServer). Property IDs and `access` come from `platform.json` / `Ihu629gVhalIds`. Shared AOSP HVAC/speed stubs live in `platform/aosp.json` (+ `AospVehicleIds`) under `:integrations:platform:common`.
 
 ## Runtime flow
 
@@ -83,7 +94,7 @@ Detects via fingerprint match for `ihu629` / `geometry`. Uses **CarPropertyManag
 
 The product UI in `:feature-web` assets uses a shared **Alive Design** token set (`themes.css`) applied app-wide: frosted surfaces, ice-blue accent, Dock sidebar with linear SVG icons (`icons/sprite.svg`), slim status chips, and glass setup overlay. Spacing/radius/touch (≥48px) are theme-agnostic across `dark` / `light` / `contrast`.
 
-Rendering is **lit-html** (vendored ESM under `web/js/vendor/`) driven by a small reactive store (`store.js` `patch` / `subscribe`). Section templates live under `web/js/sections/`; control widgets under `web/js/ui/`. Soft polls update state and lit diffs `#main` (no full `innerHTML` remount). In-session scroll is remembered per section in memory only (not `localStorage`); process kill still starts at Home. Theme/locale/units prefs remain in `localStorage` (and `/api/prefs`). Static assets are served with `Cache-Control: no-store` (no `?v=` query busting).
+Rendering is **lit-html** (vendored ESM under `web/js/vendor/`) driven by a small reactive store (`store.js` `patch` / `subscribe`). Section templates live under `web/js/sections/`; control widgets under `web/js/ui/`. Live updates arrive on `/api/events` WebSocket (`telemetry` / `entity` / `catalog`); the client bootstraps once via HTTP `refresh()` and does **not** soft-poll. In-session scroll is remembered per section in memory only (not `localStorage`); process kill still starts at Home. Theme/locale/units prefs remain in `localStorage` (and `/api/prefs`). Static assets are served with `Cache-Control: no-store` (no `?v=` query busting).
 
 Control cards are typed by `ControlDef.input` (`bool`, `choice`, `int`, `float`, `text`, `sensor`). Choice with ≤3 options renders as pills; more than three uses a styled dropdown. Each writable card can **pin** a boot value; live writes go to VHAL, persist writes go to DataStore only.
 
@@ -123,14 +134,18 @@ Product entities are the **portable contract** across platforms. See [`EntityCon
 | Home Assistant | OCA | Role |
 |----------------|-----|------|
 | **Automation** | **Shortcut (flow)** | Trigger → AND conditions → actions |
-| **Script** | **Routine** | Reusable fire-once action sequence (`run_routine`) |
+| **Script** | **Routine** | Reusable fire-once action sequence (`run_routine`); optional AND conditions gate every run |
 | **Scene** | **Scene** | Multi-entity on/off with restore or forced off-value |
 | **Helper** (`input_boolean`, …) | **`ui_card`** virtual control | Bool/command card in the entity grid (`shortcut_<id>`) |
 | **Blueprint** | Builtin scenes (e.g. **Sentinel**) | Ship templates keyed only to catalog entity ids; skip unbound targets |
 
-- **Shortcut (flow)** — triggers + conditions + actions. Event triggers: `boot` / `screen` (`on` / `off`; HU wake/sleep, debounced ~5s) / `gear` / `wheel_key` / `wifi_ssid` / `entity_state` / plugin triggers. Actions may `set_control`, `set_scene`, `run_routine`, `launch_app`, `delay_ms`, or plugin actions.
+- **Shortcut (flow)** — triggers + conditions + actions. Event triggers: `boot` / `screen` (`on` / `off`; HU wake/sleep, debounced ~5s) / `gear` / `wheel_key` / `wifi_ssid` / `entity_state` / plugin triggers. Conditions (`entity_equals` / `gear_equals` / `wifi_ssid`) are AND-gated after a trigger match. Actions may `set_control`, `set_scene`, `run_routine`, `launch_app`, `delay_ms`, or plugin actions.
 - **Scene** — snapshot configured entities, write on-values when activated; on deactivate restore snapshot or force a value per target. Builtin **Sentinel** seeds on first use (parking comfort on; HVAC / exterior lights / fog off). An external write to any target of an **active** scene deactivates that scene (user left the mode). On **boot**, every scene still marked active is restored (off-path) before boot shortcuts run.
-- **Routine** — reusable fire-once action sequence.
+- **Routine** — reusable fire-once action sequence. Optional AND conditions (same types as flows) are evaluated on **every** run (API, nested `run_routine`); empty = always pass.
+
+**Device tracker / home zone:** `device_tracker_vehicle` (My Vehicle) exposes GPS presence as HA-style `home` / `not_home` vs a home lat/lon/radius stored in `/api/prefs` (`homeLat`, `homeLon`, `homeRadiusM`; set via Settings or `POST /api/location/home/here`). Use an `entity_equals` condition with entity `device_tracker_vehicle` and value `home` to gate routines/flows. Requires `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION`.
+
+**Android section (non-VHAL):** Nav **Android** (`group=android`) holds OS-controlled entities separate from VHAL Sound / My Vehicle: `android_wifi`, `android_bluetooth`, `android_brightness` (0–255, needs Modify system settings), and HA-style **`media_player_vehicle`** (`EntityType.MEDIA_PLAYER`, input `media_player`; state `playing` / `paused` / `idle`; attributes `media_title` / `media_artist` / `media_album` / `app_id` / `volume`; writes accept states, transport `play` / `pause` / `play_pause` / `next` / `previous` / `stop`, or volume `volume_up` / `volume_down` / `volume:N`). Now-playing metadata needs the notification listener (or privileged `MEDIA_CONTENT_CONTROL`). Transport and **media** cabin volume writes use unprivileged key inject (`InputManager` / `input keyevent`); levels are read from `Settings.System` `android.car.VOLUME_GROUP/{N}` (CarVolumeGroup mirrors). OEM Som sliders map to Sound entities **`cabin_vol_media`** (0, writable via keys; same bus as media_player volume), **`cabin_vol_navigation`** (2), **`cabin_vol_voice`** (6), **`cabin_vol_call`** (3), **`cabin_vol_ring`** (7) — non-media groups are read-only without `CAR_CONTROL_AUDIO_VOLUME`. Sound **`media_volume`** stays on VHAL (`SETTING_FUNC_AUDIO_MEDIA_VOLUME`) — likely startup/limit semantics, not the live cabin bus. `speed_volume` / AVAS remain VHAL under **Sound**. Example: pause when gear = P via `set_control` on `media_player_vehicle` = `paused`.
 
 Flows may include a non-event **`ui_card` trigger** that publishes a virtual control (`shortcut_<id>`): with a `set_scene` action the card is a bool bound to that scene; otherwise a command that runs the flow.
 
@@ -155,7 +170,7 @@ One capture path: Camera → GLES mosaic → HW H.264 (`:feature-dvr`). Live cli
 
 ## Safety
 
-Writable VHAL IDs live in each integration's `platform.json` `writableAllowlist` (loaded via `PlatformConfig`). Web/debug writes require Contributor mode + token. VIN is redacted in reads/exports.
+Writable VHAL IDs are properties with `access` `w`/`rw` in each integration's `platform.json` (loaded via `PlatformConfig`; derived as `writableAllowlist`). Web/debug writes require Contributor mode + token. VIN is redacted in reads/exports.
 
 ## Extending
 

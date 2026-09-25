@@ -36,6 +36,7 @@ class OcaWebServer(
     private val variantId: String,
     private val port: Int = 8787,
     private val androidSettings: AndroidSettingsController? = null,
+    private val locationTracker: LocationTrackerController? = null,
     private val history: EntityHistoryRecorder? = null,
     private val shortcuts: ShortcutsController? = null,
     private val plugins: PluginRegistry? = null,
@@ -63,6 +64,7 @@ class OcaWebServer(
             port = port,
             prefs = prefs,
             androidSettings = androidSettings,
+            locationTracker = locationTracker,
             history = history,
             shortcuts = shortcuts,
             plugins = plugins,
@@ -77,12 +79,14 @@ class OcaWebServer(
             routing {
                 registerStaticRoutes(deps)
                 registerCoreRoutes(deps)
+                registerEventRoutes(deps)
                 registerStoreRoutes(deps)
                 registerDvrRoutes(deps)
                 registerSoundRoutes(deps)
                 registerDebugRoutes(deps)
                 registerShortcutRoutes(deps)
                 registerPluginRoutes(deps)
+                registerSpaFallbackRoutes(deps)
             }
         }
         server.start(wait = false)

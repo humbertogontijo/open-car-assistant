@@ -1,6 +1,12 @@
 /**
- * Reactive app store: mutate via patch() / notify() so subscribers re-render.
+ * Reactive app store — Lit signals only.
+ *
+ * Mutate via patch() / notify() / patchSilent(). Notifies bump a root
+ * `version` signal (rAF-coalesced). UI paint and other reactions use
+ * effect() from signals.js (or subscribe() which is that wrapper).
  */
+import { Signal, effect } from "./signals.js";
+
 export const state = {
   status: null,
   controls: [],
@@ -59,29 +65,51 @@ export const state = {
   showHiddenGroup: null,
   labTab: "vhal",
   obd2: null,
+  /** VHAL catalog: all | bound | missing */
+  probeBoundFilter: "all",
   probeFilter: "",
   /** Open choice-select control id (lit-managed). */
   openChoiceId: null,
+  /** Filter text while a searchable choice-select is open. */
+  choiceSearchQuery: "",
   shortcutEdit: null,
   pluginEditId: null,
   setupMsg: "",
   apkMessage: null,
 };
 
-const listeners = new Set();
+/**
+ * Root invalidate signal. Read inside effect() so the effect re-runs after
+ * patch/notify. Plain `state` fields are not signals yet — bump this instead.
+ */
+export const version = new Signal.State(0);
+
 let raf = 0;
 
+/**
+ * Subscribe to store updates via Lit signals (effect + version).
+ * Prefer importing effect() from signals.js for new code that already
+ * reads other signals; use this when you only care about store ticks.
+ */
 export function subscribe(fn) {
-  listeners.add(fn);
-  return function () {
-    listeners.delete(fn);
-  };
+  return effect(function () {
+    version.get();
+    fn();
+  });
 }
 
-/** Apply a shallow merge and schedule subscriber notification (rAF-coalesced). */
+/** Apply a shallow merge and schedule a version bump (rAF-coalesced). */
 export function patch(partial) {
   if (partial) Object.assign(state, partial);
   scheduleNotify();
+}
+
+/**
+ * Mutate state without re-rendering. Used by event patches while camera live
+ * preview is active so we do not tear down HLS / rebuild the catalog UI.
+ */
+export function patchSilent(partial) {
+  if (partial) Object.assign(state, partial);
 }
 
 /** Notify after in-place mutations (e.g. nested object fields). */
@@ -93,11 +121,12 @@ function scheduleNotify() {
   if (raf) return;
   raf = requestAnimationFrame(function () {
     raf = 0;
-    listeners.forEach(function (fn) {
-      try {
-        fn();
-      } catch (e) {}
-    });
+    // untrack: avoid nesting this read in some accidental consumer.
+    var next =
+      Signal.subtle.untrack(function () {
+        return version.get();
+      }) + 1;
+    version.set(next);
   });
 }
 

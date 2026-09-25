@@ -195,6 +195,8 @@ class CarPropertyBridge(context: Context) : AutoCloseable {
         }
     }
 
+    @Volatile private var propertyCallback: Any? = null
+
     /**
      * Best-effort reflective registerCallback. Returns false if the platform
      * CarPropertyManager API is unavailable — callers should poll instead.
@@ -230,6 +232,7 @@ class CarPropertyBridge(context: Context) : AutoCloseable {
             for (id in propIds) {
                 register.invoke(mgr, proxy, id, rateHz)
             }
+            propertyCallback = proxy
             true
         } catch (t: Throwable) {
             Log.d(TAG, "registerCallback unavailable: ${unwrap(t)}")
@@ -238,6 +241,18 @@ class CarPropertyBridge(context: Context) : AutoCloseable {
     }
 
     override fun close() {
+        val cb = propertyCallback
+        propertyCallback = null
+        val mgr = propertyManager
+        if (cb != null && mgr != null) {
+            try {
+                val unregister = mgr.javaClass.methods.firstOrNull {
+                    it.name == "unregisterCallback" && it.parameterTypes.size == 1
+                }
+                unregister?.invoke(mgr, cb)
+            } catch (_: Throwable) {
+            }
+        }
         try {
             car?.javaClass?.getMethod("disconnect")?.invoke(car)
         } catch (_: Throwable) {

@@ -22,7 +22,7 @@ Open Car Assistant is designed for **owned userdebug / remountable AAOS head uni
 
 - The in-car Ktor server listens on cleartext `0.0.0.0:8787`. Do not expose that port to the public internet.
 - Contributor debug mode can show a short LAN token in the Lab UI and `/debug` HTML.
-- Host tooling may use `adb root`, remount, priv-app install, and on-device `su` elevate — only on hardware you own.
+- Host tooling installs under `/data` (user-space). Optional on-device `su` helpers (e.g. wireless ADB) are only for hardware you own.
 
 See [docs/safety.md](docs/safety.md) and [docs/disclaimer.md](docs/disclaimer.md).
 

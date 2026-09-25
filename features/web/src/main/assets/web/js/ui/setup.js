@@ -25,11 +25,9 @@ export function setupOverlayTemplate() {
   const actions = s.actions || {};
   const accessNote = s.accessMode
     ? html`<p class="sub">
-        VHAL: <code class="mono">${s.accessMode}</code> (${s.accessMode === "grpc"
-          ? "unprivileged / VenusVehicleServer"
-          : s.accessMode === "car_property"
-            ? "privileged / CarPropertyManager"
-            : "unknown"})
+        VHAL: <code class="mono">${s.accessMode}</code>${s.accessMode === "grpc"
+          ? " (VenusVehicleServer)"
+          : ""}
       </p>`
     : nothing;
 
@@ -40,7 +38,7 @@ export function setupOverlayTemplate() {
         <p class="sub">
           ${t(
             "setup.sub",
-            "Conceda permissões de runtime no HU. Instalação privilegiada é opcional.",
+            "Grant runtime permissions on the HU.",
           )}
         </p>
         ${accessNote}
@@ -48,7 +46,7 @@ export function setupOverlayTemplate() {
           return html`<div class="setup-step ${st.done ? "done" : ""}">
             <div class="mark">${st.done ? "✓" : "·"}</div>
             <div class="body">
-              <h3>${st.title}${st.optional ? " (opcional)" : ""}</h3>
+              <h3>${st.title}</h3>
               <p>${st.detail}</p>
             </div>
           </div>`;
@@ -77,23 +75,6 @@ export function setupOverlayTemplate() {
           >
             ${actions.grant || t("setup.action.grant", "Conceder permissões")}
           </button>
-          ${s.privilegedOk
-            ? nothing
-            : html`<button
-                class="btn ghost"
-                @click=${async function () {
-                  patch({ setupMsg: "Elevando (su)…" });
-                  const r = await api("/api/setup/actions/elevate", { method: "POST" });
-                  let msg = r.message || JSON.stringify(r);
-                  if (r.needsReboot) {
-                    msg += " — " + t("setup.reboot.banner", "Reinicie o carro");
-                  }
-                  patch({ setupMsg: msg });
-                }}
-              >
-                ${actions.elevate ||
-                t("setup.action.elevate", "Instalar privilegiado (opcional)")}
-              </button>`}
           <button
             class="btn ghost"
             @click=${async function () {
@@ -107,15 +88,6 @@ export function setupOverlayTemplate() {
             }}
           >
             ${actions.host || t("setup.action.host", "Comando no PC")}
-          </button>
-          <button
-            class="btn ghost"
-            @click=${async function () {
-              patch({ setupMsg: "Reiniciando…" });
-              await api("/api/setup/actions/reboot", { method: "POST" });
-            }}
-          >
-            ${actions.reboot || t("setup.action.reboot", "Reiniciar")}
           </button>
         </div>
         <p class="sub">ADB / host</p>

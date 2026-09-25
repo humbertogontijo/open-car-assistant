@@ -128,8 +128,8 @@ class MainActivity : ComponentActivity() {
 
     private fun ocaUrl(intent: Intent?): String {
         val section = intent?.getStringExtra(QuickEntryMenu.EXTRA_SECTION)?.trim().orEmpty()
-        return if (section.isNotEmpty()) {
-            "http://127.0.0.1:8787/?section=" + android.net.Uri.encode(section)
+        return if (section.isNotEmpty() && section != "home") {
+            "http://127.0.0.1:8787/" + android.net.Uri.encode(section)
         } else {
             "http://127.0.0.1:8787/"
         }
@@ -195,6 +195,8 @@ class MainActivity : ComponentActivity() {
         val needed = listOf(
             Manifest.permission.CAMERA,
             Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.ACCESS_FINE_LOCATION,
             "android.car.permission.CAR_SPEED",
             "android.car.permission.CAR_ENERGY",
         ).filter {

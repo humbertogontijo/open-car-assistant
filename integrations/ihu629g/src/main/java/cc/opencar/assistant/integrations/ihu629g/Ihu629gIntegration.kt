@@ -58,8 +58,13 @@ class Ihu629gIntegration : VehicleIntegration {
                 Capability.IGNITION_EVENTS,
             ),
             variants = emptyList(),
-            bindings = emptyMap(),
-            writableAllowlist = IHU629G_WRITABLE_ALLOWLIST,
+            properties = IHU629G_WRITABLE_ALLOWLIST.map { id ->
+                PlatformConfig.PropertyDef(
+                    id = id,
+                    key = "0x${Integer.toHexString(id)}",
+                    access = "rw",
+                )
+            },
         )
     }
 }

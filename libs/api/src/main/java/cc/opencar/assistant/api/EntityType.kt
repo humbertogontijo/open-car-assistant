@@ -20,6 +20,8 @@ enum class EntityType(val id: String) {
     SEAT("seat"),
     WINDOW("window"),
     ANDROID("android"),
+    MEDIA_PLAYER("media_player"),
+    DEVICE_TRACKER("device_tracker"),
     EXTRA("extra"),
     ;
 

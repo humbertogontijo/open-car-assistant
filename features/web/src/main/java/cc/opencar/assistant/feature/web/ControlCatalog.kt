@@ -314,16 +314,16 @@ object ControlCatalog {
             acronym = "AVAS", icon = "system", lastKnown = true,
         ),
         ControlDef("esm_sound", "sound", EntityType.EXTRA, WellKnownProperties.ESM_SOUND, "choice",
-            // ESM_SOUND_TYPE_1/2/3 — Classic / Galactic note / Space walk (UI Close uses volume Off).
+            // ESM_SOUND_TYPE_1/2/3 — Classic / Galactic note / Space walk (1-based; 0 = unset).
             optionKeys = listOf(
-                "opt.esm_sound.0" to 0,
-                "opt.esm_sound.1" to 1,
-                "opt.esm_sound.2" to 2,
+                "opt.esm_sound.0" to 1,
+                "opt.esm_sound.1" to 2,
+                "opt.esm_sound.2" to 3,
             ),
             acronym = "AVAS", icon = "system", lastKnown = true,
         ),
         ControlDef("media_volume", "sound", EntityType.EXTRA, WellKnownProperties.MEDIA_VOLUME, "int",
-            icon = "system", min = 0f, max = 39f, step = 1f, lastKnown = true,
+            icon = "sound", min = 0f, max = 39f, step = 1f, lastKnown = true,
         ),
         ControlDef("speed_volume", "sound", EntityType.EXTRA, WellKnownProperties.SPEED_VOLUME, "choice",
             optionKeys = listOf(
@@ -334,7 +334,7 @@ object ControlCatalog {
             ),
             lastKnown = true, icon = "system",
         ),
-        ControlDef("usb_mode", "connect", EntityType.EXTRA, WellKnownProperties.USB_MODE, "choice",
+        ControlDef("usb_mode", "vehicle", EntityType.EXTRA, WellKnownProperties.USB_MODE, "choice",
             optionKeys = listOf(
                 "opt.usb_mode.0" to 0,
                 "opt.usb_mode.1" to 1,
@@ -378,10 +378,9 @@ object ControlCatalog {
         val i18n = context?.let { i18n(it, session) }
         val persist = memory?.persistSnapshot().orEmpty()
         return ALL.map { def ->
-            val base = if (def.id == "drive_mode") {
-                driveModeMap(session, def, store, i18n)
-            } else {
-                defToMap(def, session.diagnose(def.property), store, i18n, session)
+            val base = when {
+                def.id == "drive_mode" -> driveModeMap(session, def, store, i18n)
+                else -> defToMap(def, session.diagnose(def.property), store, i18n, session)
             }
             enrichPersist(base, def, persist[def.id], i18n)
         }
@@ -392,6 +391,7 @@ object ControlCatalog {
         context: Context? = null,
         memory: SettingsMemoryController? = null,
         android: AndroidSettingsController? = null,
+        location: LocationTrackerController? = null,
     ): List<Map<String, Any?>> {
         val controls = snapshot(session, context, memory)
         val t = session.telemetry().first()
@@ -608,7 +608,8 @@ object ControlCatalog {
             ),
         )
         val androidEntities = android?.entityMaps(i18n, persist).orEmpty()
-        return sensors + controls + androidEntities
+        val locationEntities = location?.entityMaps(i18n).orEmpty()
+        return sensors + controls + androidEntities + locationEntities
     }
 
     /** Current display value for shortcut conditions / entity_state watching. */

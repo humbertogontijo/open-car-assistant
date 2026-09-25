@@ -45,8 +45,10 @@ Adding a visible control card usually touches:
 
 1. [WellKnownProperties.kt](../libs/api/src/main/java/cc/opencar/assistant/api/WellKnownProperties.kt)
 2. [ControlCatalog.kt](../features/web/src/main/java/cc/opencar/assistant/feature/web/ControlCatalog.kt)
-3. Common i18n (`control.<id>` / options)
+3. Common i18n (`control.<id>` / options) — **required**: only described controls become product entities
 4. Optional pin map in [SettingsMemoryController.kt](../features/memory/src/main/java/cc/opencar/assistant/feature/memory/SettingsMemoryController.kt)
-5. Each platform’s `platform.json` binding / allowlist
+5. Each platform’s `platform.json` property entry (`entity` + `access`)
+
+Discover candidates in Lab → **VHAL catalog** → filter **Missing** (see [contributor-debug.md](contributor-debug.md)). The full HU property list lives in each integration’s `platform.json` → `properties` (shared AOSP stubs via `"extends": ["aosp"]`); it is for probing / gap tracking until you attach an `entity`.
 
 That sprawl is intentional for v1 (single product catalog). Platform-only enum labels belong in integration `valueMaps`, not in ControlCatalog.

@@ -6,8 +6,8 @@ or any other vehicle / head-unit OEM.
 
 ## Owned hardware only
 
-Install, privilege elevation, VHAL writes, and debug tooling are intended only
-for **head units you own** (typically unlocked / userdebug / remountable AAOS
+Install, VHAL writes, and debug tooling are intended only
+for **head units you own** (typically unlocked / userdebug AAOS
 devices). Do not use OCA to modify vehicles or systems you do not control, or
 to bypass manufacturer security on production locked devices.
 
@@ -16,7 +16,7 @@ to bypass manufacturer security on production locked devices.
 Some integration modules include reverse-engineered or observed platform
 details gathered from hardware the contributors own, for example:
 
-- Vendor VHAL property name / ID tables (`vhal_named_ids.tsv`, `platform.json`)
+- Vendor VHAL property tables (`platform.json` → `properties`)
 - Writable allowlists for comfort / ADAS / charge settings
 - Hand-rolled gRPC framing for on-device VenusVehicleServer (Antora)
 - Flyme Auto / ECARX broadcast action strings used for wake and status-bar hooks
@@ -34,7 +34,7 @@ platform signing keys are **not** included and must never be committed.
 
 ## Safety
 
-Writable properties are limited by each integration’s `writableAllowlist`. See
+Writable properties are limited by each integration’s `access` field in `platform.json` (`w` / `rw`). See
 [safety.md](safety.md) for the network threat model and install paths.
 
 ## License

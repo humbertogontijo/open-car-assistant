@@ -17,7 +17,9 @@ import cc.opencar.assistant.api.WellKnownProperties
 import cc.opencar.assistant.integrations.common.AospVehicleIds
 import cc.opencar.assistant.integrations.common.PlatformConfig
 import cc.opencar.assistant.integrations.common.PropertyAccessMode
+import cc.opencar.assistant.integrations.common.SessionEventFanout
 import cc.opencar.assistant.integrations.common.VehiclePropertyBackend
+import cc.opencar.assistant.integrations.common.entityByProp
 import cc.opencar.assistant.integrations.common.toPropertyValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -31,10 +33,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.coroutines.coroutineContext
 
+@OptIn(kotlinx.coroutines.FlowPreview::class)
 class AntoraVehicleSession(
     private val context: Context,
     initialVariant: PlatformVariant,
@@ -50,32 +55,73 @@ class AntoraVehicleSession(
     override val variant: StateFlow<PlatformVariant> = _variant.asStateFlow()
 
     private val _telemetry = MutableStateFlow(TelemetrySnapshot())
-    private val _events = MutableSharedFlow<VehicleEvent>(extraBufferCapacity = 32)
+    private val _events = MutableSharedFlow<VehicleEvent>(extraBufferCapacity = 64)
+    private val fanout = SessionEventFanout(_telemetry, _events)
 
-    private var lastGear: Int? = null
-    private var pollJob: Job? = null
+    private var telemetryJob: Job? = null
+    private var entityObserveJob: Job? = null
     private var wheelJob: Job? = null
+
+    /** propId → entityId for EntityValueChanged fan-out. */
+    private val entityByProp: Map<Int, String> = platform.entityByProp()
+
+    /** Props that affect [readSnapshot] — ignore unrelated Venus stream noise. */
+    private val telemetryPropIds: Set<Int> = buildSet {
+        bindings.values.forEach { add(it.first) }
+        add(AntoraVhalIds.INFO_EV_BATTERY_CAPACITY)
+        add(AntoraVhalIds.DRIVE_MODE_SELECTION_PURE)
+        add(AntoraVhalIds.DRIVE_MODE_SELECTION_HYBRID)
+        add(AntoraVhalIds.DRIVE_MODE_SELECTION_POWER)
+        add(AntoraVhalIds.HVAC_POWER_ON)
+        add(AntoraVhalIds.INFO_MODEL)
+        add(AntoraVhalIds.PARKING_BRAKE_ON)
+    }
 
     override val integrationId: String = Antora1000Integration.ID
 
     val accessMode: PropertyAccessMode get() = backend.mode
 
     init {
-        pollJob = scope.launch {
-            _events.emit(VehicleEvent.Boot)
-            while (isActive) {
-                val snap = readSnapshot()
-                _telemetry.value = snap
-                val gear = snap.gear
-                if (gear != null && gear != lastGear) {
-                    if (lastGear != null) {
-                        _events.emit(VehicleEvent.GearChanged(gear))
+        scope.launch { _events.emit(VehicleEvent.Boot) }
+        val propIds = platform.bindings.values.map { it.nativeId }.distinct().toIntArray()
+        val observe = when (backend.mode) {
+            PropertyAccessMode.GRPC -> backend.observe(null)
+            PropertyAccessMode.CAR_PROPERTY ->
+                backend.observe(propIds.takeIf { it.isNotEmpty() })
+        }
+        if (observe != null) {
+            Log.i(TAG, "telemetry: observe (push) mode")
+            telemetryJob = scope.launch {
+                try {
+                    fanout.publishTelemetry(readSnapshot())
+                } catch (_: Throwable) { /* best-effort */ }
+                observe
+                    .filter { it.propId in telemetryPropIds }
+                    .debounce(150)
+                    .collect {
+                        try {
+                            fanout.publishTelemetry(readSnapshot())
+                        } catch (_: Throwable) { /* best-effort */ }
                     }
-                    lastGear = gear
+            }
+            entityObserveJob = scope.launch {
+                observe.collect { update -> fanout.onPropertyUpdate(update, entityByProp) }
+            }
+        } else {
+            Log.i(TAG, "telemetry: poll mode (1s)")
+            telemetryJob = scope.launch {
+                while (isActive) {
+                    try {
+                        fanout.publishTelemetry(readSnapshot())
+                        fanout.emitBoundSnapshots(platform.bindings) { id, area ->
+                            backend.read(id, area)
+                        }
+                    } catch (_: Throwable) { /* best-effort */ }
+                    delay(POLL_MS)
                 }
-                delay(POLL_MS)
             }
         }
+        // Wheel-key poll kept until those props are confirmed on the gRPC stream.
         wheelJob = scope.launch { pollWheelKeys() }
     }
 
@@ -144,6 +190,11 @@ class AntoraVehicleSession(
 
     override fun catalog(): List<CatalogEntry> = catalogEntries
 
+    override fun entityBindings(): Map<Long, String> =
+        platform.bindings.entries.associate { (entityId, b) ->
+            b.nativeId.toLong() to entityId
+        }
+
     override fun hasBinding(property: VehicleProperty): Boolean = resolve(property) != null
 
     override fun cameras(): List<CameraSource> {
@@ -160,8 +211,11 @@ class AntoraVehicleSession(
 
     override fun dvrStreamConfig(): DvrStreamConfig = platform.dvr
 
+    override fun androidVolumeGroups() = platform.androidVolumeGroups()
+
     override fun close() {
-        pollJob?.cancel()
+        telemetryJob?.cancel()
+        entityObserveJob?.cancel()
         wheelJob?.cancel()
         scope.cancel()
         backend.close()

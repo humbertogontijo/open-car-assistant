@@ -4,8 +4,8 @@ import cc.opencar.assistant.integrations.common.AospVehicleIds
 
 /**
  * Native VHAL property IDs observed on Antora 1000 (SE1000) head units.
- * AOSP-overlapping IDs alias [AospVehicleIds]. Writable allowlist lives in
- * [platform.json] (`writableAllowlist`) and is enforced at runtime via [PlatformConfig].
+ * AOSP-overlapping IDs alias [AospVehicleIds]. Writable product policy lives in
+ * [platform.json] (`properties[].access` `w`/`rw`) and is enforced at runtime via [PlatformConfig].
  */
 object AntoraVhalIds {
     const val INFO_VIN = 0x11100100

@@ -24,6 +24,7 @@ import cc.opencar.assistant.feature.shortcuts.ShortcutsController
 import cc.opencar.assistant.feature.telemetry.TelemetryRepository
 import cc.opencar.assistant.feature.web.AndroidSettingsController
 import cc.opencar.assistant.feature.web.ControlCatalog
+import cc.opencar.assistant.feature.web.LocationTrackerController
 import cc.opencar.assistant.feature.web.OcaWebServer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -69,6 +70,8 @@ class AssistantRuntime(private val app: OcaApp) {
     var obd2: Obd2Probe? = null
         private set
     var androidSettings: AndroidSettingsController? = null
+        private set
+    var locationTracker: LocationTrackerController? = null
         private set
     var history: EntityHistoryRecorder? = null
         private set
@@ -124,7 +127,14 @@ class AssistantRuntime(private val app: OcaApp) {
         dvr = DvrController(app, sess)
         probe = CatalogProbe(app, sess)
         obd2 = Obd2Probe(sess)
-        androidSettings = AndroidSettingsController(app)
+        androidSettings = AndroidSettingsController(app, sess.androidVolumeGroups()).also {
+            // Best-effort (shell/privileged); opens nothing if Secure write is denied.
+            it.tryEnableMediaListener()
+        }
+        locationTracker = LocationTrackerController(
+            app,
+            app.getSharedPreferences("oca_ui_prefs", Context.MODE_PRIVATE),
+        )
         history = EntityHistoryRecorder(app, sess).also { it.start() }
 
         if (Capability.WRITE_SETTINGS in capabilities) {
@@ -149,12 +159,25 @@ class AssistantRuntime(private val app: OcaApp) {
         shortcuts = ShortcutsController(
             context = app,
             session = sess,
-            setControl = { id, value -> ControlCatalog.set(sess, id, value, app) },
+            setControl = { id, value ->
+                when {
+                    id in (androidSettings?.writableIds ?: emptySet()) -> {
+                        val ok = androidSettings?.apply(id, value) == true
+                        if (ok) Result.success(Unit)
+                        else Result.failure(IllegalStateException("android apply failed: $id"))
+                    }
+                    else -> ControlCatalog.set(sess, id, value, app)
+                }
+            },
             mainActivityClass = MainActivity::class.java,
             quickEntry = matched.createQuickEntry(),
             actionHandlers = actionHandlers,
             triggerSources = triggerSources,
-            readEntity = { id -> ControlCatalog.currentValue(sess, id) },
+            readEntity = { id ->
+                locationTracker?.read(id)
+                    ?: androidSettings?.read(id)
+                    ?: ControlCatalog.currentValue(sess, id)
+            },
             readGear = {
                 sess.telemetry().first().gear
             },
@@ -183,6 +206,7 @@ class AssistantRuntime(private val app: OcaApp) {
             capabilities = capabilities.map { it.name }.toSet(),
             variantId = variant.id,
             androidSettings = androidSettings,
+            locationTracker = locationTracker,
             history = history,
             shortcuts = shortcuts,
             plugins = plugins,

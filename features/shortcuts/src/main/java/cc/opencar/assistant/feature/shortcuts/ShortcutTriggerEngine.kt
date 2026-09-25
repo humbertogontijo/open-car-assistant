@@ -206,31 +206,13 @@ class ShortcutTriggerEngine(
         return count
     }
 
-    private suspend fun conditionsPass(s: Shortcut): Boolean {
-        if (s.conditions.isEmpty()) return true
-        for (c in s.conditions) {
-            when (c) {
-                is ShortcutCondition.EntityEquals -> {
-                    val actual = readEntity?.invoke(c.entityId)
-                    if (actual == null || actual != c.value) return false
-                }
-                is ShortcutCondition.GearEquals -> {
-                    val gear = readGear?.invoke()
-                    if (gear == null || gear != c.gear) return false
-                }
-                is ShortcutCondition.WifiSsid -> {
-                    val ssid = readWifiSsid?.invoke() ?: return false
-                    val ok = if (c.contains) {
-                        ssid.contains(c.ssid, ignoreCase = true)
-                    } else {
-                        ssid.equals(c.ssid, ignoreCase = true)
-                    }
-                    if (!ok) return false
-                }
-            }
-        }
-        return true
-    }
+    private suspend fun conditionsPass(s: Shortcut): Boolean =
+        ConditionEvaluator.conditionsPass(
+            conditions = s.conditions,
+            readEntity = readEntity,
+            readGear = readGear,
+            readWifiSsid = readWifiSsid,
+        )
 
     companion object {
         private const val TAG = "ShortcutTriggers"

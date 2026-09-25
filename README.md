@@ -22,24 +22,14 @@ This compiles against `libs/car-stubs`. Live vehicle property reads/writes need 
 From a computer on the same LAN as an unlocked / userdebug HU you own:
 
 ```bash
-# Antora / SE1000 (EX5 family) — dual backend (gRPC + CarProperty)
+# Antora / SE1000 (EX5 family) — VenusVehicleServer gRPC
 ./tools/oca-setup -i antora1000 -H CAR_IP setup
 
-# IHU629G (BR/CN EX2) — CarProperty only; simpler reference for new platforms
+# IHU629G (BR/CN EX2) — CarPropertyManager; simpler reference for new platforms
 ./tools/oca-setup -i ihu629g -H CAR_IP setup
 ```
 
-This builds, signs with the [community testkey](libs/signing/README.md), installs under **`/data`** (uninstallable), grants runtime car/camera permissions, and prints a permission report.
-
-Optional later — formal `CAR_VENDOR_EXTENSION` / `CONTROL_CAR_CLIMATE` via priv-app (reboot required; not uninstallable from Settings):
-
-```bash
-./tools/oca-setup -i antora1000 -H CAR_IP setup --privileged
-adb -s CAR_IP:5566 reboot
-# after boot:
-./tools/oca-setup -i antora1000 -H CAR_IP grant
-./tools/oca-setup -i antora1000 -H CAR_IP check
-```
+This builds, signs with the [community testkey](libs/signing/README.md), installs under **`/data`** (user-space, uninstallable), grants runtime car/camera permissions, and prints a permission report.
 
 `CAR_IP` and ADB port/user come from `-H` / `OCA_HOST` (required) and each integration’s `host.sh` defaults for port and Android user. See [docs/safety.md](docs/safety.md).
 
@@ -60,7 +50,7 @@ Other commands: `connect` · `build` · `sign` · `install` · `grant` · `check
 
 - The in-car Ktor server listens on **cleartext** `0.0.0.0:8787` for HU WebView and same-LAN browsers. Do **not** expose that port to the public internet.
 - Contributor debug mode can show a short token in Lab / `/debug` HTML when enabled.
-- Host tools may use `adb root` / remount / priv-app and on-device `su` elevate — intended only for **owned userdebug** head units.
+- Host tools target user-space `/data` installs on **owned userdebug** head units (wireless ADB / optional `su` helpers only where needed).
 - Details: [docs/safety.md](docs/safety.md) · [docs/disclaimer.md](docs/disclaimer.md).
 
 ## Docs
@@ -71,6 +61,6 @@ Other commands: `connect` · `build` · `sign` · `install` · `grant` · `check
 - [Adding an integration](docs/adding-an-integration.md)
 - [Adding a feature](docs/adding-a-feature.md)
 - [Plugins](docs/plugins.md)
-- [Safety / privileges](docs/safety.md)
+- [Safety / install model](docs/safety.md)
 - [Disclaimer](docs/disclaimer.md)
 - [App store catalog](docs/store.md)

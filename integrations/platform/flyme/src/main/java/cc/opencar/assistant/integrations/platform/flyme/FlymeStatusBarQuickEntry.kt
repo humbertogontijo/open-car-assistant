@@ -65,7 +65,10 @@ class FlymeStatusBarQuickEntry(
         // false → SystemUI skips empty plugin panel; contentIntent still fires
         extras.putBoolean(EXTRA_IS_PICK_ON, false)
         extras.putInt(EXTRA_SPACE_X, 1)
-        extras.putInt(EXTRA_RANK, ICON_ID)
+        // -1 → StatusIconPositionManager.addToEnd(). A concrete rank (e.g. ICON_ID)
+        // goes through addToRank/allowToInsert and often returns false on this HU
+        // ("Add status icon fail"), leaving the icon in the manager with no view.
+        extras.putInt(EXTRA_RANK, -1)
         extras.putInt(EXTRA_SPECIFIC_WIDTH, 0)
     }
 
@@ -74,7 +77,7 @@ class FlymeStatusBarQuickEntry(
         const val STYLE = "flyme_status_icon"
 
         /** Unique id — must not collide with system icons (≤0x20) or other app slots. */
-        const val ICON_ID = 0xC9 // 201
+        const val ICON_ID = 0xCA // 202 — bumped from 0xC9 after rank=-1 fix to force a fresh SystemUI POST
 
         const val EXTRA_NOTIFICATION = "flag_status_icon_notification"
         const val EXTRA_ID = "flag_status_icon_id"

@@ -43,8 +43,8 @@ class WirelessAdbController(
             "adbWifiEnabled" to wifiSetting,
             "ip" to ip,
             "connectHint" to if (enabled && activePort != null) "adb connect $ip:$activePort" else null,
-            "canToggle" to (isUserDebug() || suAvailableCached()),
-            "suAvailable" to suAvailableCached(),
+            "canToggle" to (isUserDebug() || SuProbe.available()),
+            "suAvailable" to SuProbe.available(),
             "userdebug" to isUserDebug(),
         )
     }
@@ -57,7 +57,7 @@ class WirelessAdbController(
             val direct = runCatching { toggleDirect(enable, p) }
             val result = if (direct.isSuccess) {
                 direct.getOrThrow()
-            } else if (suAvailableCached()) {
+            } else if (SuProbe.available()) {
                 log.w(TAG, "direct toggle failed: ${direct.exceptionOrNull()?.message}; trying su")
                 toggleViaSu(enable, p)
             } else {
@@ -127,81 +127,21 @@ class WirelessAdbController(
         return runSu(script)
     }
 
-    private fun getProp(name: String): String {
-        return try {
-            val p = Runtime.getRuntime().exec(arrayOf("getprop", name))
-            val out = p.inputStream.bufferedReader().readText().trim()
-            p.waitFor()
-            out
-        } catch (_: Throwable) {
-            ""
-        }
-    }
+    private fun getProp(name: String): String =
+        SuProbe.runTimed(arrayOf("getprop", name), timeoutMs = 500L) ?: ""
 
     private fun setProp(name: String, value: String) {
-        val p = Runtime.getRuntime().exec(arrayOf("setprop", name, value))
-        p.waitFor()
+        SuProbe.runTimed(arrayOf("setprop", name, value), timeoutMs = 2_000L)
     }
 
     private fun isUserDebug(): Boolean =
         Build.TYPE.contains("userdebug") || Build.TAGS?.contains("test-keys") == true
 
-    private fun suAvailableCached(): Boolean {
-        synchronized(suLock) {
-            suCached?.let { return it }
-            val v = probeSu()
-            suCached = v
-            return v
-        }
-    }
-
-    private fun probeSu(): Boolean {
-        for (argv in suProbeArgvs()) {
-            try {
-                val p = Runtime.getRuntime().exec(argv)
-                val out = p.inputStream.bufferedReader().readText()
-                p.waitFor()
-                if (out.contains("uid=0")) return true
-            } catch (_: Throwable) {
-                // try next syntax
-            }
-        }
-        return false
-    }
-
-    private fun runSu(script: String): String {
-        var last = ""
-        for (prefix in suCommandPrefixes()) {
-            try {
-                val argv = prefix + arrayOf(script)
-                val p = Runtime.getRuntime().exec(argv)
-                val out = p.inputStream.bufferedReader().readText()
-                val err = p.errorStream.bufferedReader().readText()
-                p.waitFor()
-                last = (out + err).trim()
-                if (last.contains("OK") || last.contains("uid=0")) return last
-            } catch (t: Throwable) {
-                last = t.message ?: "exec failed"
-            }
-        }
-        return last
-    }
-
-    private fun suProbeArgvs(): List<Array<String>> = listOf(
-        arrayOf("su", "0", "id"),
-        arrayOf("su", "root", "id"),
-        arrayOf("su", "-c", "id"),
-    )
-
-    private fun suCommandPrefixes(): List<Array<String>> = listOf(
-        arrayOf("su", "0", "sh", "-c"),
-        arrayOf("su", "root", "sh", "-c"),
-        arrayOf("su", "-c"),
-    )
+    private fun runSu(script: String): String =
+        SuProbe.runScript(script) { out -> out.contains("OK") || out.contains("uid=0") }
+            .ifEmpty { "su timed out" }
 
     companion object {
         private const val TAG = "WirelessAdb"
-        private val suLock = Any()
-        @Volatile private var suCached: Boolean? = null
     }
 }

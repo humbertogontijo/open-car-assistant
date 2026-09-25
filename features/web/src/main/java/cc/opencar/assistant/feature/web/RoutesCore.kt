@@ -25,9 +25,6 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
         val snap = session.telemetry().first()
         val host = call.request.local.remoteHost
         val i18n = I18nBundle.load(context, session.integrationId)
-        val driveModeLabel = i18n.resolveMaybe(snap.driveMode)
-            ?: i18n.valueLabel("drive_mode", snap.driveMode)
-            ?: snap.driveMode
         call.respond(
             mapOf(
                 "integration" to session.integrationId,
@@ -36,31 +33,7 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
                 "locale" to i18n.locale,
                 "locales" to I18nBundle.SUPPORTED,
                 "remote" to (host != "127.0.0.1" && host != "localhost" && host != "::1"),
-                "telemetry" to mapOf(
-                    "gear" to snap.gear,
-                    "gearLabel" to snap.gear?.let { i18n.valueLabel("gear", it) },
-                    "speedKmh" to snap.speedKmh,
-                    "evBatteryPercent" to snap.evBatteryPercent,
-                    "hybridSocPercent" to snap.hybridSocPercent,
-                    "rangeKm" to snap.rangeKm,
-                    "driveMode" to driveModeLabel,
-                    "driveModeKey" to snap.driveMode,
-                    "energyMode" to (snap.extras["energyMode"]?.let { i18n.resolveMaybe(it) ?: it }),
-                    "energyModeKey" to snap.extras["energyMode"],
-                    "regenLevel" to snap.regenLevel,
-                    "regenLabel" to snap.regenLevel?.let { i18n.valueLabel("regen", it) },
-                    "hvacPower" to snap.hvacPower,
-                    "hvacTempC" to snap.hvacTempC,
-                    "hvacFan" to snap.hvacFan,
-                    "chargeCurrentA" to snap.chargeCurrentA,
-                    "chargePlugConnected" to snap.chargePlugConnected,
-                    "ignitionState" to snap.ignitionState,
-                    "ignitionLabel" to snap.ignitionState?.let { i18n.valueLabel("ignition", it) },
-                    "model" to snap.extras["model"],
-                    "parkingBrake" to snap.extras["parkingBrake"],
-                    "parkingBrakeLabel" to snap.extras["parkingBrake"]?.let { i18n.valueLabel("parking_brake", it) },
-                    "extras" to snap.extras,
-                ),
+                "telemetry" to telemetryPayload(snap, i18n),
                 "setup" to SetupStatus.snapshot(context, session, prefs),
                 "plugins" to deps.pluginDetailMaps(),
                 "dvr" to deps.dvr.status(),
@@ -91,6 +64,8 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
         val raw = params["locale"] ?: call.request.queryParameters["locale"]
         val loc = I18nBundle.normalize(raw)
         prefs.edit().putString(I18nBundle.PREF_LOCALE, loc).apply()
+        I18nBundle.invalidateCache()
+        CatalogResponseCache.invalidate()
         val i18n = I18nBundle.load(context, session.integrationId, loc)
         call.respond(
             mapOf(
@@ -104,27 +79,31 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
     get("/api/controls") {
         val hidden = deps.entityVisibility.hiddenIds()
         val includeHidden = call.request.queryParameters["includeHidden"] == "1"
-        val virtual = deps.shortcuts?.virtualEntityMaps().orEmpty()
-        val all = (ControlCatalog.snapshot(session, context, memory) + virtual).map { row ->
-            val id = row["id"] as? String
-            EntityContract.enrich(row) + ("hidden" to (id != null && id in hidden))
+        val all = CatalogResponseCache.controls {
+            val virtual = deps.shortcuts?.virtualEntityMaps().orEmpty()
+            (ControlCatalog.snapshot(session, context, memory) + virtual).map { row ->
+                val id = row["id"] as? String
+                EntityContract.enrich(row) + ("hidden" to (id != null && id in hidden))
+            }
         }
         call.respond(if (includeHidden) all else all.filter { it["hidden"] != true })
     }
     get("/api/entities") {
         val hidden = deps.entityVisibility.hiddenIds()
         val includeHidden = call.request.queryParameters["includeHidden"] == "1"
-        val virtual = deps.shortcuts?.virtualEntityMaps().orEmpty()
-        val all = (ControlCatalog.entities(session, context, memory, deps.androidSettings) + virtual).map { row ->
-            val id = row["id"] as? String
-            EntityContract.enrich(row) + ("hidden" to (id != null && id in hidden))
+        val all = CatalogResponseCache.entities {
+            val virtual = deps.shortcuts?.virtualEntityMaps().orEmpty()
+            (ControlCatalog.entities(session, context, memory, deps.androidSettings, deps.locationTracker) + virtual).map { row ->
+                val id = row["id"] as? String
+                EntityContract.enrich(row) + ("hidden" to (id != null && id in hidden))
+            }
         }
         call.respond(if (includeHidden) all else all.filter { it["hidden"] != true })
     }
     get("/api/entities/hidden") {
         val hidden = deps.entityVisibility.hiddenIds()
         val virtual = deps.shortcuts?.virtualEntityMaps().orEmpty()
-        val all = ControlCatalog.entities(session, context, memory, deps.androidSettings) + virtual
+        val all = ControlCatalog.entities(session, context, memory, deps.androidSettings, deps.locationTracker) + virtual
         call.respond(
             mapOf(
                 "ids" to hidden.toList().sorted(),
@@ -138,7 +117,7 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
         val id = call.parameters["id"] ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("ok" to false))
         val hidden = deps.entityVisibility.hiddenIds()
         val virtual = deps.shortcuts?.virtualEntityMaps().orEmpty()
-        val row = (ControlCatalog.entities(session, context, memory, deps.androidSettings) + virtual)
+        val row = (ControlCatalog.entities(session, context, memory, deps.androidSettings, deps.locationTracker) + virtual)
             .firstOrNull { it["id"] == id }
             ?: return@get call.respond(HttpStatusCode.NotFound, mapOf("ok" to false, "error" to "not found"))
         call.respond(EntityContract.enrich(row) + ("hidden" to (id in hidden)))
@@ -153,6 +132,8 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
             else -> return@post call.respond(HttpStatusCode.BadRequest, mapOf("ok" to false, "error" to "hidden required"))
         }
         deps.entityVisibility.setHidden(id, hide)
+        CatalogResponseCache.invalidate()
+        WebEventHub.emitCatalog("visibility")
         call.respond(mapOf("ok" to true, "id" to id, "hidden" to hide, "ids" to deps.entityVisibility.hiddenIds().toList().sorted()))
     }
     get("/api/setup") {
@@ -199,13 +180,51 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
             call.respond(HttpStatusCode.BadRequest, mapOf("error" to "value required"))
             return@post
         }
-        val on = value == "1" || value.equals("true", true) || value.equals("on", true)
         val result = when (id) {
-            AndroidSettingsController.ID_WIFI -> android.setWifi(on)
-            AndroidSettingsController.ID_BT -> android.setBluetooth(on)
+            AndroidSettingsController.ID_WIFI,
+            AndroidSettingsController.ID_BT,
+            -> {
+                val on = value == "1" || value.equals("true", true) || value.equals("on", true)
+                if (id == AndroidSettingsController.ID_WIFI) android.setWifi(on) else android.setBluetooth(on)
+            }
+            AndroidSettingsController.ID_BRIGHTNESS -> {
+                val n = value.toIntOrNull()
+                if (n == null) mapOf("ok" to false, "error" to "integer value required")
+                else android.setBrightness(n)
+            }
+            AndroidSettingsController.ID_MEDIA_PLAYER -> {
+                val ok = android.apply(id, value)
+                mapOf("ok" to ok, "error" to if (ok) null else "apply failed", "status" to android.status())
+            }
             else -> mapOf("ok" to false, "error" to "unknown id")
         }
         call.respond(result)
+    }
+    post("/api/android/media-listener/enable") {
+        val android = deps.androidSettings
+        if (android == null) {
+            call.respond(HttpStatusCode.NotFound, mapOf("error" to "android settings unavailable"))
+            return@post
+        }
+        val enabled = android.tryEnableMediaListener()
+        if (!enabled) {
+            android.openMediaListenerSettings()
+        }
+        call.respond(
+            mapOf(
+                "ok" to enabled,
+                "mediaListenerEnabled" to (android.status()["mediaListenerEnabled"] == true),
+                "openedSettings" to !enabled,
+            ),
+        )
+    }
+    post("/api/android/write-settings/open") {
+        val android = deps.androidSettings
+        if (android == null) {
+            call.respond(HttpStatusCode.NotFound, mapOf("error" to "android settings unavailable"))
+            return@post
+        }
+        call.respond(android.openWriteSettings())
     }
     get("/api/history") {
         val history = deps.history
@@ -228,7 +247,7 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
             ?: (end - 24L * 60 * 60 * 1000)
         val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 2000
         val virtual = deps.shortcuts?.virtualEntityMaps().orEmpty()
-        val entityMeta = (ControlCatalog.entities(session, context, memory, deps.androidSettings) + virtual)
+        val entityMeta = (ControlCatalog.entities(session, context, memory, deps.androidSettings, deps.locationTracker) + virtual)
             .firstOrNull { it["id"] == entityId }
             ?.let { EntityContract.enrich(it) }
         call.respond(
@@ -241,16 +260,6 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
             ),
         )
     }
-    post("/api/setup/actions/elevate") {
-        val elev = PrivilegeElevator(context, session.integrationId)
-        call.respond(elev.elevate())
-    }
-    get("/api/setup/actions/elevate-status") {
-        call.respond(PrivilegeElevator(context, session.integrationId).status())
-    }
-    post("/api/setup/actions/reboot") {
-        call.respond(PrivilegeElevator(context, session.integrationId).reboot())
-    }
     post("/api/controls/{id}") {
         val id = call.parameters["id"] ?: return@post
         val params = call.receiveParameters()
@@ -259,22 +268,21 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
             call.respond(HttpStatusCode.BadRequest, mapOf("error" to "value required"))
             return@post
         }
-        if (id == AndroidSettingsController.ID_WIFI || id == AndroidSettingsController.ID_BT) {
-            val android = deps.androidSettings
-            if (android == null) {
-                call.respond(HttpStatusCode.NotFound, mapOf("error" to "android settings unavailable"))
-                return@post
+        val android = deps.androidSettings
+        if (android != null && id in android.writableIds) {
+            val ok = android.apply(id, value)
+            if (ok) {
+                CatalogResponseCache.invalidate()
+                WebEventHub.emitCatalog("android_write")
+                deps.shortcuts?.onControlWritten(id)
             }
-            val on = value == "1" || value.equals("true", true) || value.equals("on", true)
-            val result = when (id) {
-                AndroidSettingsController.ID_WIFI -> android.setWifi(on)
-                else -> android.setBluetooth(on)
-            }
-            call.respond(mapOf("ok" to (result["ok"] == true), "error" to result["error"]))
+            call.respond(mapOf("ok" to ok, "error" to if (ok) null else "apply failed"))
             return@post
         }
         val virtual = deps.shortcuts?.handleVirtualWrite(id, value)
         if (virtual != null) {
+            CatalogResponseCache.invalidate()
+            WebEventHub.emitCatalog("virtual_write")
             call.respond(
                 mapOf(
                     "ok" to (virtual["ok"] == true),
@@ -285,6 +293,9 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
         }
         val result = ControlCatalog.set(session, id, value, context)
         if (result.isSuccess) {
+            CatalogResponseCache.invalidate()
+            WebEventHub.emitCatalog("control_write")
+            WebEventHub.emitEntity(id, value, status = "ok")
             deps.shortcuts?.onControlWritten(id)
         }
         call.respond(
@@ -312,12 +323,17 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
         call.respond(memory.setPersist(id, enabled, value))
     }
     get("/api/prefs") {
+        val loc = deps.locationTracker
+        val home = loc?.homeSnapshot() ?: emptyMap()
         call.respond(
             mapOf(
                 "theme" to (prefs.getString("theme", "dark") ?: "dark"),
                 "locale" to I18nBundle.normalize(prefs.getString(I18nBundle.PREF_LOCALE, null)),
                 "locales" to I18nBundle.SUPPORTED,
                 "units" to normalizeUnits(prefs.getString("units", null)),
+                "homeLat" to home["homeLat"],
+                "homeLon" to home["homeLon"],
+                "homeRadiusM" to home["homeRadiusM"],
             ),
         )
     }
@@ -336,15 +352,86 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
         if (units != null) {
             edit.putString("units", unitsToStorage(units))
         }
+        val loc = deps.locationTracker
+        val homeLat = params["homeLat"]
+        val homeLon = params["homeLon"]
+        val homeRadius = params["homeRadiusM"]
+        val clearHome = params["clearHome"] == "1" || params["clearHome"] == "true"
+        var homeChanged = false
+        if (clearHome) {
+            if (loc != null) {
+                loc.clearHome()
+            } else {
+                edit.remove(LocationTrackerController.PREF_HOME_LAT)
+                edit.remove(LocationTrackerController.PREF_HOME_LON)
+            }
+            homeChanged = true
+        } else if (homeLat != null && homeLon != null) {
+            val lat = homeLat.toDoubleOrNull()
+            val lon = homeLon.toDoubleOrNull()
+            if (lat != null && lon != null) {
+                if (loc != null) {
+                    loc.setHome(lat, lon)
+                } else {
+                    edit.putString(LocationTrackerController.PREF_HOME_LAT, lat.toString())
+                    edit.putString(LocationTrackerController.PREF_HOME_LON, lon.toString())
+                }
+                homeChanged = true
+            }
+        }
+        if (homeRadius != null) {
+            val r = homeRadius.toFloatOrNull()
+            if (r != null) {
+                if (loc != null) {
+                    loc.setHomeRadius(r)
+                } else {
+                    edit.putFloat(
+                        LocationTrackerController.PREF_HOME_RADIUS_M,
+                        r.coerceIn(
+                            LocationTrackerController.MIN_RADIUS_M,
+                            LocationTrackerController.MAX_RADIUS_M,
+                        ),
+                    )
+                }
+                homeChanged = true
+            }
+        }
         edit.apply()
+        if (homeChanged) {
+            CatalogResponseCache.invalidate()
+            WebEventHub.emitCatalog("home")
+        }
+        val home = loc?.homeSnapshot() ?: emptyMap()
         call.respond(
             mapOf(
                 "ok" to true,
                 "theme" to (prefs.getString("theme", "dark") ?: "dark"),
                 "locale" to I18nBundle.normalize(prefs.getString(I18nBundle.PREF_LOCALE, null)),
                 "units" to normalizeUnits(prefs.getString("units", null)),
+                "homeLat" to home["homeLat"],
+                "homeLon" to home["homeLon"],
+                "homeRadiusM" to home["homeRadiusM"],
             ),
         )
+    }
+    post("/api/location/home/here") {
+        val loc = deps.locationTracker
+        if (loc == null) {
+            call.respond(HttpStatusCode.NotFound, mapOf("ok" to false, "error" to "location unavailable"))
+            return@post
+        }
+        val result = loc.setHomeHere()
+        CatalogResponseCache.invalidate()
+        WebEventHub.emitCatalog("home")
+        call.respond(result)
+    }
+    get("/api/location/home") {
+        val loc = deps.locationTracker
+        if (loc == null) {
+            call.respond(HttpStatusCode.NotFound, mapOf("ok" to false, "error" to "location unavailable"))
+            return@get
+        }
+        call.respond(mapOf("ok" to true) + loc.homeSnapshot())
     }
     post("/api/memory/capture") {
         if (memory == null) {

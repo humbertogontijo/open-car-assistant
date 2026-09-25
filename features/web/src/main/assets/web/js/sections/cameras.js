@@ -1,5 +1,5 @@
 import { html, nothing } from "../lit.js";
-import { state, patch } from "../store.js";
+import { state, patch, patchSilent } from "../store.js";
 import { t } from "../i18n.js";
 import { api } from "../api.js";
 import { prefCard, prefSegment, boolToggle } from "../ui/cards.js";
@@ -71,18 +71,23 @@ async function setCamMode(mode) {
   await loadRecordings();
 }
 
-/** Soft-refresh wall-clock DVR timeline (also used by app poll as loadRecordings). */
-export async function loadRecordings() {
+/**
+ * Soft-refresh wall-clock DVR timeline (also used by app poll as loadRecordings).
+ * @param {{ silent?: boolean }} [opts] — silent skips lit re-render (live preview path).
+ */
+export async function loadRecordings(opts) {
+  const silent = !!(opts && opts.silent);
+  const apply = silent ? patchSilent : patch;
   try {
     const res = await api("/api/dvr/timeline");
-    patch({
+    apply({
       dvrTimeline: {
         segments: (res && res.segments) || [],
         recording: !!(res && res.recording),
       },
     });
   } catch (e) {
-    patch({
+    apply({
       dvrTimeline: { segments: [], recording: false },
     });
   }

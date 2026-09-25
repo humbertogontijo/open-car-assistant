@@ -33,10 +33,6 @@ load_integration() {
   : "${OCA_ANDROID_USER:?}"
   : "${OCA_PACKAGE:?}"
   : "${OCA_ACTIVITY:?}"
-  : "${OCA_PRIV_APP_DIR:?}"
-  if [[ -z "${OCA_PRIVAPP_XML_SRC:-}" && -f "$ROOT/integrations/${id}/privapp-permissions.xml" ]]; then
-    OCA_PRIVAPP_XML_SRC="$ROOT/integrations/${id}/privapp-permissions.xml"
-  fi
   local host_disp="${OCA_HOST:-<set -H or OCA_HOST>}"
   ok "Integration: $id  host=$host_disp:$OCA_ADB_PORT  user=$OCA_ANDROID_USER  pkg=$OCA_PACKAGE"
 }

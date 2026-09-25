@@ -23,18 +23,112 @@ async function saveUnitPrefs(unitsObj) {
 export async function reloadEntities() {
   try {
     const pair = await Promise.all([api("/api/entities"), api("/api/controls")]);
-    patch({ entities: pair[0], controls: pair[1] });
+    patch({
+      entities: mergeTransportHold(pair[0]),
+      controls: mergeTransportHold(pair[1]),
+    });
   } catch (e) {
     notify();
   }
 }
 
+/** Brief hold so a slow NotificationListener catalog cannot undo play/pause. */
+const transportHoldUntil = Object.create(null);
+const transportHoldValue = Object.create(null);
+const TRANSPORT_HOLD_MS = 2500;
+
+export function mediaStateLabel(value) {
+  if (value === "playing") return t("media_player.playing", "Playing");
+  if (value === "paused") return t("media_player.paused", "Paused");
+  if (value === "idle") return t("media_player.idle", "Idle");
+  return null;
+}
+
+/** @returns {string|null} held transport value while the hold is active */
+export function heldTransportValue(id) {
+  if (!id) return null;
+  if ((transportHoldUntil[id] || 0) < Date.now()) return null;
+  return transportHoldValue[id] || null;
+}
+
+function setTransportHold(id, value) {
+  transportHoldValue[id] = value;
+  transportHoldUntil[id] = Date.now() + TRANSPORT_HOLD_MS;
+}
+
+function applyTransportHold(row) {
+  if (!row || !row.id) return row;
+  const held = heldTransportValue(row.id);
+  if (!held || row.value === held) return row;
+  if (row.value !== "playing" && row.value !== "paused" && row.value !== "idle") {
+    return row;
+  }
+  const updated = Object.assign({}, row, {
+    value: held,
+    valueLabel: mediaStateLabel(held) || row.valueLabel,
+  });
+  if (updated.state !== undefined) updated.state = held;
+  return updated;
+}
+
+/** Merge active play/pause holds into a catalog list (SSE reload + setControl). */
+export function mergeTransportHold(list) {
+  if (!list || !list.length) return list;
+  let next = null;
+  for (let i = 0; i < list.length; i++) {
+    const merged = applyTransportHold(list[i]);
+    if (merged !== list[i]) {
+      if (next == null) next = list.slice();
+      next[i] = merged;
+    }
+  }
+  return next || list;
+}
+
+/** Optimistically patch one entity/control row so transport UI flips immediately. */
+function optimisticControlValue(id, value) {
+  if (!id || value == null) return;
+  setTransportHold(id, value);
+  const label = mediaStateLabel(value);
+  function bump(list) {
+    if (!list || !list.length) return list;
+    let next = null;
+    for (let i = 0; i < list.length; i++) {
+      const row = list[i];
+      if (!row || row.id !== id) continue;
+      if (next == null) next = list.slice();
+      const updated = Object.assign({}, row, { value: value });
+      if (label) updated.valueLabel = label;
+      if (updated.state !== undefined) updated.state = value;
+      next[i] = updated;
+      break;
+    }
+    return next || list;
+  }
+  patch({
+    entities: bump(state.entities),
+    controls: bump(state.controls),
+  });
+}
+
 export async function setControl(id, val) {
+  // Media transport: flip local state before the round-trip. NotificationListener
+  // can lag ~1–2s; hold must not be clobbered by a stale catalog during that window.
+  if (val === "play") optimisticControlValue(id, "playing");
+  else if (val === "pause") optimisticControlValue(id, "paused");
+
   await api("/api/controls/" + encodeURIComponent(id), {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: "value=" + encodeURIComponent(val),
   });
+
+  // Prefer SSE entity/catalog events when connected — avoid a full catalog
+  // reload racing the transport hold on every click.
+  if (state._eventsOpen) {
+    notify();
+    return;
+  }
   await reloadEntities();
 }
 
@@ -145,6 +239,10 @@ export async function runPref(pref, next, extra) {
       }
     }
     patch(updates);
+    return;
+  }
+  if (pref === "lab-bound") {
+    patch({ probeBoundFilter: next || "all" });
     return;
   }
   if (pref === "cam-storage") {

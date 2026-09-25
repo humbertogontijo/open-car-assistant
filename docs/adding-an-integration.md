@@ -9,21 +9,22 @@ Collaborator work stays under `integrations/<platform-id>/`. Gradle auto-include
 ```
 integrations/<platform-id>/
   host.sh                      # oca-setup defaults (ADB host/port/user)
-  privapp-permissions.xml      # privileged whitelist template
   build.gradle.kts
   src/main/assets/
-    platform.json              # match, bindings, allowlist, variants, driveModeEnum
-    vhal_named_ids.tsv         # optional catalog (VHAL backends)
+    platform.json              # extends, properties, android overlays, variants, …
     i18n/<platform-id>/        # optional overrides + valueMaps (en.json, pt-BR.json)
   src/main/java/...            # thin Integration + bridge only when needed
   src/main/resources/META-INF/services/
     cc.opencar.assistant.api.VehicleIntegration   # FQCN of your implementation
 ```
 
+Product install is **user-space `/data`**. Prefer a transport that works without priv-app (Antora: gRPC). If your HU only exposes VHAL via `CarPropertyManager`, use shared `CarPropertyBackend` from `:integrations:platform:common`. Formal `signature|privileged` grants (priv-app whitelist, OEM platform key) stay inside the platform folder if you need them — core `oca-setup` does not elevate.
+
 Shared layers (not auto-registered as integrations):
 
 ```
 integrations/platform/common/   # AAOS plumbing: PlatformConfig, CarPropertyBridge, …
+  src/main/assets/platform/     # Shared parents: aosp.json, android.json (via "extends")
 integrations/platform/flyme/    # Flyme Auto family helpers
 libs/support/                   # :oca-support — I18nBundle, LastKnownStore (product helpers)
 libs/api/                       # :integration-api — SPI
@@ -32,9 +33,9 @@ libs/api/                       # :integration-api — SPI
 ## Steps
 
 1. Create `integrations/<platform-id>/` as above.
-2. Fill `platform.json` (`backend`: `vhal`). Prefer config over Kotlin for bindings/allowlist/match. Copy structure from **`ihu629g`** (simple) rather than Antora when starting out.
-3. Implement `VehicleIntegration` (+ optional `warm`, `createQuickEntry`, `wakeSignals`) on `VehiclePropertyBackend` / `CarPropertyBackend`.
-4. Keep a **writable allowlist** in JSON for memory / web writes.
+2. Fill `platform.json` (`backend`: `vhal`, `"extends": ["aosp", "android"]`). Prefer config over Kotlin for properties / match. Put the full HU property catalog under `properties` (`id`, `key`, `access`, `areas`, optional `entity`). Use `access: "rw"` (or `"w"`) for product-writable props. Copy structure from **`ihu629g`** (simple) rather than Antora when starting out; regenerate Antora-scale catalogs with `tools/gen-platform-properties`.
+3. Implement `VehicleIntegration` (+ optional `warm`, `createQuickEntry`, `wakeSignals`) on `VehiclePropertyBackend` / `CarPropertyBackend`. Prefer implementing `observe()` when the transport can push property changes; leave it null so the session polls (~1s). The product UI is event-driven (`session.telemetry()` / `events()` → `/api/events` WebSocket) either way.
+4. Product writes are gated by `access` `w`/`rw` (derived allowlist). OEM-specific Android bits (e.g. `VOLUME_GROUP/*`) go under `android.volumeGroups` in the integration file — shared wifi/bt/brightness live in `platform/android.json`.
 5. Register the class in `META-INF/services/cc.opencar.assistant.api.VehicleIntegration` (one FQCN per line).
 6. Host setup: `./tools/oca-setup -i <platform-id> -H <ip> setup` (loads `integrations/<id>/host.sh`).
 7. i18n: reuse common keys from `:oca-support`; add platform packs only for overrides / valueMaps (see below).

@@ -3,8 +3,8 @@ package cc.opencar.assistant.api
 /**
  * Home Assistant–inspired entity contract for the product surface.
  *
- * Integrations bind [WellKnownProperties] in `platform.json`; the curated
- * [ControlCatalog] (feature-web) exposes stable catalog **entity ids** used by
+ * Integrations map [WellKnownProperties] via `platform.json` → `properties[].entity`;
+ * the curated [ControlCatalog] (feature-web) exposes stable catalog **entity ids** used by
  * UI, history, shortcuts, scenes, and routines. Features never hardcode VHAL hex.
  *
  * JSON maps from `/api/entities` (and virtual shortcut cards) include:
@@ -56,15 +56,29 @@ object EntityContract {
     /**
      * Adds HA-shaped aliases (`domain`, `state`, `friendlyName`, `available`,
      * `attributes`) without removing legacy keys used by the web shell.
+     * Idempotent: already-enriched rows are returned as-is.
      */
     fun enrich(row: Map<String, Any?>): Map<String, Any?> {
+        if (row[FIELD_DOMAIN] != null &&
+            row.containsKey(FIELD_AVAILABLE) &&
+            row[FIELD_ATTRIBUTES] is Map<*, *>
+        ) {
+            return row
+        }
         val status = row[FIELD_STATUS] as? String
         val label = row[FIELD_LABEL] as? String
         val domain = (row[FIELD_DOMAIN] as? String)
             ?: (row[FIELD_ENTITY] as? String)
             ?: EntityType.EXTRA.id
         val value = row[FIELD_VALUE]
+        @Suppress("UNCHECKED_CAST")
+        val existingAttrs = row[FIELD_ATTRIBUTES] as? Map<*, *>
         val attributes = linkedMapOf<String, Any?>().apply {
+            if (existingAttrs != null) {
+                for ((k, v) in existingAttrs) {
+                    if (k is String && v != null) put(k, v)
+                }
+            }
             put("friendly_name", label)
             put("device_class", row[FIELD_DEVICE_CLASS])
             put("unit_of_measurement", row[FIELD_UNIT])

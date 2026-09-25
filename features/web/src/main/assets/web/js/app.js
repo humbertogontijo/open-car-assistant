@@ -1,5 +1,5 @@
 import { api, $ } from "./api.js";
-import { state, patch, subscribe, notify } from "./store.js";
+import { state, patch, notify, subscribe } from "./store.js";
 import { render as litRender } from "./lit.js";
 import { sectionView } from "./sections/index.js";
 import {
@@ -11,7 +11,6 @@ import {
   stopCameraLive,
   applyCameraPlayerSrc,
   ensureStoreLoaded,
-  isTimelineBusy,
 } from "./sections/index.js";
 import { loadShortcuts } from "./sections/shortcuts.js";
 import { shouldShowSetup, renderSetupOverlay } from "./ui/setup.js";
@@ -19,6 +18,14 @@ import { setTheme } from "./theme.js";
 import { loadI18n } from "./i18n.js";
 import { loadIcons, mountNavIcons } from "./icons.js";
 import { stashCurrentScroll, restoreSectionScroll, rememberScroll } from "./nav.js";
+import { connectEvents } from "./events.js";
+import {
+  applyLegacySectionQuery,
+  setRouteEnterHandler,
+  startRouter,
+  gotoSection,
+  router,
+} from "./router.js";
 
 function updateNavActive(sec) {
   document.querySelectorAll(".nav-item").forEach(function (n) {
@@ -39,25 +46,9 @@ function applyCapabilityNav() {
     });
     el.style.display = ok ? "" : "none";
     if (!ok && state.section === el.getAttribute("data-sec")) {
-      patch({ section: "home" });
-      updateNavActive("home");
+      goSection("home", { replace: true });
     }
   });
-}
-
-function shouldSkipSoftRender() {
-  if (document.querySelector(".choice-select.open") || state.openChoiceId) return true;
-  if (state.shortcutEdit) return true;
-  if (state.pluginEditId) return true;
-  if (typeof isTimelineBusy === "function" && isTimelineBusy()) return true;
-  const ae = document.activeElement;
-  if (
-    ae &&
-    (ae.matches("input, textarea, select") || ae.closest(".choice-select, .choice-menu"))
-  ) {
-    return true;
-  }
-  return false;
 }
 
 function paint() {
@@ -66,7 +57,8 @@ function paint() {
   const probeScrollEl = document.getElementById("probeScroll");
   const prevProbeScroll = probeScrollEl ? probeScrollEl.scrollTop : 0;
 
-  litRender(sectionView(state.section), main);
+  var outlet = router.outlet();
+  litRender(outlet != null ? outlet : sectionView(state.section), main);
   renderSetupOverlay();
   mountNavIcons();
   updateNavActive(state.section);
@@ -88,7 +80,12 @@ function paint() {
   if (probeAfter) probeAfter.scrollTop = prevProbeScroll;
 }
 
-subscribe(paint);
+// Lit signals only: store.subscribe bumps version → re-run paint.
+subscribe(function () {
+  try {
+    paint();
+  } catch (e) {}
+});
 
 export async function refresh() {
   await loadIcons();
@@ -170,6 +167,9 @@ export async function refresh() {
     if (units && typeof units === "object") {
       updatesPrefs = { units: units };
     }
+    if (prefs.homeLat != null) updatesPrefs.homeLat = prefs.homeLat;
+    if (prefs.homeLon != null) updatesPrefs.homeLon = prefs.homeLon;
+    if (prefs.homeRadiusM != null) updatesPrefs.homeRadiusM = prefs.homeRadiusM;
   } catch (e) {}
 
   const updates = {
@@ -217,21 +217,26 @@ export async function refresh() {
   notify();
 }
 
-function goSection(sec) {
-  if (!sec) return;
-  const prev = state.section;
-  stashCurrentScroll();
-  updateNavActive(sec);
-
-  if (
-    (prev === "cameras" || prev === "dvr") &&
-    sec !== "cameras" &&
-    sec !== "dvr"
-  ) {
-    stopCameraLive();
+function onSectionEnter(sec, prev) {
+  if (prev && prev !== sec) {
+    stashCurrentScroll();
+    if (
+      (prev === "cameras" || prev === "dvr") &&
+      sec !== "cameras" &&
+      sec !== "dvr"
+    ) {
+      stopCameraLive();
+    }
   }
 
-  const updates = { section: sec, openChoiceId: null, showHiddenGroup: null };
+  updateNavActive(sec);
+
+  const updates = {
+    section: sec,
+    openChoiceId: null,
+    choiceSearchQuery: "",
+    showHiddenGroup: null,
+  };
   if (sec === "store") updates._storeLoaded = false;
   patch(updates);
 
@@ -294,55 +299,26 @@ function goSection(sec) {
   }
 }
 
-window.__ocaGoSection = goSection;
-
-document.querySelectorAll(".nav-item").forEach(function (el) {
-  el.onclick = function () {
-    goSection(el.getAttribute("data-sec"));
-  };
-});
-
-(function applySectionQuery() {
-  try {
-    var params = new URLSearchParams(window.location.search || "");
-    var sec = params.get("section");
-    if (sec) {
-      state.section = sec;
-      updateNavActive(sec);
-    }
-  } catch (e) {}
-})();
-
-async function softRefresh() {
-  try {
-    const s = await api("/api/status");
-    state.status = s;
-    if (s.setup) state.setup = s.setup;
-    try {
-      state.adb = (s && s.adb) || state.adb;
-    } catch (e) {}
-    const pair = await Promise.all([api("/api/entities"), api("/api/controls")]);
-    state.entities = pair[0];
-    state.controls = pair[1];
-    if (state.section === "cameras" || state.section === "dvr") {
-      try {
-        await loadRecordings();
-      } catch (e) {}
-    }
-    if (shouldSkipSoftRender()) return;
-    // Timeline busy: still refresh timeline data above, but skip full paint.
-    if (typeof isTimelineBusy === "function" && isTimelineBusy()) return;
-    // Remember scroll before notify so paint can restore within-section position.
-    const main = $("main");
-    if (main) rememberScroll(state.section, main.scrollTop);
-    notify();
-  } catch (e) {}
+function goSection(sec, options) {
+  if (!sec) return;
+  return gotoSection(sec, options);
 }
 
-refresh();
-setInterval(softRefresh, 3000);
-document.addEventListener("visibilitychange", function () {
-  if (document.visibilityState === "visible") softRefresh();
+window.__ocaGoSection = goSection;
+
+applyLegacySectionQuery();
+setRouteEnterHandler(onSectionEnter);
+startRouter(function () {
+  notify();
+});
+
+/**
+ * Bootstrap once over HTTP, then live updates via `/api/events` WebSocket
+ * (see events.js). No softRefresh interval — that stacked with camera live
+ * preview and pegged the SoC.
+ */
+refresh().then(function () {
+  connectEvents();
 });
 
 // Persist in-session scroll while scrolling.

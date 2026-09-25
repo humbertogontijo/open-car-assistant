@@ -2,67 +2,40 @@
 
 ## Writable allowlist
 
-Only properties listed in each integration's `platform.json` `writableAllowlist` may be written via memory reapply, web controls, or `/debug` POST. Comfort / ADAS / charge / hybrid energy modes only — no steering, braking, or propulsion torque writes.
+Only properties with `access` `w` or `rw` in each integration's `platform.json` may be written via memory reapply, web controls, or `/debug` POST. Comfort / ADAS / charge / hybrid energy modes only — no steering, braking, or propulsion torque writes.
 
 ## Threat model / network
 
 - Ktor binds to LAN (`0.0.0.0:8787`) with cleartext HTTP for the in-car WebView and same-LAN browsers. **Do not** expose the port to the public internet.
 - Contributor writes and sensitive debug reads require a token when Contributor mode is on; the token may appear in `/debug` HTML while that mode is enabled.
-- Host CLI may use `adb root`, remount, and priv-app install; the on-device UI may attempt `su` elevate. These paths are for **owned userdebug / remountable** head units only — not production locked cars or third-party devices.
+- Host CLI installs under **`/data`** (user-space). Wireless ADB and optional on-device `su` (e.g. ADB toggle helpers) are for **owned userdebug** head units only — not production locked cars or third-party devices.
 - Home Assistant long-lived access tokens are stored in app prefs when configured via the UI/API; they are not shipped in the repo. GET APIs return only a masked token hint.
 
 ## Redaction
 
 - VIN is redacted in property reads and debug exports.
 
-## Install model (Antora) — two VHAL interfaces
+## Install model — user-space first
 
-Antora exposes **two backends**; the session picks one at connect time:
+Product tooling and the shell assume a normal **`/data`** install with the community testkey (uninstallable from HU Settings).
 
-| Install | Backend | How |
-|---------|---------|-----|
-| **Unprivileged** `/data` (default) | **gRPC** `vhal_proto.VehicleServer` on `127.0.0.1:40004` (VenusVehicleServer) | Plaintext OkHttp channel, `client_id` / `session_id` metadata, bidi `SetProperty` + property value stream. No `CAR_VENDOR_EXTENSION` needed. |
-| **Privileged** priv-app / platform key | **CarPropertyManager** | Formal `CAR_VENDOR_EXTENSION` + `CONTROL_CAR_CLIMATE` grants via privapp whitelist. |
+| Platform | Default VHAL path | Notes |
+|----------|-------------------|--------|
+| **antora1000** | gRPC → VenusVehicleServer `127.0.0.1:40004` | No `CAR_VENDOR_EXTENSION` needed. |
+| **ihu629g** | `CarPropertyManager` via shared `CarPropertyBackend` | Uses runtime/install car permissions available to a user app. |
 
-**Default:** normal `/data` install with the community testkey. That keeps the app uninstallable from HU Settings and uses the gRPC path for vendor / drive-mode / climate writes.
+Platforms that need formal `signature\|privileged` grants (priv-app whitelist, OEM platform key, etc.) own that in their integration — shared means such as `CarPropertyBackend` remain available. Core `oca-setup` and the in-app setup UI do **not** elevate to `/system/priv-app`.
 
-`android.car.permission.CAR_VENDOR_EXTENSION` and `CONTROL_CAR_CLIMATE` remain **`signature|privileged`**. They are only required when you opt into the CarPropertyManager backend (priv-app).
-
-| Path | Formal vendor/HVAC grants? | Notes |
-|------|----------------------------|-------|
-| Normal `adb install` + testkey (`:signing:signApk`) | **No** (uses gRPC) | Recommended default. Community testkey fingerprint `d7f1f224`. Runtime `CAR_SPEED` / `CAR_ENERGY` + install `CAR_INFO` / `CAR_POWERTRAIN`. |
-| `pm grant … CAR_VENDOR_EXTENSION` | **No** | Not a changeable/runtime permission. |
-| OEM **platform** signature | Yes → CarProperty | OEM platform keys are **not** in this repo. |
-| **`/system/priv-app` + privapp whitelist XML** | Yes → CarProperty | Optional. Unlocked/userdebug HUs with `adb root` + `remount`. App cannot be uninstalled from Settings. |
-
-The unprivileged `/data` + testkey install does **not** receive `CAR_VENDOR_EXTENSION`; it talks to VenusVehicleServer over gRPC, not `CarPropertyManager`.
-
-### Host setup (recommended)
+### Host setup
 
 Replace `CAR_IP` with the HU address (required — there is no default LAN IP).
 
 ```bash
-# Default: /data install + runtime grants (uninstallable)
+# /data install + runtime grants (uninstallable)
 ./tools/oca-setup -i antora1000 -H CAR_IP setup
-
-# Optional later: formal vendor + HVAC privileges (priv-app, reboot required)
-./tools/oca-setup -i antora1000 -H CAR_IP setup --privileged
-adb -s CAR_IP:5566 reboot
-# after boot:
-./tools/oca-setup -i antora1000 -H CAR_IP grant
-./tools/oca-setup -i antora1000 -H CAR_IP check
-./tools/oca-setup -i antora1000 -H CAR_IP start
 ```
 
-`install-privileged` / in-app elevate will:
-
-1. `adb root` + remount (or `su` from the UI on userdebug)
-2. Uninstall the `/data` copy when using host CLI
-3. Push APK to `/system/priv-app/OpenCarAssistant/`
-4. Install `privapp-permissions.xml` from `integrations/<id>/`
-5. Require reboot so PackageManager applies `PRIVILEGED`
-
-Web UI setup (`/api/setup/actions/*`): request runtime permissions; elevate/host commands stay available but are optional.
+Web UI setup (`/api/setup/actions/*`): request runtime permissions and show host install hints.
 
 ### Camera note
 
@@ -70,7 +43,7 @@ Live and DVR share one GPU path: camera `SurfaceTexture` → GLES mosaic → HW 
 
 ## Multi-app VHAL writers
 
-Prefer a single writer for regen / drive mode / ADAS toggles when other apps also talk to VenusVehicleServer or `CarPropertyManager`. Only elevate to priv-app if you want the CarPropertyManager backend (formal grants) — the default gRPC path works with the community testkey `/data` install.
+Prefer a single writer for regen / drive mode / ADAS toggles when other apps also talk to VenusVehicleServer or `CarPropertyManager`.
 
 ## Parking Comfort / DVR
 

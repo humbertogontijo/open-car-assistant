@@ -1,4 +1,4 @@
-import { html, nothing, repeat, unsafeHTML, classMap } from "../lit.js";
+import { html, nothing, repeat, unsafeHTML, classMap, live } from "../lit.js";
 import { fmt } from "../api.js";
 import { t } from "../i18n.js";
 import { iconSvg } from "../icons.js";
@@ -16,6 +16,7 @@ import {
   hideEntity,
   unhideEntity,
   runPref,
+  mediaStateLabel,
 } from "../actions.js";
 import {
   unitLabelFor,
@@ -25,6 +26,8 @@ import {
 function icon(name) {
   return unsafeHTML(iconSvg(name || "sensor"));
 }
+
+let choiceSearchTimer = 0;
 
 function displayUnit(c) {
   return unitLabelFor(c);
@@ -111,7 +114,9 @@ function statusNote(c) {
 }
 
 function closeChoices() {
-  if (state.openChoiceId != null) patch({ openChoiceId: null });
+  if (state.openChoiceId != null || state.choiceSearchQuery) {
+    patch({ openChoiceId: null, choiceSearchQuery: "" });
+  }
 }
 
 if (!window.__ocaChoiceCloseBound) {
@@ -184,6 +189,7 @@ export function choiceSelect(opts) {
   const locked = !!opts.locked;
   const pinnedVal = opts.pinnedVal;
   const choiceKey = opts.choiceKey || "choice";
+  const searchable = !!opts.searchable;
   const hasCurrent = current != null && current !== "";
   const hasPin = pinnedVal != null && pinnedVal !== "";
   const pinTitle = t("persist.back_hint", "Applied only after the car restarts");
@@ -192,12 +198,22 @@ export function choiceSelect(opts) {
     ? optionLabel(list, current)
     : t("persist.pick_short", "Select…");
   const open = state.openChoiceId === choiceKey;
+  const query = open && searchable ? String(state.choiceSearchQuery || "") : "";
+  const q = query.trim().toLowerCase();
+  const filtered = !q
+    ? list
+    : list.filter(function (o) {
+        const lab = String(o.label || "").toLowerCase();
+        const val = String(o.value != null ? o.value : "").toLowerCase();
+        return lab.indexOf(q) >= 0 || val.indexOf(q) >= 0;
+      });
   const rootClass = classMap({
     "choice-select": true,
     "pin-match": hasPin && match,
     "pin-diff": hasPin && !match,
     unset: !hasCurrent,
     open: open,
+    searchable: searchable,
   });
   return html`
     <div
@@ -216,7 +232,19 @@ export function choiceSelect(opts) {
         @click=${function (ev) {
           ev.stopPropagation();
           if (locked) return;
-          patch({ openChoiceId: open ? null : choiceKey });
+          const nextOpen = !open;
+          patch({
+            openChoiceId: nextOpen ? choiceKey : null,
+            choiceSearchQuery: "",
+          });
+          if (nextOpen && searchable) {
+            requestAnimationFrame(function () {
+              const input = document.querySelector(
+                '[data-choice-select].open .choice-search',
+              );
+              if (input) input.focus();
+            });
+          }
         }}
       >
         <span class="choice-label">${label}</span>
@@ -232,33 +260,66 @@ export function choiceSelect(opts) {
         </svg>
       </button>
       <div class="choice-menu" role="listbox" ?hidden=${!open}>
-        ${list.map(function (o) {
-          const active = hasCurrent && String(current) === String(o.value);
-          const pinned = hasPin && String(pinnedVal) === String(o.value);
-          return html`
-            <button
-              type="button"
-              class="choice-opt ${active ? "active" : ""} ${pinned ? "pin-mark" : ""}"
-              role="option"
-              data-val=${o.value}
-              ?disabled=${locked || !!o.disabled}
-              aria-selected=${active ? "true" : "false"}
-              title=${o.disabled
-                ? o.title || t("cameras.storage.unavailable", "Not available")
-                : pinned
-                  ? pinTitle
-                  : nothing}
-              @click=${function (ev) {
-                ev.stopPropagation();
-                if (locked || o.disabled) return;
-                patch({ openChoiceId: null });
-                opts.onSelect(o.value);
-              }}
-            >
-              ${o.label}
-            </button>
-          `;
-        })}
+        ${searchable
+          ? html`
+              <input
+                class="field choice-search"
+                type="search"
+                autocomplete="off"
+                enterkeyhint="search"
+                placeholder=${t("common.search", "Search…")}
+                .value=${live(query)}
+                @click=${function (ev) {
+                  ev.stopPropagation();
+                }}
+                @input=${function (ev) {
+                  const v = ev.target.value;
+                  if (choiceSearchTimer) clearTimeout(choiceSearchTimer);
+                  choiceSearchTimer = setTimeout(function () {
+                    choiceSearchTimer = 0;
+                    patch({ choiceSearchQuery: v });
+                  }, 120);
+                }}
+                @keydown=${function (ev) {
+                  ev.stopPropagation();
+                  if (ev.key === "Escape") {
+                    patch({ openChoiceId: null, choiceSearchQuery: "" });
+                  }
+                }}
+              />
+            `
+          : nothing}
+        ${filtered.length
+          ? filtered.map(function (o) {
+              const active = hasCurrent && String(current) === String(o.value);
+              const pinned = hasPin && String(pinnedVal) === String(o.value);
+              return html`
+                <button
+                  type="button"
+                  class="choice-opt ${active ? "active" : ""} ${pinned ? "pin-mark" : ""}"
+                  role="option"
+                  data-val=${o.value}
+                  ?disabled=${locked || !!o.disabled}
+                  aria-selected=${active ? "true" : "false"}
+                  title=${o.disabled
+                    ? o.title || t("cameras.storage.unavailable", "Not available")
+                    : pinned
+                      ? pinTitle
+                      : nothing}
+                  @click=${function (ev) {
+                    ev.stopPropagation();
+                    if (locked || o.disabled) return;
+                    patch({ openChoiceId: null, choiceSearchQuery: "" });
+                    opts.onSelect(o.value);
+                  }}
+                >
+                  ${o.label}
+                </button>
+              `;
+            })
+          : html`<p class="choice-empty hint">
+              ${t("common.no_results", "No matches")}
+            </p>`}
       </div>
       ${hasPin && !match ? pinChip(optionLabel(list, pinnedVal)) : nothing}
     </div>
@@ -475,7 +536,148 @@ function sensorDisplay(c) {
   return fmt(c.value);
 }
 
+function mediaAttr(c, camel, snake) {
+  if (c[camel] != null && c[camel] !== "") return c[camel];
+  const attrs = c.attributes || {};
+  if (attrs[camel] != null && attrs[camel] !== "") return attrs[camel];
+  if (snake) {
+    if (c[snake] != null && c[snake] !== "") return c[snake];
+    if (attrs[snake] != null && attrs[snake] !== "") return attrs[snake];
+  }
+  return null;
+}
+
+function mediaPlayerCard(c, restore) {
+  const playing = c.value === "playing";
+  const title =
+    mediaAttr(c, "mediaTitle", "media_title") ||
+    t("media_player.nothing", "Nothing playing");
+  const artist = mediaAttr(c, "mediaArtist", "media_artist") || "";
+  const album = mediaAttr(c, "mediaAlbum", "media_album") || "";
+  const stateLabel =
+    mediaStateLabel(c.value) || c.valueLabel || fmt(c.value);
+  const locked = c.status !== "ok" && c.status !== "cached";
+  const sub = [artist, album].filter(Boolean).join(" · ");
+  const volMaxRaw = mediaAttr(c, "volumeMax", "volume_max");
+  const volMinRaw = mediaAttr(c, "volumeMin", "volume_min");
+  const volMax = Number(volMaxRaw != null ? volMaxRaw : c.max != null ? c.max : 39);
+  const volMin = Number(volMinRaw != null ? volMinRaw : c.min != null ? c.min : 0);
+  const volRaw = mediaAttr(c, "volume");
+  const vol =
+    volRaw != null && volRaw !== "" && !isNaN(Number(volRaw))
+      ? Number(volRaw)
+      : volMin;
+
+  function send(cmd) {
+    if (locked) return;
+    setControl(c.id, cmd);
+  }
+
+  function onVolumeInput(ev) {
+    if (locked) return;
+    const n = parseInt(ev.target.value, 10);
+    if (isNaN(n)) return;
+    send("volume:" + n);
+  }
+
+  return html`
+    <div
+      class="ctrl-card media-player-card ${playing ? "is-playing" : ""} ${locked ? "locked" : ""}"
+      data-card=${c.id}
+    >
+      <div class="ctrl-head">
+        <div class="ctrl-icon">${icon(c.icon || "sound")}</div>
+        <div class="ctrl-meta">
+          <h3>${c.label}</h3>
+          <p class="hint media-state">${stateLabel}</p>
+        </div>
+        <div class="card-actions">${hideBtn(c.id, restore)}</div>
+      </div>
+      <div class="ctrl-body media-player-body">
+        <div class="media-now">
+          <div class="media-title">${title}</div>
+          ${sub
+            ? html`<div class="media-artist">${sub}</div>`
+            : nothing}
+        </div>
+        <div class="media-transport" role="group" aria-label=${t("media_player.transport", "Transport")}>
+          <button
+            type="button"
+            class="media-btn"
+            title=${t("media_player.previous", "Previous")}
+            aria-label=${t("media_player.previous", "Previous")}
+            ?disabled=${locked}
+            @click=${function () {
+              send("previous");
+            }}
+          >
+            ‹‹
+          </button>
+          <button
+            type="button"
+            class="media-btn media-btn-main"
+            title=${playing
+              ? t("media_player.pause", "Pause")
+              : t("media_player.play", "Play")}
+            aria-label=${playing
+              ? t("media_player.pause", "Pause")
+              : t("media_player.play", "Play")}
+            ?disabled=${locked}
+            @click=${function () {
+              send(playing ? "pause" : "play");
+            }}
+          >
+            ${playing ? "❚❚" : "▶"}
+          </button>
+          <button
+            type="button"
+            class="media-btn"
+            title=${t("media_player.next", "Next")}
+            aria-label=${t("media_player.next", "Next")}
+            ?disabled=${locked}
+            @click=${function () {
+              send("next");
+            }}
+          >
+            ››
+          </button>
+        </div>
+        <div
+          class="media-volume-slider"
+          role="group"
+          aria-label=${t("media_player.volume", "Volume")}
+        >
+          <span class="media-volume-label">${vol}<span class="unit">/${isNaN(volMax) ? 39 : volMax}</span></span>
+          <input
+            type="range"
+            class="media-range"
+            min=${isNaN(volMin) ? 0 : volMin}
+            max=${isNaN(volMax) ? 39 : volMax}
+            step="1"
+            .value=${String(vol)}
+            ?disabled=${locked}
+            @change=${onVolumeInput}
+            @input=${function (ev) {
+              // Live label while dragging; commit on change.
+              const label = ev.target.parentElement &&
+                ev.target.parentElement.querySelector(".media-volume-label");
+              if (label) {
+                const max = isNaN(volMax) ? 39 : volMax;
+                label.innerHTML =
+                  ev.target.value + '<span class="unit">/' + max + "</span>";
+              }
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function controlCard(c, restore) {
+  if (c.input === "media_player" || c.entity === "media_player" || c.domain === "media_player") {
+    return mediaPlayerCard(c, restore);
+  }
   if (c.input === "sensor") {
     if (!restore && c.status !== "ok") return nothing;
     return html`

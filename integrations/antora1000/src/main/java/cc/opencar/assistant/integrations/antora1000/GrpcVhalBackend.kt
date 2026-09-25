@@ -2,6 +2,7 @@ package cc.opencar.assistant.integrations.antora1000
 
 import android.util.Log
 import cc.opencar.assistant.integrations.common.PropertyAccessMode
+import cc.opencar.assistant.integrations.common.PropertyUpdate
 import cc.opencar.assistant.integrations.common.VehiclePropertyBackend
 import io.grpc.CallOptions
 import io.grpc.ManagedChannel
@@ -11,6 +12,10 @@ import io.grpc.okhttp.OkHttpChannelBuilder
 import io.grpc.stub.ClientCalls
 import io.grpc.stub.MetadataUtils
 import io.grpc.stub.StreamObserver
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.util.UUID
@@ -21,8 +26,10 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Unprivileged Antora VHAL access via ECARX VenusVehicleServer gRPC
+ * User-space Antora VHAL access via ECARX VenusVehicleServer gRPC
  * (`vhal_proto.VehicleServer` on localhost:40004).
+ *
+ * [StartPropertyValuesStream] pushes into [cache] and [updates]; [read] is cache-only.
  */
 class GrpcVhalBackend(
     private val host: String = DEFAULT_HOST,
@@ -31,6 +38,10 @@ class GrpcVhalBackend(
     override val mode: PropertyAccessMode = PropertyAccessMode.GRPC
 
     private val cache = ConcurrentHashMap<Long, VhalProto.CachedProp>()
+    private val updates = MutableSharedFlow<PropertyUpdate>(
+        extraBufferCapacity = 256,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
     private val writeExecutor = Executors.newSingleThreadExecutor { r ->
         Thread(r, "oca-vhal-grpc-write").apply { isDaemon = true }
     }
@@ -40,6 +51,8 @@ class GrpcVhalBackend(
     private val streamAlive = AtomicBoolean(false)
 
     override val available: Boolean get() = connected.get()
+
+    override fun observe(propIds: IntArray?): Flow<PropertyUpdate> = updates.asSharedFlow()
 
     fun connect(): Boolean {
         if (connected.get()) return true
@@ -79,7 +92,7 @@ class GrpcVhalBackend(
             setRequestObserver = requestObs
             streamAlive.set(true)
 
-            // Property value stream → cache
+            // Property value stream → cache + observe fan-out
             Thread({
                 try {
                     val call = ch.newCall(START_STREAM, CallOptions.DEFAULT)
@@ -90,6 +103,13 @@ class GrpcVhalBackend(
                             override fun onNext(value: ByteArray) {
                                 for (p in VhalProto.parseValueList(value)) {
                                     cache[cacheKey(p.propId, p.areaId)] = p
+                                    updates.tryEmit(
+                                        PropertyUpdate(
+                                            propId = p.propId,
+                                            areaId = p.areaId,
+                                            value = p.primary(),
+                                        ),
+                                    )
                                 }
                                 latch.countDown()
                             }
@@ -151,11 +171,13 @@ class GrpcVhalBackend(
     override fun writeInt(propId: Int, areaId: Int, value: Int): Boolean =
         writeBytes(VhalProto.encodeSetInt(propId, areaId, value), propId, areaId) {
             cache[cacheKey(propId, areaId)] = VhalProto.CachedProp(propId, areaId, int32 = listOf(value))
+            updates.tryEmit(PropertyUpdate(propId, areaId, value))
         }
 
     override fun writeFloat(propId: Int, areaId: Int, value: Float): Boolean =
         writeBytes(VhalProto.encodeSetFloat(propId, areaId, value), propId, areaId) {
             cache[cacheKey(propId, areaId)] = VhalProto.CachedProp(propId, areaId, float = listOf(value))
+            updates.tryEmit(PropertyUpdate(propId, areaId, value))
         }
 
     override fun writeBoolean(propId: Int, areaId: Int, value: Boolean): Boolean =

@@ -16,6 +16,9 @@ class ShortcutRunner(
     private val actionHandlers: Map<String, ShortcutActionHandler> = emptyMap(),
     private val setScene: (suspend (sceneId: String, active: Boolean?) -> Map<String, Any?>)? = null,
     private val getRoutine: (suspend (routineId: String) -> Routine?)? = null,
+    private val readEntity: (suspend (String) -> String?)? = null,
+    private val readGear: (suspend () -> Int?)? = null,
+    private val readWifiSsid: (() -> String?)? = null,
 ) {
     private val runningRoutines = ThreadLocal.withInitial { mutableSetOf<String>() }
 
@@ -29,6 +32,15 @@ class ShortcutRunner(
     suspend fun runRoutine(routine: Routine): Map<String, Any?> {
         if (!routine.enabled) {
             return mapOf("ok" to false, "error" to "disabled")
+        }
+        if (!ConditionEvaluator.conditionsPass(
+                conditions = routine.conditions,
+                readEntity = readEntity,
+                readGear = readGear,
+                readWifiSsid = readWifiSsid,
+            )
+        ) {
+            return mapOf("ok" to false, "error" to "conditions not met", "id" to routine.id)
         }
         val stack = runningRoutines.get()!!
         if (routine.id in stack) {

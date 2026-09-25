@@ -21,8 +21,8 @@ function controlById(id) {
   return null;
 }
 
-/** Options for a control value, preferring API i18n labels (same as cards). */
-function valueOptionsForControl(c) {
+/** Options for a control/entity value, preferring API i18n labels (same as cards). */
+export function valueOptionsForControl(c) {
   if (!c) return null;
   if (c.input === "bool") {
     return boolOpts();
@@ -35,19 +35,54 @@ function valueOptionsForControl(c) {
       };
     });
   }
+  const domain = c.domain || c.entity;
+  if (domain === "device_tracker") {
+    return [
+      { value: "home", label: t("device_tracker.home", "Home") },
+      { value: "not_home", label: t("device_tracker.not_home", "Away") },
+    ];
+  }
+  if (domain === "media_player" || c.input === "media_player") {
+    return [
+      { value: "playing", label: t("media_player.playing", "Playing") },
+      { value: "paused", label: t("media_player.paused", "Paused") },
+      { value: "idle", label: t("media_player.idle", "Idle") },
+    ];
+  }
+  const maps = (state.i18n && state.i18n.valueMaps) || {};
+  const mapId = c.valueMapId || null;
+  if (mapId && maps[mapId]) {
+    return Object.keys(maps[mapId])
+      .map(function (k) {
+        return {
+          value: String(k),
+          label: t(maps[mapId][k], String(k)),
+        };
+      })
+      .sort(function (a, b) {
+        const na = parseInt(a.value, 10);
+        const nb = parseInt(b.value, 10);
+        if (!isNaN(na) && !isNaN(nb)) return na - nb;
+        return a.value < b.value ? -1 : a.value > b.value ? 1 : 0;
+      });
+  }
   return null;
 }
 
-function blankTarget() {
-  return {
-    entityId: "",
-    onValue: "1",
-    off: { policy: "restore" },
-  };
-}
-
-function valueField(opts) {
-  const options = opts.options;
+/**
+ * Value editor: choice select when mapped options exist, else free-text field.
+ * @param {object} opts
+ * @param {object|null} [opts.entity] - entity/control row (for options)
+ * @param {*} opts.current
+ * @param {string} opts.choiceKey
+ * @param {function} opts.onSelect
+ * @param {string} [opts.placeholder]
+ * @param {string} [opts.inputStyle]
+ */
+export function entityValueField(opts) {
+  const options = opts.options != null
+    ? opts.options
+    : valueOptionsForControl(opts.entity);
   const current = opts.current != null ? String(opts.current) : "";
   if (options && options.length) {
     return choiceSelect({
@@ -62,13 +97,22 @@ function valueField(opts) {
   return html`
     <input
       class="field"
-      style="width:100%;margin-top:4px"
+      style=${opts.inputStyle || "width:100%;margin-top:4px"}
+      placeholder=${opts.placeholder || ""}
       .value=${live(current)}
       @input=${function (ev) {
         opts.onSelect(ev.target.value);
       }}
     />
   `;
+}
+
+function blankTarget() {
+  return {
+    entityId: "",
+    onValue: "1",
+    off: { policy: "restore" },
+  };
 }
 
 /**
@@ -173,6 +217,7 @@ function targetRow(edit, raw, i, controls, opts) {
         }),
         current: trow.entityId || "",
         choiceKey: "scene-target-entity-" + i,
+        searchable: true,
         onSelect: function (next) {
           edit.targets[i].entityId = next;
           const c = controlById(next);
@@ -188,7 +233,7 @@ function targetRow(edit, raw, i, controls, opts) {
       })}
       <label class="hint" style="margin-top:8px;display:block">${t("scenes.on_value", "On value")}</label>
       <div style="margin-top:4px">
-        ${valueField({
+        ${entityValueField({
           options: valueOpts,
           current: trow.onValue,
           choiceKey: "scene-target-on-" + i,
@@ -228,7 +273,7 @@ function targetRow(edit, raw, i, controls, opts) {
         ? html`
             <label class="hint" style="margin-top:8px;display:block">${t("scenes.off_value", "Off value")}</label>
             <div style="margin-top:4px">
-              ${valueField({
+              ${entityValueField({
                 options: valueOpts,
                 current: off.value != null ? off.value : "0",
                 choiceKey: "scene-target-offval-" + i,

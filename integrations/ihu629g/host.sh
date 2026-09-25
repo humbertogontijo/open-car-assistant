@@ -13,10 +13,5 @@ OCA_ACTIVITY="${OCA_ACTIVITY:-cc.opencar.assistant.MainActivity}"
 OCA_APK_DEBUG="${OCA_APK_DEBUG:-$ROOT/app/build/outputs/apk/debug/app-debug.apk}"
 OCA_APK_SIGNED="${OCA_APK_SIGNED:-$ROOT/app/build/outputs/apk/debug/app-debug_signed.apk}"
 
-OCA_PRIV_APP_DIR="${OCA_PRIV_APP_DIR:-/system/priv-app/OpenCarAssistant}"
-OCA_PRIVAPP_XML_SRC="${OCA_PRIVAPP_XML_SRC:-$ROOT/integrations/ihu629g/privapp-permissions.xml}"
-OCA_PRIVAPP_XML_DST="${OCA_PRIVAPP_XML_DST:-/system/etc/permissions/privapp-permissions-opencar.xml}"
-
 OCA_RUNTIME_PERMS=""
-OCA_PRIVILEGED_PERMS=""
 OCA_INSTALL_PERMS=""

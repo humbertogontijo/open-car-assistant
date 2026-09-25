@@ -7,6 +7,7 @@ import { prefSegment } from "../ui/cards.js";
 function probeRows() {
   const tab = state.labTab || "vhal";
   const q = (state.probeFilter || "").toLowerCase();
+  const boundFilter = state.probeBoundFilter || "all";
   let rows;
   if (tab === "entities") {
     rows = (state.entities || []).map(function (e) {
@@ -16,20 +17,46 @@ function probeRows() {
         status: e.status || "",
         value: e.valueLabel || e.value || "",
         permission: e.group || "",
+        entity: e.id || "",
       };
     });
   } else {
     const src = tab === "obd2" ? state.obd2 : state.probe;
     rows = (src && src.results) || [];
   }
-  return rows
-    .filter(function (r) {
-      if (!q) return true;
-      return (r.name + r.family + r.status + (r.permission || "") + (r.value || ""))
+  return rows.filter(function (r) {
+    if (tab === "vhal") {
+      if (boundFilter === "bound" && !r.entity) return false;
+      if (boundFilter === "missing" && r.entity) return false;
+    }
+    if (!q) return true;
+    return (
+      (
+        r.name +
+        r.family +
+        r.status +
+        (r.permission || "") +
+        (r.value || "") +
+        (r.entity || "")
+      )
         .toLowerCase()
-        .indexOf(q) >= 0;
-    })
-    .slice(0, 400);
+        .indexOf(q) >= 0
+    );
+  });
+}
+
+const LAB_ROW_CAP = 400;
+
+function cappedProbeRows() {
+  const all = probeRows();
+  if (all.length <= LAB_ROW_CAP) {
+    return { rows: all, total: all.length, capped: false };
+  }
+  return {
+    rows: all.slice(0, LAB_ROW_CAP),
+    total: all.length,
+    capped: true,
+  };
 }
 
 export function sectionLab() {
@@ -49,8 +76,14 @@ export function sectionLab() {
     tab === "obd2"
       ? t("lab.source.obd2", "OBD2_LIVE_FRAME / OBD2_FREEZE_FRAME (VHAL)")
       : tab === "entities"
-        ? t("lab.source.entities", "Bound product entities (ControlCatalog)")
-        : t("lab.source.vhal", "VHAL catalog (CarPropertyManager / gRPC)");
+        ? t(
+            "lab.source.entities",
+            "Bound product entities (ControlCatalog + i18n description)",
+          )
+        : t(
+            "lab.source.vhal",
+            "Full VHAL catalog — filter Missing to see props not yet cards",
+          );
   const contributorOn = !!lab.contributor;
   const token = (contributorOn && (lab.token || state.token)) || "";
   const override = lab.integrationOverride || "";
@@ -60,7 +93,14 @@ export function sectionLab() {
     { value: "obd2", label: t("lab.tab.obd2", "OBD2") },
     { value: "entities", label: t("lab.tab.entities", "Product entities") },
   ];
-  const rows = probeRows();
+  const boundOpts = [
+    { value: "all", label: t("lab.bound.all", "All") },
+    { value: "bound", label: t("lab.bound.bound", "Bound (cards)") },
+    { value: "missing", label: t("lab.bound.missing", "Missing") },
+  ];
+  const probe = cappedProbeRows();
+  const rows = probe.rows;
+  const showEntityCol = tab === "vhal";
 
   return html`
     <h1>${t("lab.title", "Lab / Contributor")}</h1>
@@ -158,6 +198,19 @@ export function sectionLab() {
     <div class="card" style="margin-bottom:12px">
       ${prefSegment("lab-tab", tabOpts, tab)}
       <p class="sub" style="margin:10px 0 0">${sourceHint}</p>
+      ${tab === "vhal"
+        ? html`
+            <p class="hint" style="margin:8px 0 0">
+              ${t(
+                "lab.gap.hint",
+                "All VHAL props from platform.json are listed here. Only props with a product description (i18n + ControlCatalog + platform.json entity) become cards. Use Missing to find candidates.",
+              )}
+            </p>
+            <div style="margin-top:10px">
+              ${prefSegment("lab-bound", boundOpts, state.probeBoundFilter || "all")}
+            </div>
+          `
+        : nothing}
     </div>
     <div class="card">
       <div class="row">
@@ -192,27 +245,41 @@ export function sectionLab() {
       <pre class="mono">
 ${JSON.stringify(sum || { tip: t("lab.probe.tip", "Click Re-probe") }, null, 2)}</pre
       >
-      <div id="probeScroll" class="table-scroll" style="max-height:420px;overflow:auto">
+      <p class="sub" style="margin:8px 0">
+        ${t("lab.rows", "Showing")} ${rows.length}
+        ${probe.capped
+          ? html` / ${probe.total}`
+          : tab === "vhal" && state.probe && state.probe.results
+            ? html` / ${(state.probe.results || []).length}`
+            : nothing}
+      </p>
+      <div id="probeScroll" class="table-scroll" style="max-height:520px;overflow:auto">
         <table class="table" id="probeTable">
           <thead>
             <tr>
-              <th>Nome</th>
-              <th>Família</th>
-              <th>Status</th>
-              <th>Valor</th>
-              <th>Perm</th>
+              <th>${t("lab.col.name", "Name")}</th>
+              <th>${t("lab.col.family", "Family")}</th>
+              ${showEntityCol
+                ? html`<th>${t("lab.col.entity", "Entity")}</th>`
+                : nothing}
+              <th>${t("lab.col.status", "Status")}</th>
+              <th>${t("lab.col.value", "Value")}</th>
+              <th>${t("lab.col.perm", "Perm")}</th>
             </tr>
           </thead>
           <tbody>
             ${repeat(
               rows,
               function (r) {
-                return r.name + "|" + r.family;
+                return r.name + "|" + (r.entity || "") + "|" + r.family;
               },
               function (r) {
                 return html`<tr>
                   <td class="mono">${r.name}</td>
                   <td>${r.family}</td>
+                  ${showEntityCol
+                    ? html`<td class="mono">${r.entity || "—"}</td>`
+                    : nothing}
                   <td>${r.status}</td>
                   <td class="mono">${fmt(r.value)}</td>
                   <td class="mono">${fmt(r.permission)}</td>

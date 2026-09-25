@@ -62,6 +62,12 @@ interface VehicleSession {
     fun cameras(): List<CameraSource>
 
     /**
+     * Native VHAL id → product entity / control id for props with `entity` in `platform.json`.
+     * Lab uses this to mark catalog rows as cards vs still-missing.
+     */
+    fun entityBindings(): Map<Long, String> = emptyMap()
+
+    /**
      * True when this session maps [property] to a native id.
      * Used for write-only commands where [diagnose] may be Unavailable but [set] still works.
      */
@@ -72,6 +78,12 @@ interface VehicleSession {
      * Not user-configurable — integrations set what the HU can sustain.
      */
     fun dvrStreamConfig(): DvrStreamConfig = DvrStreamConfig.DEFAULT
+
+    /**
+     * Cabin volume groups from `platform.json` → `android.volumeGroups`
+     * (after `extends` merge). Empty when the platform does not declare any.
+     */
+    fun androidVolumeGroups(): List<AndroidVolumeGroup> = emptyList()
 
     fun close()
 }

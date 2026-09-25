@@ -47,7 +47,7 @@ export function isRecordingPlayback() {
   return state.cameraPlayerMode === "dvr";
 }
 
-/** True while the user is scrubbing or dragging a cut range (softRefresh should not repaint). */
+/** True while the user is scrubbing or dragging a cut range (event paint should not repaint). */
 export function isTimelineBusy() {
   return !!timelineSeeking || !!cutDrag;
 }

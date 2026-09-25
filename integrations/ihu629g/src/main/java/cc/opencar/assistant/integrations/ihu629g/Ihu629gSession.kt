@@ -17,7 +17,10 @@ import cc.opencar.assistant.api.WellKnownProperties
 import cc.opencar.assistant.integrations.common.AospVehicleIds
 import cc.opencar.assistant.integrations.common.CarPropertyBackend
 import cc.opencar.assistant.integrations.common.PlatformConfig
+import cc.opencar.assistant.integrations.common.SessionEventFanout
 import cc.opencar.assistant.integrations.common.VehiclePropertyBackend
+import cc.opencar.assistant.integrations.common.entityByProp
+import cc.opencar.assistant.integrations.common.toPropertyValue
 import cc.opencar.assistant.integrations.common.wellKnownByKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +34,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -38,6 +42,7 @@ import kotlinx.coroutines.launch
  * EX2 / IHU629G session — VHAL via [CarPropertyBackend].
  * No VenusVehicleServer on this HU.
  */
+@OptIn(kotlinx.coroutines.FlowPreview::class)
 class Ihu629gSession(
     private val context: Context,
     private val platform: PlatformConfig,
@@ -51,24 +56,46 @@ class Ihu629gSession(
     private val _variant = MutableStateFlow(initialVariant)
     override val variant: StateFlow<PlatformVariant> = _variant.asStateFlow()
     private val _telemetry = MutableStateFlow(TelemetrySnapshot())
-    private val _events = MutableSharedFlow<VehicleEvent>(extraBufferCapacity = 8)
-    private var lastGear: Int? = null
-    private var pollJob: Job? = null
+    private val _events = MutableSharedFlow<VehicleEvent>(extraBufferCapacity = 64)
+    private val fanout = SessionEventFanout(_telemetry, _events)
+    private var telemetryJob: Job? = null
+    private var entityObserveJob: Job? = null
+
+    private val entityByProp: Map<Int, String> = platform.entityByProp()
 
     override val integrationId: String = Ihu629gIntegration.ID
 
     init {
-        pollJob = scope.launch {
-            _events.emit(VehicleEvent.Boot)
-            while (isActive) {
-                val snap = readSnapshot()
-                _telemetry.value = snap
-                val gear = snap.gear
-                if (gear != null && gear != lastGear) {
-                    if (lastGear != null) _events.emit(VehicleEvent.GearChanged(gear))
-                    lastGear = gear
+        scope.launch { _events.emit(VehicleEvent.Boot) }
+        val propIds = platform.bindings.values.map { it.nativeId }.distinct().toIntArray()
+        val observe = backend.observe(propIds.takeIf { it.isNotEmpty() })
+        if (observe != null) {
+            Log.i(TAG, "telemetry: observe (push) mode")
+            telemetryJob = scope.launch {
+                try {
+                    fanout.publishTelemetry(readSnapshot())
+                } catch (_: Throwable) { /* best-effort */ }
+                observe.debounce(150).collect {
+                    try {
+                        fanout.publishTelemetry(readSnapshot())
+                    } catch (_: Throwable) { /* best-effort */ }
                 }
-                delay(1000)
+            }
+            entityObserveJob = scope.launch {
+                observe.collect { update -> fanout.onPropertyUpdate(update, entityByProp) }
+            }
+        } else {
+            Log.i(TAG, "telemetry: poll mode (1s)")
+            telemetryJob = scope.launch {
+                while (isActive) {
+                    try {
+                        fanout.publishTelemetry(readSnapshot())
+                        fanout.emitBoundSnapshots(platform.bindings) { id, area ->
+                            backend.read(id, area)
+                        }
+                    } catch (_: Throwable) { /* best-effort */ }
+                    delay(POLL_MS)
+                }
             }
         }
     }
@@ -124,9 +151,16 @@ class Ihu629gSession(
         else Result.failure(IllegalStateException("VHAL write failed"))
     }
 
-    override fun catalog(): List<CatalogEntry> = emptyList()
+    override fun catalog(): List<CatalogEntry> = platform.catalogEntries()
+
+    override fun entityBindings(): Map<Long, String> =
+        platform.bindings.entries.associate { (entityId, b) ->
+            b.nativeId.toLong() to entityId
+        }
 
     override fun hasBinding(property: VehicleProperty): Boolean = resolve(property) != null
+
+    override fun androidVolumeGroups() = platform.androidVolumeGroups()
 
     override fun cameras(): List<CameraSource> {
         return try {
@@ -141,7 +175,8 @@ class Ihu629gSession(
     override fun dvrStreamConfig(): DvrStreamConfig = platform.dvr
 
     override fun close() {
-        pollJob?.cancel()
+        telemetryJob?.cancel()
+        entityObserveJob?.cancel()
         scope.cancel()
         backend.close()
     }
@@ -233,6 +268,7 @@ class Ihu629gSession(
 
     companion object {
         private const val TAG = "Ihu629gSession"
+        private const val POLL_MS = 1000L
 
         private fun wellKnownBindings(platform: PlatformConfig): Map<VehicleProperty, Pair<Int, Int>> {
             val out = mutableMapOf<VehicleProperty, Pair<Int, Int>>()

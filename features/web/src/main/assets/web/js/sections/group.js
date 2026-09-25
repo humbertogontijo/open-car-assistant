@@ -22,6 +22,8 @@ var FAMILY_ORDER = [
   "light",
   "hud",
   "sensor",
+  "device_tracker",
+  "media_player",
   "android",
   "extra",
 ];

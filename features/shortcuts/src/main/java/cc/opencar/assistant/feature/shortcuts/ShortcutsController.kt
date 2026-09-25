@@ -30,7 +30,7 @@ class ShortcutsController(
     actionHandlers: Map<String, ShortcutActionHandler> = emptyMap(),
     triggerSources: List<ShortcutTriggerSource> = emptyList(),
     private val readEntity: (suspend (String) -> String?)? = null,
-    readGear: (suspend () -> Int?)? = null,
+    private val readGear: (suspend () -> Int?)? = null,
 ) {
     val store = ShortcutStore.get(context)
     val sceneStore = SceneStore.get(context)
@@ -51,6 +51,8 @@ class ShortcutsController(
         return result
     }
 
+    private lateinit var wifiMonitor: WifiSsidMonitor
+
     val runner = ShortcutRunner(
         context = context,
         setControl = ::trackedSetControl,
@@ -61,9 +63,13 @@ class ShortcutsController(
             else sceneEngine.setActive(sceneId, active)
         },
         getRoutine = { id -> store.getRoutine(id) },
+        readEntity = readEntity,
+        readGear = readGear,
+        readWifiSsid = {
+            if (::wifiMonitor.isInitialized) wifiMonitor.currentSsid() else null
+        },
     )
 
-    private lateinit var wifiMonitor: WifiSsidMonitor
     private var entityWatcher: EntityValueWatcher? = null
     val engine: ShortcutTriggerEngine
 
@@ -84,6 +90,7 @@ class ShortcutsController(
                 store = store,
                 readEntity = readEntity,
                 onChanged = { id, value -> engine.onEntityChanged(id, value) },
+                events = session.events(),
             )
         }
     }
@@ -280,6 +287,11 @@ class ShortcutsController(
         val actions = actionsRaw?.mapNotNull { ShortcutAction.fromMap(it) }
             ?: base?.actions
             ?: emptyList()
+        @Suppress("UNCHECKED_CAST")
+        val conditionsRaw = body["conditions"] as? List<Map<*, *>>
+        val conditions = conditionsRaw?.mapNotNull { ShortcutCondition.fromMap(it) }
+            ?: base?.conditions
+            ?: emptyList()
         val uiCard = if (body.containsKey("uiCard")) {
             UiCardSpec.fromAny(body["uiCard"])
         } else {
@@ -293,6 +305,7 @@ class ShortcutsController(
                 icon = icon,
                 enabled = enabled,
                 actions = actions.take(ShortcutAction.MAX_ACTIONS),
+                conditions = conditions,
                 uiCard = uiCard,
             ),
         )

@@ -65,6 +65,7 @@ internal fun Routing.registerDebugRoutes(deps: OcaWebDeps) {
                         "areaId" to it.areaId,
                         "value" to it.value,
                         "message" to it.message,
+                        "entity" to it.entity,
                     )
                 },
             ),
@@ -164,6 +165,7 @@ internal fun Routing.registerDebugRoutes(deps: OcaWebDeps) {
                     },
                     "value" to (outcome as? cc.opencar.assistant.api.ReadOutcome.Ok)?.value?.display(),
                     "permission" to (outcome as? cc.opencar.assistant.api.ReadOutcome.Denied)?.permission,
+                    "entity" to it.property.nativeId?.let { id -> session.entityBindings()[id] },
                 )
             },
         )
@@ -325,7 +327,7 @@ internal fun htmlDebug(debug: ContributorDebugState): String = """
     <h1>Contributor debug</h1>
     <p>Token: <code>${if (debug.contributorMode) debug.token else "(disabled)"}</code></p>
     <p>ADB: <code>${debug.adbHint()}</code></p>
-    <p>Lab UI: <a href="/?section=lab">/?section=lab</a> · <a href="/api/lab">/api/lab</a></p>
+    <p>Lab UI: <a href="/lab">/lab</a> · <a href="/api/lab">/api/lab</a></p>
     <ul>
       <li><a href="/">Product UI</a></li>
       <li><a href="/debug/adb-hint">/debug/adb-hint</a></li>

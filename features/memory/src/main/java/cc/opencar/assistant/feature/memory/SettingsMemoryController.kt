@@ -125,6 +125,13 @@ class SettingsMemoryController(
         // Android (non-VHAL) — applied via ExternalSettingsApplier
         "android_wifi" to null,
         "android_bluetooth" to null,
+        "android_brightness" to null,
+        "media_player_vehicle" to null,
+        "cabin_vol_media" to null,
+        "cabin_vol_navigation" to null,
+        "cabin_vol_voice" to null,
+        "cabin_vol_call" to null,
+        "cabin_vol_ring" to null,
     )
 
     fun start() {
