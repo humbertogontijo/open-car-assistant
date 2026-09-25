@@ -38,7 +38,7 @@ class SettingsMemoryController(
     private val applyControl: suspend (id: String, raw: String) -> Result<Unit>,
     /** Live value for capture / snapshot. */
     private val readControl: suspend (id: String) -> String?,
-    /** Extra pin ids not in [EntityRegistry] (android_*, cabin_vol_*, …). */
+    /** Extra pin ids not in [EntityRegistry] (`switch.wifi`, `number.vol_*`, …). */
     extraPinIds: Collection<String> = emptyList(),
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

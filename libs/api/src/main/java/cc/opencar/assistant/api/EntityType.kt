@@ -4,8 +4,12 @@ package cc.opencar.assistant.api
  * Product entity domains used by the web shell to pick card templates.
  *
  * Entity ids follow Home Assistant shape: `domain.object_id`
- * (e.g. `cover.window_driver`, `switch.mirror_fold`, `climate.cabin`).
+ * (e.g. `cover.window_driver`, `switch.wifi`, `climate.cabin`).
  * Legacy bare / pre-cover ids resolve via [fromId] and [EntityRegistry] aliases.
+ *
+ * Domain taxonomy is AAOS + CarPlay Ultra–led — see `docs/domains.md`.
+ * There is no `android` product domain; HU radios/brightness/volumes use
+ * [SWITCH] / [NUMBER] / [MEDIA_PLAYER] with nav groups `connect` / `display` / `sound`.
  */
 enum class EntityType(val id: String) {
     // --- Composites (multi-property) ---
@@ -20,10 +24,12 @@ enum class EntityType(val id: String) {
     STEERING("steering"),
     CAMERA("camera"),
 
-    // --- Cover / fan / lock ---
+    // --- Cover / fan / lock / seat ---
     COVER("cover"),
     FAN("fan"),
     LOCK("lock"),
+    /** Planned: AAOS `SEAT_*` / CarPlay Ultra Seat — promote when position/memory is bound. */
+    SEAT("seat"),
 
     // --- Atomic widgets ---
     SWITCH("switch"),
@@ -32,7 +38,6 @@ enum class EntityType(val id: String) {
     SENSOR("sensor"),
 
     // --- Platform / virtual ---
-    ANDROID("android"),
     DEVICE_TRACKER("device_tracker"),
     EXTRA("extra"),
     ;
@@ -47,7 +52,8 @@ enum class EntityType(val id: String) {
                 "brake" -> CHASSIS
                 "charging" -> CHARGER
                 "ambient_light" -> LIGHT
-                "adas", "seat" -> SWITCH
+                "adas" -> SWITCH
+                "seat" -> SEAT
                 "window", "trunk", "hood", "sunroof", "door", "mirror" -> COVER
                 else -> EXTRA
             }

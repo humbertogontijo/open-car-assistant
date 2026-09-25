@@ -27,9 +27,9 @@ function volumeLabel(v) {
   return t(v.labelKey || "cameras.storage.app", v.label || v.id || "");
 }
 
-/** Android / OS entities + helpers (not VHAL). Legacy `connect` deep-links here. */
-export function pageAndroid() {
-  const group = "android";
+/** Connection / HU helpers page (wifi, bt, ADB, storage). */
+export function pageConnect() {
+  const group = "connect";
   const viewing = isShowingHidden(group);
   const items = viewing
     ? hiddenEntitiesByGroup(group)
@@ -64,14 +64,14 @@ export function pageAndroid() {
             <div class="row" style="justify-content:space-between;margin:0 0 4px;gap:8px">
               <strong style="min-width:0">${volumeLabel(v)}</strong>
               ${v.writable === false
-                ? html`<span class="badge warn">${t("android.storage.readonly", "Read-only")}</span>`
+                ? html`<span class="badge warn">${t("connect.storage.readonly", "Read-only")}</span>`
                 : nothing}
             </div>
             <div class="storage-bar" title=${pct + "%"}>
               <div class="storage-bar-fill" style="width:${pct}%"></div>
             </div>
             <p class="sub" style="margin:4px 0 0">
-              ${t("android.storage.used_free", "{used} used · {free} free of {total}")
+              ${t("connect.storage.used_free", "{used} used · {free} free of {total}")
                 .replace("{used}", fmtBytes(used))
                 .replace("{free}", fmtBytes(free))
                 .replace("{total}", fmtBytes(total))}
@@ -79,13 +79,13 @@ export function pageAndroid() {
           </li>`;
         })}
       </ul>`
-    : html`<p class="persist-note">${t("android.storage.empty", "No volumes reported")}</p>`;
+    : html`<p class="persist-note">${t("connect.storage.empty", "No volumes reported")}</p>`;
 
   return html`
     ${pageHead(
-      t("section.android.title", "Android"),
+      t("section.connect.title", "Connection"),
       group,
-      t("section.android.sub", "Radios, media, brightness, and system helpers"),
+      t("section.connect.sub", "Radios, ADB, storage, and system helpers"),
     )}
     ${familySections(items, viewing ? { restore: true } : null)}
     ${viewing
@@ -99,7 +99,7 @@ export function pageAndroid() {
       })}
       ${prefCard({
         icon: "system",
-        title: t("android.storage", "Storage"),
+        title: t("connect.storage", "Storage"),
         body: storageBody,
       })}
       ${prefCard({

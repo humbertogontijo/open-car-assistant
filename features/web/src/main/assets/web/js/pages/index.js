@@ -5,7 +5,7 @@ import { pageEnergy, loadEnergyDash } from "./energy.js";
 import { pageControls } from "./controls.js";
 import { pageDrive } from "./drive.js";
 import { pageSound, loadSounds } from "./sound.js";
-import { pageAndroid } from "./connect.js";
+import { pageConnect } from "./connect.js";
 import { pageAssistant } from "./assistant.js";
 import { pageCameras, loadRecordings, startCameraLive, stopCameraLive, applyCameraPlayerSrc, isTimelineBusy } from "./cameras.js";
 import { pageHistory, loadHistoryPoints } from "./history.js";
@@ -23,7 +23,7 @@ export {
   pageControls,
   pageDrive,
   pageSound,
-  pageAndroid,
+  pageConnect,
   pageAssistant,
   pageCameras,
   pageHistory,
@@ -62,9 +62,7 @@ export function pageView(page) {
       return pageGroup(t("section.display.title", "Tela"), "", "display");
     },
     sound: pageSound,
-    android: pageAndroid,
-    // Legacy nav / deep-link id
-    connect: pageAndroid,
+    connect: pageConnect,
     vehicle: function () {
       return pageGroup(t("section.vehicle.title", "Meu Veículo"), "", "vehicle");
     },

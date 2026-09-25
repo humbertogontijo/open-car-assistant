@@ -13,7 +13,6 @@ export const PAGE_IDS = [
   "assistant",
   "display",
   "sound",
-  "android",
   "connect",
   "vehicle",
   "cameras",

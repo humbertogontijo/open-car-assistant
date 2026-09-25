@@ -185,7 +185,11 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
             AndroidSettingsController.ID_BT,
             -> {
                 val on = value == "1" || value.equals("true", true) || value.equals("on", true)
-                if (id == AndroidSettingsController.ID_WIFI) android.setWifi(on) else android.setBluetooth(on)
+                if (id == AndroidSettingsController.ID_WIFI) {
+                    android.setWifi(on)
+                } else {
+                    android.setBluetooth(on)
+                }
             }
             AndroidSettingsController.ID_BRIGHTNESS -> {
                 val n = value.toIntOrNull()

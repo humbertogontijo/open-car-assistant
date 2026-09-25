@@ -11,7 +11,6 @@ const ICON_MAP = {
   display: "i-hud",
   sound: "i-sound",
   connect: "i-usb",
-  android: "i-system",
   vehicle: "i-sensor",
   history: "i-history",
   safety: "i-safety",

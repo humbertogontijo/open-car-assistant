@@ -26,7 +26,7 @@ var FAMILY_ORDER = [
   "number",
   "sensor",
   "device_tracker",
-  "android",
+  "seat",
   "extra",
 ];
 

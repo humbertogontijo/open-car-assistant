@@ -72,32 +72,32 @@
       {
         "groupId": 0,
         "settingsKey": "android.car.VOLUME_GROUP/0",
-        "entity": "cabin_vol_media",
+        "entity": "number.vol_media",
         "access": "rw",
         "writeVia": "media_keyevent"
       },
       {
         "groupId": 2,
         "settingsKey": "android.car.VOLUME_GROUP/2",
-        "entity": "cabin_vol_navigation",
+        "entity": "number.vol_navigation",
         "access": "r"
       },
       {
         "groupId": 6,
         "settingsKey": "android.car.VOLUME_GROUP/6",
-        "entity": "cabin_vol_voice",
+        "entity": "number.vol_voice",
         "access": "r"
       },
       {
         "groupId": 3,
         "settingsKey": "android.car.VOLUME_GROUP/3",
-        "entity": "cabin_vol_call",
+        "entity": "number.vol_call",
         "access": "r"
       },
       {
         "groupId": 7,
         "settingsKey": "android.car.VOLUME_GROUP/7",
-        "entity": "cabin_vol_ring",
+        "entity": "number.vol_ring",
         "access": "r"
       }
     ]

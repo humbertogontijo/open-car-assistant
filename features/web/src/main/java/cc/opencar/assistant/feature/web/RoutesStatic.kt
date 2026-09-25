@@ -22,7 +22,6 @@ private val SPA_PAGES = setOf(
     "assistant",
     "display",
     "sound",
-    "android",
     "connect",
     "vehicle",
     "cameras",

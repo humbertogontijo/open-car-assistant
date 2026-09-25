@@ -80,8 +80,10 @@ data class CameraRoleConfig(
 }
 
 /**
- * Cabin [CarVolumeGroup] declared in `platform.json` → `android.volumeGroups`.
- * Shared Android settings stay in `platform/android.json`; OEM group maps overlay per integration.
+ * Cabin [CarVolumeGroup] declared in `platform.json` → `android.volumeGroups`
+ * (AAOS transport fragment). Shared HU settings stay in `platform/android.json`;
+ * OEM group maps overlay per integration. Product entity ids are HA-shaped
+ * (`number.vol_media`, …) — see `docs/domains.md`.
  */
 data class AndroidVolumeGroup(
     val groupId: Int,

@@ -117,6 +117,8 @@ object EntityRegistry {
         // Zones: Antora HVAC_TEMPERATURE_SET is a single area (driver). Multi-zone
         // cabin climate would be extra climate.* entities (like covers) when a
         // platform lists multiple temp areas — not invented heat/cool modes.
+        // AAOS/Ultra attrs: power, temperature, current_temperature, fan_mode,
+        // fan_direction, ac, auto, recirc; dual/SYNC when HVAC_DUAL_ON is bound.
         attributes = mapOf(
             "power" to "hvac_power",
             "temperature" to "hvac_temp_c",

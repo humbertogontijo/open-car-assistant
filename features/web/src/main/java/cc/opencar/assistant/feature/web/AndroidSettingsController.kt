@@ -23,12 +23,14 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * Android radios, brightness, and HA-style media_player for automations.
+ * HU radios, brightness, and HA-style media_player for automations.
  *
- * Media: [OcaNotificationListener] / MediaController for now-playing metadata;
- * [KeyEventInject] for transport + cabin volume writes; [CarAudioVolume] for level read.
+ * Product domains are platform-agnostic ([EntityType.SWITCH] / [EntityType.NUMBER] /
+ * [EntityType.MEDIA_PLAYER]) — see `docs/domains.md`. This controller talks to Android
+ * Settings / CarAudio; the catalog ids it emits are portable (`switch.wifi`, …).
  *
  * Cabin volume groups come from `platform.json` → `android.volumeGroups` (via [volumeGroups]).
+ * The `android` JSON key is the AAOS transport fragment, not a product domain.
  */
 class AndroidSettingsController(
     private val context: Context,
@@ -327,31 +329,32 @@ class AndroidSettingsController(
         val wifiBt = listOf(
             boolEntity(
                 id = ID_WIFI,
-                labelKey = "control.android.wifi",
-                hintKey = "control.android.wifi.hint",
+                labelKey = "control.${ID_WIFI}",
+                hintKey = "control.${ID_WIFI}.hint",
                 enabled = st["wifiEnabled"] == true,
                 available = st["wifiAvailable"] == true,
                 pin = persist[ID_WIFI],
-                group = "android",
+                group = "connect",
             ),
             boolEntity(
                 id = ID_BT,
-                labelKey = "control.android.bluetooth",
-                hintKey = "control.android.bluetooth.hint",
+                labelKey = "control.${ID_BT}",
+                hintKey = "control.${ID_BT}.hint",
                 enabled = st["bluetoothEnabled"] == true,
                 available = st["bluetoothAvailable"] == true,
                 pin = persist[ID_BT],
-                group = "android",
+                group = "connect",
             ),
         )
 
         val brightnessEntity = EntityContract.enrich(
             mapOf(
                 "id" to ID_BRIGHTNESS,
-                "group" to "android",
-                "entity" to EntityType.ANDROID.id,
-                "labelKey" to "control.android.brightness",
-                "hintKey" to "control.android.brightness.hint",
+                "group" to "display",
+                "entity" to EntityType.NUMBER.id,
+                "domain" to EntityType.NUMBER.id,
+                "labelKey" to "control.${ID_BRIGHTNESS}",
+                "hintKey" to "control.${ID_BRIGHTNESS}.hint",
                 "input" to "int",
                 "icon" to "display",
                 "writable" to canWrite,
@@ -402,11 +405,11 @@ class AndroidSettingsController(
         val mediaPlayerEntity = EntityContract.enrich(
             mapOf(
                 "id" to ID_MEDIA_PLAYER,
-                "group" to "android",
+                "group" to "sound",
                 "entity" to EntityType.MEDIA_PLAYER.id,
                 "domain" to EntityType.MEDIA_PLAYER.id,
-                "labelKey" to "control.media_player.vehicle",
-                "hintKey" to "control.media_player.vehicle.hint",
+                "labelKey" to "control.${ID_MEDIA_PLAYER}",
+                "hintKey" to "control.${ID_MEDIA_PLAYER}.hint",
                 "input" to "media_player",
                 "icon" to "sound",
                 "writable" to true,
@@ -440,7 +443,8 @@ class AndroidSettingsController(
                 mapOf(
                     "id" to def.entityId,
                     "group" to "sound",
-                    "entity" to EntityType.ANDROID.id,
+                    "entity" to EntityType.NUMBER.id,
+                    "domain" to EntityType.NUMBER.id,
                     "labelKey" to "control.${def.entityId}",
                     "hintKey" to "control.${def.entityId}.hint",
                     "input" to "int",
@@ -479,7 +483,8 @@ class AndroidSettingsController(
             mapOf(
                 "id" to id,
                 "group" to group,
-                "entity" to EntityType.ANDROID.id,
+                "entity" to EntityType.SWITCH.id,
+                "domain" to EntityType.SWITCH.id,
                 "labelKey" to labelKey,
                 "hintKey" to hintKey,
                 "input" to "bool",
@@ -513,11 +518,12 @@ class AndroidSettingsController(
 
     companion object {
         private const val TAG = "AndroidSettings"
-        const val ID_WIFI = "android.wifi"
-        const val ID_BT = "android.bluetooth"
-        const val ID_BRIGHTNESS = "android.brightness"
+        const val ID_WIFI = "switch.wifi"
+        const val ID_BT = "switch.bluetooth"
+        const val ID_BRIGHTNESS = "number.brightness"
         /** HU active media session — HA-style media_player domain. */
         const val ID_MEDIA_PLAYER = "media_player.vehicle"
+
         private const val BRIGHTNESS_MIN = 1
         private const val BRIGHTNESS_MAX = 255
         /** Pause(1)|Prev(16)|Next(32)|Stop(4096)|Play(16384)|Volume(4) — HA subset. */

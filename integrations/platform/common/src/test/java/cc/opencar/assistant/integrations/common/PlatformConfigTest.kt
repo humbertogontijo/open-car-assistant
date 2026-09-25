@@ -30,7 +30,7 @@ class PlatformConfigTest {
         assertEquals("front", cfg.cameras.first().role)
         assertEquals("0", cfg.cameras.first().cameraId)
         assertTrue(cfg.properties.size >= 100)
-        assertTrue(cfg.android.volumeGroups.any { it.entity == "cabin_vol_media" })
+        assertTrue(cfg.android.volumeGroups.any { it.entity == "number.vol_media" })
         assertTrue(cfg.catalogEntries().isNotEmpty())
         assertEquals(
             cfg.writableAllowlist.size,
@@ -49,7 +49,7 @@ class PlatformConfigTest {
         assertEquals(570491136, cfg.bindings.getValue("drive_mode").nativeId)
         assertTrue(cfg.driveModeEnum.containsKey(570491137))
         assertTrue(605029888 in cfg.writableAllowlist)
-        assertTrue(cfg.android.settings.any { it.entity == "android_wifi" })
+        assertTrue(cfg.android.settings.any { it.entity == "switch.wifi" })
     }
 
     @Test
@@ -105,7 +105,7 @@ class PlatformConfigTest {
               {
                 "android": {
                   "settings": [
-                    { "settingsKey": "wifi_on", "entity": "android_wifi", "access": "rw" }
+                    { "settingsKey": "wifi_on", "entity": "switch.wifi", "access": "rw" }
                   ],
                   "volumeGroups": []
                 }
@@ -134,7 +134,7 @@ class PlatformConfigTest {
                 "volumeGroups": [
                   {
                     "groupId": 0,
-                    "entity": "cabin_vol_media",
+                    "entity": "number.vol_media",
                     "access": "rw",
                     "writeVia": "media_keyevent"
                   }
@@ -150,9 +150,9 @@ class PlatformConfigTest {
         assertEquals("hvac_power", power.entity)
         assertEquals("rw", power.access)
         assertTrue(power.canWrite)
-        assertTrue(cfg.android.settings.any { it.entity == "android_wifi" })
+        assertTrue(cfg.android.settings.any { it.entity == "switch.wifi" })
         assertEquals(1, cfg.android.volumeGroups.size)
-        assertEquals("cabin_vol_media", cfg.android.volumeGroups.first().entity)
+        assertEquals("number.vol_media", cfg.android.volumeGroups.first().entity)
     }
 
     @Test

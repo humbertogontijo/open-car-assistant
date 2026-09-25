@@ -1,6 +1,11 @@
-# Car-native composites & covers
+# Car-native composites & covers (Antora)
+
+Canonical domain field inventories (AAOS + CarPlay Ultra) live in **[domains.md](domains.md)**.
+This page keeps **platform-specific** Antora binding notes, HVAC zones, and Wave tables.
 
 Product controls are **composites** (multi-property systems), **covers** (open/close + optional position), or thin **widget** atomics (`switch` / `select` / `number` / `sensor`). Entity ids are Home Assistant–shaped: `domain.object_id`.
+
+HU radios / brightness / cabin volumes are **not** an `android` product domain — they use `switch.wifi`, `switch.bluetooth`, `number.brightness`, `number.vol_*` (transport still comes from `platform/android.json`). See [domains.md](domains.md) § HU settings.
 
 ## Composites
 
@@ -43,6 +48,7 @@ HVAC extras as atomics (not climate attrs): `switch.hvac_max_defrost`, `hvac_max
 | `hud` | `hud.main` | `hud_active` / `snow` / `ar` + Wave-1 `hud_display_mode`, `hud_angle` |
 | `light` | `light.ambient` | `color` ← `ambience_main_color`, `brightness` ← `ambience_intensity` |
 | `camera` | `camera.front` / `rear` / `left` / `right` | Camera2 via `platform.json` → `cameras[]` (not VHAL); mosaic is DVR-only |
+| `seat` | *(planned)* | AAOS `SEAT_*` when position/memory is productized — see [domains.md](domains.md) |
 
 ## Covers
 
@@ -55,7 +61,7 @@ HVAC extras as atomics (not climate attrs): `switch.hvac_max_defrost`, `hvac_max
 
 Sibling atomics: `switch.window_lock`, `switch.auto_close_window`, `switch.sunroof_tilt`, `number.trunk_open_height`.
 
-Mirrors are atomics (`switch.mirror_fold`, `switch.mirror_auto_fold`). Doors are not product entities on Antora: `DOOR_POS` is ajar-only, `DOOR_MOVE` is the liftgate, lock UX is `switch.central_lock`.
+Mirrors are atomics (`switch.mirror_fold`, `switch.mirror_auto_fold`). Doors are not product entities on Antora: `DOOR_POS` is ajar-only, `DOOR_MOVE` is the liftgate, lock UX is `lock.central`.
 
 Legacy aliases (`climate`, `hvac_power`, `window.driver`, …) resolve via `EntityRegistry.resolve` / `aliasAttribute`.
 
@@ -73,7 +79,7 @@ Legacy aliases (`climate`, `hvac_power`, `window.driver`, …) resolve via `Enti
 | `HVAC_AUTO_RECIRC_ON` | `0x15200512` | `hvac_auto_recirc` | `climate.cabin.auto_recirc` | rw |
 | `HVAC_FUNC_AUTO_SEAT_VENTILATION` | `0x254070b5` | `hvac_auto_seat_vent` | `climate.cabin.auto_seat_vent` | rw |
 | `CHARGE_FUNC_EXTERNAL_CHARGING_LIGHT` | `0x2120727c` | `charge_external_light` | `charger.vehicle.external_light` | rw |
-| `WINDOW_LOCK` / `WINDOW_POS` | `0x13200bc4` / `0x13400bc0` | `window_lock` / `window_pos` | `switch.window_lock` / `cover.window_*` | rw |
+| `WINDOW_LOCK` / `WINDOW_POS` | `0x13200bc4` / `0x13400bc0` | `window_lock` / `window_pos` | `lock.windows` / `cover.window_*` | rw |
 | `DOOR_MOVE` | `0x16400b01` | `trunk_move` | `cover.trunk` (OPEN=1 CLOSE=0) | rw |
 | `BCM_FUNC_TRUNK_DOOR_STATUS` | `0x214073bc` | `trunk_status` | `cover.trunk` readback | rw |
 | `BCM_FUNC_SUNROOF_TILT` | `0x23207156` | `sunroof_tilt` | `switch.sunroof_tilt` | rw |
@@ -93,7 +99,7 @@ Access values restored from the HU `CarPropertyConfig` dump when promoting (`rw`
 
 ## AdaptAPI gaps
 
-AdaptAPI FUNC names often match `platform.json` `key`, but some AutoSettings FUNCs have **no VHAL id** on this HU yet. Do not invent hex IDs.
+AdaptAPI FUNC names often match `platform.json` `key`, but some AutoSettings FUNCs have **no VHAL id** on this HU yet. Do not invent hex IDs. Vendor prefix → domain mapping is in [domains.md](domains.md) § Vendor AdaptAPI prefixes.
 
 ## Exterior UI
 

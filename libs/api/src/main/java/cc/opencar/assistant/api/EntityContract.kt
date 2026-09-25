@@ -45,6 +45,10 @@ package cc.opencar.assistant.api
  *
  * MQTT / HA outbound discovery may publish these fields later; inbound HA bridge
  * remains [plugins/homeassistant].
+ *
+ * Domain taxonomy (AAOS + CarPlay Ultra field inventories): `docs/domains.md`.
+ * There is no `android` product domain — HU radios/brightness/volumes use
+ * `switch` / `number` / `media_player` with nav groups `connect` / `display` / `sound`.
  */
 object EntityContract {
     const val FIELD_ID = "id"

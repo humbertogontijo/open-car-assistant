@@ -17,6 +17,10 @@ import org.json.JSONObject
  *
  * Shared fragments live under `platform/<name>.json` (e.g. aosp, android) and are pulled in
  * via `"extends": ["aosp", "android"]`.
+ *
+ * The `android` fragment (`platform/android.json`) is an **AAOS HU settings transport**
+ * (Settings keys + volumeGroups) — not a product entity domain. Product ids use
+ * `switch.wifi` / `number.brightness` / `number.vol_*` (see `docs/domains.md`).
  */
 data class PlatformConfig(
     val id: String,
