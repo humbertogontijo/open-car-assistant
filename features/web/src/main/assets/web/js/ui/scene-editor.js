@@ -1,0 +1,297 @@
+import { html, nothing } from "../lit.js";
+import { live } from "../lit.js";
+import { repeat } from "../lit.js";
+import { api } from "../api.js";
+import { state, notify } from "../store.js";
+import { prefCard, boolToggle, choiceSelect, boolOpts } from "./cards.js";
+import { t } from "../i18n.js";
+
+function writableControls() {
+  return (state.controls || state.entities || []).filter(function (c) {
+    return c && c.writable !== false && !c.virtual;
+  });
+}
+
+function controlById(id) {
+  if (!id) return null;
+  const list = writableControls();
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].id === id) return list[i];
+  }
+  return null;
+}
+
+/** Options for a control value, preferring API i18n labels (same as cards). */
+function valueOptionsForControl(c) {
+  if (!c) return null;
+  if (c.input === "bool") {
+    return boolOpts();
+  }
+  if (c.options && c.options.length) {
+    return c.options.map(function (o) {
+      return {
+        value: String(o.value),
+        label: o.label != null ? String(o.label) : String(o.value),
+      };
+    });
+  }
+  return null;
+}
+
+function blankTarget() {
+  return {
+    entityId: "",
+    onValue: "1",
+    off: { policy: "restore" },
+  };
+}
+
+function valueField(opts) {
+  const options = opts.options;
+  const current = opts.current != null ? String(opts.current) : "";
+  if (options && options.length) {
+    return choiceSelect({
+      options: options,
+      current: current,
+      choiceKey: opts.choiceKey,
+      onSelect: function (next) {
+        opts.onSelect(next);
+      },
+    });
+  }
+  return html`
+    <input
+      class="field"
+      style="width:100%;margin-top:4px"
+      .value=${live(current)}
+      @input=${function (ev) {
+        opts.onSelect(ev.target.value);
+      }}
+    />
+  `;
+}
+
+/**
+ * @param {object} opts
+ * @param {object} opts.edit - scene draft
+ * @param {function} opts.onChange - mutate + notify
+ * @param {function} opts.onSave
+ * @param {function} opts.onCancel
+ * @param {string} [opts.title]
+ */
+export function sceneEditorCard(opts) {
+  const edit = opts.edit || {};
+  const targets = edit.targets || [];
+  const controls = writableControls();
+
+  return prefCard({
+    icon: edit.icon || "climate",
+    title:
+      opts.title ||
+      (edit.id
+        ? t("scenes.edit", "Edit scene")
+        : t("scenes.new", "New scene")),
+    body: html`
+      <label class="hint">${t("shortcuts.name", "Name")}</label>
+      <input
+        class="field"
+        style="width:100%;margin:4px 0 12px"
+        .value=${live(edit.name || "")}
+        @input=${function (ev) {
+          edit.name = ev.target.value;
+          opts.onChange && opts.onChange();
+        }}
+      />
+      <div style="margin-bottom:12px">
+        ${boolToggle(edit.enabled !== false, function (val) {
+          edit.enabled = val === "1";
+          opts.onChange && opts.onChange();
+          notify();
+        })}
+      </div>
+      <h3 style="margin:0 0 8px;font-size:1rem">${t("scenes.targets", "Targets")}</h3>
+      <div>
+        ${repeat(
+          targets,
+          function (_, idx) {
+            return "st-" + idx;
+          },
+          function (raw, i) {
+            return targetRow(edit, raw, i, controls, opts);
+          },
+        )}
+      </div>
+      <button
+        class="btn"
+        type="button"
+        style="margin-top:4px"
+        @click=${function () {
+          edit.targets = (edit.targets || []).concat([blankTarget()]);
+          opts.onChange && opts.onChange();
+          notify();
+        }}
+      >
+        ${t("scenes.add_target", "Add target")}
+      </button>
+      <div class="row" style="gap:8px;margin-top:16px;width:100%">
+        <button
+          class="btn primary"
+          type="button"
+          style="flex:1"
+          @click=${function () {
+            opts.onSave && opts.onSave();
+          }}
+        >
+          ${t("shortcuts.save", "Save")}
+        </button>
+        <button
+          class="btn ghost"
+          type="button"
+          style="flex:1"
+          @click=${function () {
+            opts.onCancel && opts.onCancel();
+          }}
+        >
+          ${t("shortcuts.cancel", "Cancel")}
+        </button>
+      </div>
+    `,
+  });
+}
+
+function targetRow(edit, raw, i, controls, opts) {
+  const trow = raw || blankTarget();
+  const off = trow.off || { policy: "restore" };
+  const policy = off.policy === "set" ? "set" : "restore";
+  const ctrl = controlById(trow.entityId);
+  const valueOpts = valueOptionsForControl(ctrl);
+  return html`
+    <div class="shortcut-action" style="margin-bottom:10px;padding:10px;border:1px solid var(--border, #333);border-radius:8px">
+      ${choiceSelect({
+        options: controls.map(function (c) {
+          return { value: c.id, label: c.label || c.id };
+        }),
+        current: trow.entityId || "",
+        choiceKey: "scene-target-entity-" + i,
+        onSelect: function (next) {
+          edit.targets[i].entityId = next;
+          const c = controlById(next);
+          const optsFor = valueOptionsForControl(c);
+          if (optsFor && optsFor.length && !optsFor.some(function (o) {
+            return String(o.value) === String(edit.targets[i].onValue);
+          })) {
+            edit.targets[i].onValue = String(optsFor[0].value);
+          }
+          opts.onChange && opts.onChange();
+          notify();
+        },
+      })}
+      <label class="hint" style="margin-top:8px;display:block">${t("scenes.on_value", "On value")}</label>
+      <div style="margin-top:4px">
+        ${valueField({
+          options: valueOpts,
+          current: trow.onValue,
+          choiceKey: "scene-target-on-" + i,
+          onSelect: function (next) {
+            edit.targets[i].onValue = next;
+            opts.onChange && opts.onChange();
+            notify();
+          },
+        })}
+      </div>
+      <label class="hint" style="margin-top:8px;display:block">${t("scenes.off_policy", "Off")}</label>
+      <div style="margin-top:4px">
+        ${choiceSelect({
+          options: [
+            { value: "restore", label: t("scenes.off.restore", "Restore snapshot") },
+            { value: "set", label: t("scenes.off.set", "Set value") },
+          ],
+          current: policy,
+          choiceKey: "scene-target-off-" + i,
+          onSelect: function (next) {
+            if (next === "set") {
+              const def =
+                (valueOpts && valueOpts[0] && String(valueOpts[0].value)) || "0";
+              edit.targets[i].off = {
+                policy: "set",
+                value: (edit.targets[i].off && edit.targets[i].off.value) || def,
+              };
+            } else {
+              edit.targets[i].off = { policy: "restore" };
+            }
+            opts.onChange && opts.onChange();
+            notify();
+          },
+        })}
+      </div>
+      ${policy === "set"
+        ? html`
+            <label class="hint" style="margin-top:8px;display:block">${t("scenes.off_value", "Off value")}</label>
+            <div style="margin-top:4px">
+              ${valueField({
+                options: valueOpts,
+                current: off.value != null ? off.value : "0",
+                choiceKey: "scene-target-offval-" + i,
+                onSelect: function (next) {
+                  edit.targets[i].off = { policy: "set", value: next };
+                  opts.onChange && opts.onChange();
+                  notify();
+                },
+              })}
+            </div>
+          `
+        : nothing}
+      <button
+        class="btn ghost"
+        type="button"
+        style="margin-top:8px"
+        @click=${function () {
+          edit.targets.splice(i, 1);
+          opts.onChange && opts.onChange();
+          notify();
+        }}
+      >
+        ×
+      </button>
+    </div>
+  `;
+}
+
+export async function saveScene(edit) {
+  const body = {
+    id: edit.id || undefined,
+    name: (edit.name || "").trim() || "Scene",
+    icon: edit.icon || "climate",
+    enabled: edit.enabled !== false,
+    targets: (edit.targets || [])
+      .filter(function (x) {
+        return x && x.entityId;
+      })
+      .slice(0, 16)
+      .map(function (x) {
+        return {
+          entityId: x.entityId,
+          onValue: x.onValue != null ? String(x.onValue) : "0",
+          off:
+            x.off && x.off.policy === "set"
+              ? { policy: "set", value: String(x.off.value != null ? x.off.value : "0") }
+              : { policy: "restore" },
+        };
+      }),
+  };
+  const res = await api("/api/scenes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return res;
+}
+
+export function blankScene() {
+  return {
+    name: "",
+    enabled: true,
+    icon: "climate",
+    targets: [blankTarget()],
+  };
+}

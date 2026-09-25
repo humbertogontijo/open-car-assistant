@@ -103,7 +103,8 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
     get("/api/controls") {
         val hidden = deps.entityVisibility.hiddenIds()
         val includeHidden = call.request.queryParameters["includeHidden"] == "1"
-        val all = ControlCatalog.snapshot(session, context, memory).map { row ->
+        val virtual = deps.shortcuts?.virtualEntityMaps().orEmpty()
+        val all = (ControlCatalog.snapshot(session, context, memory) + virtual).map { row ->
             val id = row["id"] as? String
             row + ("hidden" to (id != null && id in hidden))
         }
@@ -112,7 +113,8 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
     get("/api/entities") {
         val hidden = deps.entityVisibility.hiddenIds()
         val includeHidden = call.request.queryParameters["includeHidden"] == "1"
-        val all = ControlCatalog.entities(session, context, memory, deps.androidSettings).map { row ->
+        val virtual = deps.shortcuts?.virtualEntityMaps().orEmpty()
+        val all = (ControlCatalog.entities(session, context, memory, deps.androidSettings) + virtual).map { row ->
             val id = row["id"] as? String
             row + ("hidden" to (id != null && id in hidden))
         }
@@ -120,7 +122,8 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
     }
     get("/api/entities/hidden") {
         val hidden = deps.entityVisibility.hiddenIds()
-        val all = ControlCatalog.entities(session, context, memory, deps.androidSettings)
+        val virtual = deps.shortcuts?.virtualEntityMaps().orEmpty()
+        val all = ControlCatalog.entities(session, context, memory, deps.androidSettings) + virtual
         call.respond(
             mapOf(
                 "ids" to hidden.toList().sorted(),
@@ -253,6 +256,16 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
                 else -> android.setBluetooth(on)
             }
             call.respond(mapOf("ok" to (result["ok"] == true), "error" to result["error"]))
+            return@post
+        }
+        val virtual = deps.shortcuts?.handleVirtualWrite(id, value)
+        if (virtual != null) {
+            call.respond(
+                mapOf(
+                    "ok" to (virtual["ok"] == true),
+                    "error" to virtual["error"],
+                ),
+            )
             return@post
         }
         val result = ControlCatalog.set(session, id, value, context)

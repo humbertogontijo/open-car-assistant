@@ -70,6 +70,15 @@ class DvrStorageMathTest {
     }
 
     @Test
+    fun isUnderDirectoryRejectsSiblingPrefix() {
+        val dir = File("/data/app/files")
+        assertTrue(DvrStorageMath.isUnderDirectory(File("/data/app/files/dvr/a.mp4"), dir))
+        assertTrue(DvrStorageMath.isUnderDirectory(File("/data/app/files"), dir))
+        assertFalse(DvrStorageMath.isUnderDirectory(File("/data/app/files2/a.mp4"), dir))
+        assertFalse(DvrStorageMath.isUnderDirectory(File("/data/app/files_backup/a.mp4"), dir))
+    }
+
+    @Test
     fun isDvrRecordingName() {
         assertTrue(DvrStorageMath.isDvrRecordingName("oca_dvr_20260101_120000.mp4"))
         assertFalse(DvrStorageMath.isDvrRecordingName("oca_dvr_x.mjpeg"))

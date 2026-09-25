@@ -15,6 +15,14 @@ object DvrStorageMath {
      */
     fun dvrDirUnder(storageRoot: File): File = File(storageRoot, SUBDIR_DVR)
 
+    /** True when [file] is [dir] or a descendant (canonical paths, separator-safe). */
+    fun isUnderDirectory(file: File, dir: File): Boolean {
+        val canon = runCatching { file.canonicalFile }.getOrNull() ?: return false
+        val root = runCatching { dir.canonicalFile }.getOrNull() ?: return false
+        val prefix = root.path
+        return canon.path == prefix || canon.path.startsWith(prefix + File.separator)
+    }
+
     /** True when [name] is a continuous DVR media file we still recognize. */
     fun isDvrRecordingName(name: String): Boolean {
         if (name.isBlank() || name.contains("..") || name.contains('/') || name.contains('\\')) {

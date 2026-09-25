@@ -6,11 +6,14 @@ import { state, notify } from "../store.js";
 import { prefCard, segmentToggle, choiceSelect, boolToggle, prefSegment } from "../ui/cards.js";
 import { runPref } from "../actions.js";
 import { t } from "../i18n.js";
+import { sceneEditorCard, saveScene, blankScene } from "../ui/scene-editor.js";
 
 var ignoreTypeClicksUntil = 0;
 
 function ensureShortcutsState() {
   if (!state.shortcuts) state.shortcuts = [];
+  if (!state.routines) state.routines = [];
+  if (!state.scenes) state.scenes = [];
   if (!state.shortcutSlots) state.shortcutSlots = {};
   if (!state.shortcutOverlay) state.shortcutOverlay = {};
   if (!state.shortcutApps) state.shortcutApps = [];
@@ -28,7 +31,18 @@ function ensureShortcutsState() {
     ];
   }
   if (state.shortcutEdit == null) state.shortcutEdit = null;
+  if (state.routineEdit == null) state.routineEdit = null;
+  if (state.sceneEdit == null) state.sceneEdit = null;
   if (state.shortcutMessage == null) state.shortcutMessage = null;
+  if (!state.shortcutsTab) state.shortcutsTab = "flows";
+}
+
+/** Active draft that owns the actions[] being edited (flow or routine). */
+function actionEditDraft() {
+  if (state.shortcutsTab === "routines" && state.routineEdit) return state.routineEdit;
+  if (state.shortcutEdit) return state.shortcutEdit;
+  if (state.routineEdit) return state.routineEdit;
+  return null;
 }
 
 export async function loadShortcuts() {
@@ -36,6 +50,8 @@ export async function loadShortcuts() {
   try {
     const res = await api("/api/shortcuts");
     state.shortcuts = (res && res.shortcuts) || [];
+    state.routines = (res && res.routines) || [];
+    state.scenes = (res && res.scenes) || [];
     state.shortcutSlots = (res && res.slots) || {};
     state.shortcutOverlay = (res && res.overlay) || {};
     state.shortcutWheelKeys = (res && res.wheelKeys) || state.shortcutWheelKeys;
@@ -151,6 +167,12 @@ function triggerLabel(tr) {
   tr = normalizeTrigger(tr);
   if (!tr || !tr.type) return "";
   if (tr.type === "boot") return t("shortcuts.trigger.boot", "Boot");
+  if (tr.type === "ui_card") {
+    return (
+      t("shortcuts.trigger.ui_card", "UI card") +
+      (tr.group ? ": " + tr.group : "")
+    );
+  }
   if (tr.type === "screen") {
     const on = tr.on !== false;
     return (
@@ -217,6 +239,12 @@ function actionLabel(a) {
   if (a.type === "set_control") return (a.entityId || "?") + "=" + (a.value || "");
   if (a.type === "launch_app") return a.packageName || "?";
   if (a.type === "delay_ms") return (a.ms || 0) + "ms";
+  if (a.type === "set_scene") {
+    const mode =
+      a.active === true ? "on" : a.active === false ? "off" : "toggle";
+    return "scene:" + (a.sceneId || "?") + " " + mode;
+  }
+  if (a.type === "run_routine") return "routine:" + (a.routineId || "?");
   if (a.type === "plugin") {
     const p = a.params || {};
     return (
@@ -237,6 +265,7 @@ function triggerTypeOptions() {
     { value: "wheel_key", label: t("shortcuts.trigger.wheel", "Wheel key") },
     { value: "wifi_ssid", label: t("shortcuts.trigger.wifi", "Wi‑Fi SSID") },
     { value: "entity_state", label: t("shortcuts.trigger.entity_state", "Entity") },
+    { value: "ui_card", label: t("shortcuts.trigger.ui_card", "UI card") },
   ];
   if (configuredPlugins().length) {
     opts.push({ value: "plugin", label: t("shortcuts.trigger.plugin", "Plugin") });
@@ -284,6 +313,8 @@ function gearOptions() {
 function actionTypeOptions() {
   const opts = [
     { value: "set_control", label: t("shortcuts.action.set_control", "Set control") },
+    { value: "set_scene", label: t("shortcuts.action.set_scene", "Set scene") },
+    { value: "run_routine", label: t("shortcuts.action.run_routine", "Run routine") },
     { value: "launch_app", label: t("shortcuts.action.launch_app", "Launch app") },
     { value: "delay_ms", label: t("shortcuts.action.delay", "Delay") },
   ];
@@ -313,6 +344,11 @@ function blankActionForType(next) {
   else if (next === "set_control") {
     blank.entityId = "";
     blank.value = "";
+  } else if (next === "set_scene") {
+    blank.sceneId = (state.scenes && state.scenes[0] && state.scenes[0].id) || "";
+    blank.active = true;
+  } else if (next === "run_routine") {
+    blank.routineId = (state.routines && state.routines[0] && state.routines[0].id) || "";
   } else if (next === "launch_app") {
     blank.packageName = "";
   } else if (next === "plugin") {
@@ -334,6 +370,7 @@ function blankTriggerForType(next) {
   if (next === "entity_state") return { type: "entity_state", entityId: "", value: "" };
   if (next === "gear") return { type: "gear", gear: 4 };
   if (next === "screen") return { type: "screen", on: true };
+  if (next === "ui_card") return { type: "ui_card", group: "assistant" };
   if (next === "plugin") {
     const plugins = pluginSelectOptions();
     const pid = plugins[0] && plugins[0].value;
@@ -378,7 +415,8 @@ function pluginParamsFields(pluginId, kind, name, params, index, indexKind) {
           placeholder=${key}
           .value=${live(val)}
           @input=${function (ev) {
-            const edit = state.shortcutEdit;
+            const edit =
+              indexKind === "action" ? actionEditDraft() : state.shortcutEdit;
             if (!edit) return;
             const row =
               indexKind === "action"
@@ -395,7 +433,8 @@ function pluginParamsFields(pluginId, kind, name, params, index, indexKind) {
 }
 
 function syncPluginParamsFromDom(index, indexKind) {
-  const edit = state.shortcutEdit;
+  const edit =
+    indexKind === "action" ? actionEditDraft() : state.shortcutEdit;
   if (!edit) return;
   const row =
     indexKind === "action" ? edit.actions[index] : edit.triggers[index];
@@ -429,7 +468,7 @@ function actionRow(a, i, controls, apps) {
         current: a.entityId || "",
         choiceKey: "sc-action-entity-" + i,
         onSelect: function (next) {
-          const edit = state.shortcutEdit;
+          const edit = actionEditDraft();
           if (!edit || !edit.actions[i]) return;
           edit.actions[i].type = "set_control";
           edit.actions[i].entityId = next;
@@ -444,11 +483,102 @@ function actionRow(a, i, controls, apps) {
         placeholder="value"
         .value=${live(a.value || "")}
         @input=${function (ev) {
-          if (state.shortcutEdit && state.shortcutEdit.actions[i]) {
-            state.shortcutEdit.actions[i].value = ev.target.value;
-          }
+          const edit = actionEditDraft();
+          if (edit && edit.actions[i]) edit.actions[i].value = ev.target.value;
         }}
       />
+    `;
+  } else if (a.type === "set_scene") {
+    const scenes = state.scenes || [];
+    mid = html`
+      ${choiceSelect({
+        options: scenes.map(function (s) {
+          return { value: s.id, label: s.name || s.id };
+        }),
+        current: a.sceneId || "",
+        choiceKey: "sc-action-scene-" + i,
+        onSelect: function (next) {
+          const edit = actionEditDraft();
+          if (!edit || !edit.actions[i]) return;
+          edit.actions[i].type = "set_scene";
+          edit.actions[i].sceneId = next;
+          ignoreTypeClicksUntil = Date.now() + 500;
+          notify();
+        },
+      })}
+      <div style="margin-top:8px">
+        ${choiceSelect({
+          options: [
+            { value: "on", label: t("scenes.active.on", "On") },
+            { value: "off", label: t("scenes.active.off", "Off") },
+            { value: "toggle", label: t("scenes.active.toggle", "Toggle") },
+          ],
+          current:
+            a.active === true ? "on" : a.active === false ? "off" : "toggle",
+          choiceKey: "sc-action-scene-mode-" + i,
+          onSelect: function (next) {
+            const edit = actionEditDraft();
+            if (!edit || !edit.actions[i]) return;
+            edit.actions[i].type = "set_scene";
+            edit.actions[i].active =
+              next === "on" ? true : next === "off" ? false : null;
+            ignoreTypeClicksUntil = Date.now() + 500;
+            notify();
+          },
+        })}
+      </div>
+      <button
+        class="btn ghost"
+        type="button"
+        style="margin-top:8px"
+        @click=${function () {
+          const sid =
+            (actionEditDraft() &&
+              actionEditDraft().actions[i] &&
+              actionEditDraft().actions[i].sceneId) ||
+            "";
+          state.shortcutsTab = "scenes";
+          openEditScene(sid || null);
+        }}
+      >
+        ${t("scenes.edit_inline", "Edit scene")}
+      </button>
+    `;
+  } else if (a.type === "run_routine") {
+    const routines = state.routines || [];
+    mid = html`
+      ${choiceSelect({
+        options: routines.map(function (r) {
+          return { value: r.id, label: r.name || r.id };
+        }),
+        current: a.routineId || "",
+        choiceKey: "sc-action-routine-" + i,
+        onSelect: function (next) {
+          const edit = actionEditDraft();
+          if (!edit || !edit.actions[i]) return;
+          edit.actions[i].type = "run_routine";
+          edit.actions[i].routineId = next;
+          ignoreTypeClicksUntil = Date.now() + 500;
+          notify();
+        },
+      })}
+      <button
+        class="btn ghost"
+        type="button"
+        style="margin-top:8px"
+        @click=${function () {
+          const rid =
+            (actionEditDraft() &&
+              actionEditDraft().actions[i] &&
+              actionEditDraft().actions[i].routineId) ||
+            "";
+          // Switch to routines tab to edit (shared store)
+          state.shortcutsTab = "routines";
+          openEditRoutine(rid || null);
+        }}
+      >
+        ${t("routines.edit_inline", "Edit routine")}
+      </button>
     `;
   } else if (a.type === "launch_app") {
     mid = choiceSelect({
@@ -458,7 +588,7 @@ function actionRow(a, i, controls, apps) {
       current: a.packageName || "",
       choiceKey: "sc-action-pkg-" + i,
       onSelect: function (next) {
-        const edit = state.shortcutEdit;
+        const edit = actionEditDraft();
         if (!edit || !edit.actions[i]) return;
         edit.actions[i].type = "launch_app";
         edit.actions[i].packageName = next;
@@ -478,7 +608,7 @@ function actionRow(a, i, controls, apps) {
           current: pluginId,
           choiceKey: "sc-action-plugin-" + i,
           onSelect: function (next) {
-            const edit = state.shortcutEdit;
+            const edit = actionEditDraft();
             if (!edit || !edit.actions[i]) return;
             syncPluginParamsFromDom(i, "action");
             edit.actions[i].type = "plugin";
@@ -498,7 +628,7 @@ function actionRow(a, i, controls, apps) {
               current: actionName,
               choiceKey: "sc-action-pa-" + i,
               onSelect: function (next) {
-                const edit = state.shortcutEdit;
+                const edit = actionEditDraft();
                 if (!edit || !edit.actions[i]) return;
                 syncPluginParamsFromDom(i, "action");
                 edit.actions[i].type = "plugin";
@@ -522,9 +652,10 @@ function actionRow(a, i, controls, apps) {
         style="width:100%;margin-top:8px"
         .value=${live(a.ms != null ? String(a.ms) : "500")}
         @input=${function (ev) {
-          if (state.shortcutEdit && state.shortcutEdit.actions[i]) {
+          const edit = actionEditDraft();
+          if (edit && edit.actions[i]) {
             const ms = parseInt(ev.target.value || "0", 10);
-            state.shortcutEdit.actions[i].ms = isNaN(ms) ? 0 : ms;
+            edit.actions[i].ms = isNaN(ms) ? 0 : ms;
           }
         }}
       />
@@ -537,7 +668,7 @@ function actionRow(a, i, controls, apps) {
         current: a.type || "delay_ms",
         onSelect: function (next) {
           if (Date.now() < ignoreTypeClicksUntil) return;
-          const edit = state.shortcutEdit;
+          const edit = actionEditDraft();
           if (!edit || !edit.actions[i]) return;
           if (edit.actions[i].type === next) return;
           syncPluginParamsFromDom(i, "action");
@@ -551,7 +682,7 @@ function actionRow(a, i, controls, apps) {
         type="button"
         style="margin-top:8px"
         @click=${function () {
-          const edit = state.shortcutEdit;
+          const edit = actionEditDraft();
           if (!edit) return;
           syncPluginParamsFromDom(i, "action");
           edit.actions.splice(i, 1);
@@ -686,6 +817,37 @@ function triggerRow(tr, i, controls) {
         })}
       </div>
     `;
+  } else if (tr.type === "ui_card") {
+    extra = html`
+      <div style="margin-top:8px">
+        <p class="hint" style="margin:0 0 8px">
+          ${t(
+            "shortcuts.trigger.ui_card.hint",
+            "Shows a control card. With a Set scene action, the card toggles that scene.",
+          )}
+        </p>
+        ${choiceSelect({
+          options: [
+            { value: "assistant", label: t("section.assistant.title", "Assistant") },
+            { value: "controls", label: t("section.controls.title", "Controls") },
+            { value: "home", label: t("section.home.title", "Home") },
+            { value: "energy", label: t("section.energy.title", "Energy") },
+            { value: "drive", label: t("section.drive.title", "Drive") },
+            { value: "lights", label: t("section.lights.title", "Lights") },
+          ],
+          current: tr.group || "assistant",
+          choiceKey: "sc-trig-uicard-" + i,
+          onSelect: function (next) {
+            const edit = state.shortcutEdit;
+            if (!edit || !edit.triggers[i]) return;
+            edit.triggers[i].type = "ui_card";
+            edit.triggers[i].group = next;
+            ignoreTypeClicksUntil = Date.now() + 500;
+            notify();
+          },
+        })}
+      </div>
+    `;
   } else if (tr.type === "plugin") {
     const pluginOpts = pluginSelectOptions();
     const pluginId = tr.pluginId || (pluginOpts[0] && pluginOpts[0].value) || "";
@@ -798,6 +960,7 @@ function editorCard(edit) {
         })}
       </div>
       <h3 style="margin:0 0 8px;font-size:1rem">${t("shortcuts.actions", "Actions")}</h3>
+      <p class="hint">${t("shortcuts.actions.hint", "Use Set scene / Run routine to compose reusable blocks.")}</p>
       <div id="scActions">
         ${repeat(
           actions,
@@ -817,7 +980,9 @@ function editorCard(edit) {
         @click=${function () {
           const edit = state.shortcutEdit;
           if (!edit) return;
-          edit.actions = (edit.actions || []).concat([{ type: "delay_ms", ms: 500 }]);
+          edit.actions = (edit.actions || []).concat([
+            { type: "run_routine", routineId: "" },
+          ]);
           notify();
         }}
       >
@@ -1085,6 +1250,8 @@ async function runShortcut(id) {
 }
 
 function openEditShortcut(id) {
+  state.routineEdit = null;
+  state.sceneEdit = null;
   const s = (state.shortcuts || []).find(function (x) {
     return x.id === id;
   });
@@ -1093,6 +1260,60 @@ function openEditShortcut(id) {
   state.shortcutEdit.actions = (state.shortcutEdit.actions || []).map(normalizeAction);
   state.shortcutEdit.triggers = (state.shortcutEdit.triggers || []).map(normalizeTrigger);
   notify();
+  scrollToEditor();
+}
+
+function openEditRoutine(id) {
+  state.shortcutEdit = null;
+  state.sceneEdit = null;
+  if (!id) {
+    state.routineEdit = {
+      name: "",
+      enabled: true,
+      icon: "drive",
+      actions: [{ type: "set_control", entityId: "", value: "" }],
+    };
+    notify();
+    scrollToEditor();
+    return;
+  }
+  const r = (state.routines || []).find(function (x) {
+    return x.id === id;
+  });
+  if (!r) {
+    state.routineEdit = {
+      name: "",
+      enabled: true,
+      icon: "drive",
+      actions: [{ type: "delay_ms", ms: 0 }],
+    };
+  } else {
+    state.routineEdit = JSON.parse(JSON.stringify(r));
+    state.routineEdit.actions = (state.routineEdit.actions || []).map(normalizeAction);
+  }
+  notify();
+  scrollToEditor();
+}
+
+function openEditScene(id) {
+  state.shortcutEdit = null;
+  state.routineEdit = null;
+  if (!id) {
+    state.sceneEdit = blankScene();
+    notify();
+    scrollToEditor();
+    return;
+  }
+  const s = (state.scenes || []).find(function (x) {
+    return x.id === id;
+  });
+  if (!s) state.sceneEdit = blankScene();
+  else state.sceneEdit = JSON.parse(JSON.stringify(s));
+  notify();
+  scrollToEditor();
+}
+
+function scrollToEditor() {
   requestAnimationFrame(function () {
     const wrap = document.getElementById("scEditorWrap");
     if (wrap) wrap.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1109,8 +1330,266 @@ async function deleteShortcut(id) {
   notify();
 }
 
-export function sectionShortcuts() {
-  ensureShortcutsState();
+async function deleteRoutine(id) {
+  if (!confirm(t("routines.delete_confirm", "Delete this routine?"))) return;
+  await api("/api/routines/" + encodeURIComponent(id), { method: "DELETE" });
+  if (state.routineEdit && state.routineEdit.id === id) state.routineEdit = null;
+  await loadShortcuts();
+  notify();
+}
+
+async function deleteScene(id) {
+  if (!confirm(t("scenes.delete_confirm", "Delete this scene?"))) return;
+  await api("/api/scenes/" + encodeURIComponent(id), { method: "DELETE" });
+  if (state.sceneEdit && state.sceneEdit.id === id) state.sceneEdit = null;
+  await loadShortcuts();
+  notify();
+}
+
+async function toggleScene(id, active) {
+  try {
+    await api("/api/scenes/" + encodeURIComponent(id) + "/set", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ active: !!active }),
+    });
+    await loadShortcuts();
+  } catch (e) {
+    state.shortcutMessage = String(e && e.message ? e.message : e);
+  }
+  notify();
+}
+
+async function runRoutine(id) {
+  try {
+    const res = await api("/api/routines/" + encodeURIComponent(id) + "/run", {
+      method: "POST",
+    });
+    if (res && res.ok === false) {
+      state.shortcutMessage = res.error || t("shortcuts.run_failed", "Run failed");
+    }
+  } catch (e) {
+    state.shortcutMessage = String(e && e.message ? e.message : e);
+  }
+  notify();
+}
+
+function routineEditorCard(edit) {
+  const controls = (state.controls || []).filter(function (c) {
+    return c.writable !== false;
+  });
+  const apps = state.shortcutApps || [];
+  const actions = edit.actions || [];
+  return prefCard({
+    icon: edit.icon || "drive",
+    title: edit.id
+      ? t("routines.edit", "Edit routine")
+      : t("routines.new", "New routine"),
+    body: html`
+      <label class="hint">${t("shortcuts.name", "Name")}</label>
+      <input
+        class="field"
+        id="scName"
+        style="width:100%;margin:4px 0 12px"
+        .value=${live(edit.name || "")}
+        @input=${function (ev) {
+          if (state.routineEdit) state.routineEdit.name = ev.target.value;
+        }}
+      />
+      <div style="margin-bottom:12px">
+        ${boolToggle(edit.enabled !== false, function (val) {
+          if (state.routineEdit) state.routineEdit.enabled = val === "1";
+          notify();
+        })}
+      </div>
+      <h3 style="margin:0 0 8px;font-size:1rem">${t("shortcuts.actions", "Actions")}</h3>
+      <div>
+        ${repeat(
+          actions,
+          function (_, idx) {
+            return "ra-" + idx;
+          },
+          function (raw, i) {
+            return actionRow(raw, i, controls, apps);
+          },
+        )}
+      </div>
+      <button
+        class="btn"
+        type="button"
+        style="margin-top:4px"
+        @click=${function () {
+          if (!state.routineEdit) return;
+          state.routineEdit.actions = (state.routineEdit.actions || []).concat([
+            { type: "set_control", entityId: "", value: "" },
+          ]);
+          notify();
+        }}
+      >
+        ${t("shortcuts.add_action", "Add action")}
+      </button>
+      <div class="row" style="gap:8px;margin-top:16px;width:100%">
+        <button
+          class="btn primary"
+          type="button"
+          style="flex:1"
+          @click=${function () {
+            saveRoutine();
+          }}
+        >
+          ${t("shortcuts.save", "Save")}
+        </button>
+        <button
+          class="btn ghost"
+          type="button"
+          style="flex:1"
+          @click=${function () {
+            state.routineEdit = null;
+            notify();
+          }}
+        >
+          ${t("shortcuts.cancel", "Cancel")}
+        </button>
+      </div>
+    `,
+  });
+}
+
+async function saveRoutine() {
+  const edit = state.routineEdit || {};
+  (edit.actions || []).forEach(function (_, i) {
+    syncPluginParamsFromDom(i, "action");
+  });
+  const body = toApiShortcut({
+    id: edit.id || undefined,
+    name: (edit.name || "").trim() || "Routine",
+    icon: edit.icon || "drive",
+    enabled: edit.enabled !== false,
+    actions: (edit.actions || []).slice(0, 10),
+  });
+  delete body.triggers;
+  delete body.conditions;
+  try {
+    const res = await api("/api/routines", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (res && res.ok === false) {
+      state.shortcutMessage = res.error || "save failed";
+    } else {
+      state.routineEdit = null;
+    }
+    await loadShortcuts();
+  } catch (e) {
+    state.shortcutMessage = String(e && e.message ? e.message : e);
+  }
+  notify();
+}
+
+function sceneListCard(s) {
+  return prefCard({
+    icon: s.icon || "climate",
+    title: s.name || s.id,
+    sub: s.builtin ? t("scenes.builtin", "Built-in") : "",
+    body: html`
+      <div class="row" style="gap:8px;flex-wrap:wrap;width:100%">
+        ${boolToggle(!!s.active, function (val) {
+          toggleScene(s.id, val === "1");
+        })}
+        <button
+          class="btn"
+          type="button"
+          style="flex:1"
+          @click=${function () {
+            openEditScene(s.id);
+          }}
+        >
+          ${t("shortcuts.edit", "Edit")}
+        </button>
+        <button
+          class="btn ghost"
+          type="button"
+          @click=${function () {
+            deleteScene(s.id);
+          }}
+        >
+          ${s.builtin
+            ? t("scenes.reset", "Reset")
+            : t("shortcuts.delete", "Delete")}
+        </button>
+      </div>
+    `,
+  });
+}
+
+function routineListCard(r) {
+  const acts = (r.actions || []).map(actionLabel).filter(Boolean).join(" · ");
+  return prefCard({
+    icon: r.icon || "drive",
+    title: r.name || r.id,
+    sub: acts || t("shortcuts.no_actions", "No actions"),
+    body: html`
+      <div class="row" style="gap:8px;width:100%">
+        <button
+          class="btn"
+          type="button"
+          style="flex:1"
+          @click=${function () {
+            runRoutine(r.id);
+          }}
+        >
+          ${t("shortcuts.run", "Run")}
+        </button>
+        <button
+          class="btn"
+          type="button"
+          style="flex:1"
+          @click=${function () {
+            openEditRoutine(r.id);
+          }}
+        >
+          ${t("shortcuts.edit", "Edit")}
+        </button>
+        <button
+          class="btn ghost"
+          type="button"
+          @click=${function () {
+            deleteRoutine(r.id);
+          }}
+        >
+          ${t("shortcuts.delete", "Delete")}
+        </button>
+      </div>
+    `,
+  });
+}
+
+function tabBar() {
+  const tab = state.shortcutsTab || "flows";
+  return html`
+    <div style="margin:0 0 16px">
+      ${segmentToggle({
+        options: [
+          { value: "flows", label: t("shortcuts.tab.flows", "Shortcuts") },
+          { value: "scenes", label: t("shortcuts.tab.scenes", "Scenes") },
+          { value: "routines", label: t("shortcuts.tab.routines", "Routines") },
+        ],
+        current: tab,
+        choiceKey: "shortcuts-main-tab",
+        onSelect: function (next) {
+          state.shortcutsTab = next;
+          state.shortcutEdit = null;
+          state.routineEdit = null;
+          state.sceneEdit = null;
+          notify();
+        },
+      })}
+    </div>
+  `;
+}
+
+function flowsTab() {
   const list = state.shortcuts || [];
   const edit = state.shortcutEdit;
   const editingId = edit && edit.id ? edit.id : null;
@@ -1134,41 +1613,179 @@ export function sectionShortcuts() {
     listContent = prefCard({
       icon: "drive",
       title: t("shortcuts.empty", "No shortcuts yet"),
-      sub: t("shortcuts.empty.hint", "Create a shortcut, then assign it to a pin slot."),
+      sub: t(
+        "shortcuts.empty.hint",
+        "Create a shortcut with triggers that run scenes or routines.",
+      ),
       body: nothing,
     });
   }
 
   return html`
-    <div class="section-head">
-      <h1>${t("section.shortcuts.title", "Shortcuts")}</h1>
+    <div class="section-head" style="margin-top:0">
       <button
         class="btn primary"
-        id="scNew"
         type="button"
         @click=${function () {
+          state.routineEdit = null;
+          state.sceneEdit = null;
           state.shortcutEdit = {
             name: "",
             enabled: true,
-            actions: [{ type: "delay_ms", ms: 0 }],
+            actions: [{ type: "run_routine", routineId: "" }],
             triggers: [],
           };
           notify();
-          requestAnimationFrame(function () {
-            const wrap = document.getElementById("scEditorWrap");
-            if (wrap) wrap.scrollIntoView({ behavior: "smooth", block: "start" });
-            const name = document.getElementById("scName");
-            if (name) name.focus();
-          });
+          scrollToEditor();
         }}
       >
         ${t("shortcuts.new", "New shortcut")}
       </button>
     </div>
+    <div class="grid">${listContent}</div>
+    ${slotsGrid()}
+  `;
+}
+
+function scenesTab() {
+  const list = state.scenes || [];
+  const edit = state.sceneEdit;
+  const editingId = edit && edit.id ? edit.id : null;
+  const isNew = !!(edit && !edit.id);
+
+  const cards = list.map(function (s) {
+    if (editingId && s.id === editingId) {
+      return html`<div id="scEditorWrap">
+        ${sceneEditorCard({
+          edit: edit,
+          onChange: function () {},
+          onSave: async function () {
+            try {
+              const res = await saveScene(edit);
+              if (res && res.ok === false) {
+                state.shortcutMessage = res.error || "save failed";
+              } else {
+                state.sceneEdit = null;
+              }
+              await loadShortcuts();
+            } catch (e) {
+              state.shortcutMessage = String(e && e.message ? e.message : e);
+            }
+            notify();
+          },
+          onCancel: function () {
+            state.sceneEdit = null;
+            notify();
+          },
+        })}
+      </div>`;
+    }
+    return sceneListCard(s);
+  });
+
+  const newEditor = isNew
+    ? html`<div id="scEditorWrap">
+        ${sceneEditorCard({
+          edit: edit,
+          onChange: function () {},
+          onSave: async function () {
+            try {
+              const res = await saveScene(edit);
+              if (res && res.ok === false) {
+                state.shortcutMessage = res.error || "save failed";
+              } else {
+                state.sceneEdit = null;
+              }
+              await loadShortcuts();
+            } catch (e) {
+              state.shortcutMessage = String(e && e.message ? e.message : e);
+            }
+            notify();
+          },
+          onCancel: function () {
+            state.sceneEdit = null;
+            notify();
+          },
+        })}
+      </div>`
+    : nothing;
+
+  return html`
+    <div class="section-head" style="margin-top:0">
+      <button
+        class="btn primary"
+        type="button"
+        @click=${function () {
+          openEditScene(null);
+        }}
+      >
+        ${t("scenes.new", "New scene")}
+      </button>
+    </div>
+    <div class="grid">${cards}${newEditor}</div>
+  `;
+}
+
+function routinesTab() {
+  const list = state.routines || [];
+  const edit = state.routineEdit;
+  const editingId = edit && edit.id ? edit.id : null;
+  const isNew = !!(edit && !edit.id);
+
+  const cards = list.map(function (r) {
+    if (editingId && r.id === editingId) {
+      return html`<div id="scEditorWrap">${routineEditorCard(edit)}</div>`;
+    }
+    return routineListCard(r);
+  });
+
+  const newEditor = isNew
+    ? html`<div id="scEditorWrap">${routineEditorCard(edit)}</div>`
+    : nothing;
+
+  let listContent;
+  if (list.length || isNew) {
+    listContent = html`${cards}${newEditor}`;
+  } else {
+    listContent = prefCard({
+      icon: "drive",
+      title: t("routines.empty", "No routines yet"),
+      sub: t("routines.empty.hint", "Routines are reusable action sequences."),
+      body: nothing,
+    });
+  }
+
+  return html`
+    <div class="section-head" style="margin-top:0">
+      <button
+        class="btn primary"
+        type="button"
+        @click=${function () {
+          openEditRoutine(null);
+        }}
+      >
+        ${t("routines.new", "New routine")}
+      </button>
+    </div>
+    <div class="grid">${listContent}</div>
+  `;
+}
+
+export function sectionShortcuts() {
+  ensureShortcutsState();
+  const tab = state.shortcutsTab || "flows";
+  let body = flowsTab();
+  if (tab === "scenes") body = scenesTab();
+  else if (tab === "routines") body = routinesTab();
+
+  return html`
+    <div class="section-head">
+      <h1>${t("section.shortcuts.title", "Shortcuts")}</h1>
+    </div>
     ${state.shortcutMessage
       ? html`<pre class="mono">${state.shortcutMessage}</pre>`
       : nothing}
-    <div class="grid" style="margin-top:12px">${listContent}</div>
-    ${slotsGrid()}
+    ${tabBar()}
+    ${body}
   `;
 }

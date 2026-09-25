@@ -6,34 +6,62 @@ import cc.opencar.assistant.api.plugin.ShortcutActionHandler
 import kotlinx.coroutines.delay
 
 /**
- * Executes a shortcut's action sequence. Control writes go through [setControl];
- * app launches through [AppLauncher]; plugin actions through [actionHandlers].
+ * Executes a flow or routine action sequence. Control writes go through [setControl];
+ * scenes via [setScene]; nested routines via [runRoutine] with recursion guard.
  */
 class ShortcutRunner(
     private val context: Context,
     private val setControl: suspend (entityId: String, value: String) -> Result<Unit>,
     private val launcher: AppLauncher = AppLauncher(context),
     private val actionHandlers: Map<String, ShortcutActionHandler> = emptyMap(),
+    private val setScene: (suspend (sceneId: String, active: Boolean?) -> Map<String, Any?>)? = null,
+    private val getRoutine: (suspend (routineId: String) -> Routine?)? = null,
 ) {
+    private val runningRoutines = ThreadLocal.withInitial { mutableSetOf<String>() }
+
     suspend fun run(shortcut: Shortcut): Map<String, Any?> {
         if (!shortcut.enabled) {
             return mapOf("ok" to false, "error" to "disabled")
         }
+        return runActions(shortcut.id, shortcut.actions, kind = "flow")
+    }
+
+    suspend fun runRoutine(routine: Routine): Map<String, Any?> {
+        if (!routine.enabled) {
+            return mapOf("ok" to false, "error" to "disabled")
+        }
+        val stack = runningRoutines.get()!!
+        if (routine.id in stack) {
+            return mapOf("ok" to false, "error" to "routine recursion: ${routine.id}")
+        }
+        stack.add(routine.id)
+        return try {
+            runActions(routine.id, routine.actions, kind = "routine")
+        } finally {
+            stack.remove(routine.id)
+        }
+    }
+
+    private suspend fun runActions(
+        id: String,
+        actions: List<ShortcutAction>,
+        kind: String,
+    ): Map<String, Any?> {
         val results = mutableListOf<Map<String, Any?>>()
-        for ((index, action) in shortcut.actions.withIndex()) {
+        for ((index, action) in actions.withIndex()) {
             val step = runAction(action)
             results.add(mapOf("index" to index, "action" to action.toMap()) + step)
             if (step["ok"] != true) {
-                Log.w(TAG, "shortcut ${shortcut.id} step $index failed: ${step["error"]}")
+                Log.w(TAG, "$kind $id step $index failed: ${step["error"]}")
                 return mapOf(
                     "ok" to false,
-                    "id" to shortcut.id,
+                    "id" to id,
                     "error" to step["error"],
                     "steps" to results,
                 )
             }
         }
-        return mapOf("ok" to true, "id" to shortcut.id, "steps" to results)
+        return mapOf("ok" to true, "id" to id, "steps" to results)
     }
 
     private suspend fun runAction(action: ShortcutAction): Map<String, Any?> {
@@ -61,6 +89,22 @@ class ShortcutRunner(
                 val r = handler.run(action.action, action.params)
                 if (r.isSuccess) mapOf("ok" to true)
                 else mapOf("ok" to false, "error" to (r.exceptionOrNull()?.message ?: "plugin action failed"))
+            }
+            is ShortcutAction.SetScene -> {
+                val fn = setScene
+                    ?: return mapOf("ok" to false, "error" to "scenes unavailable")
+                val result = fn(action.sceneId, action.active)
+                if (result["ok"] == true) mapOf("ok" to true, "scene" to result)
+                else mapOf("ok" to false, "error" to (result["error"] ?: "set_scene failed"))
+            }
+            is ShortcutAction.RunRoutine -> {
+                val getter = getRoutine
+                    ?: return mapOf("ok" to false, "error" to "routines unavailable")
+                val routine = getter(action.routineId)
+                    ?: return mapOf("ok" to false, "error" to "routine not found: ${action.routineId}")
+                val result = runRoutine(routine)
+                if (result["ok"] == true) mapOf("ok" to true, "routine" to result)
+                else mapOf("ok" to false, "error" to (result["error"] ?: "run_routine failed"))
             }
         }
     }

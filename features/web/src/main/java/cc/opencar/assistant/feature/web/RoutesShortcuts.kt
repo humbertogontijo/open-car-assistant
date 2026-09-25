@@ -14,7 +14,14 @@ internal fun Routing.registerShortcutRoutes(deps: OcaWebDeps) {
 
     get("/api/shortcuts") {
         if (shortcuts == null) {
-            call.respond(mapOf("shortcuts" to emptyList<Any>(), "overlay" to mapOf("available" to false)))
+            call.respond(
+                mapOf(
+                    "shortcuts" to emptyList<Any>(),
+                    "routines" to emptyList<Any>(),
+                    "scenes" to emptyList<Any>(),
+                    "overlay" to mapOf("available" to false),
+                ),
+            )
             return@get
         }
         val list = shortcuts.listMaps()
@@ -22,6 +29,8 @@ internal fun Routing.registerShortcutRoutes(deps: OcaWebDeps) {
         call.respond(
             mapOf(
                 "shortcuts" to list,
+                "routines" to shortcuts.listRoutineMaps(),
+                "scenes" to shortcuts.listSceneMaps(),
                 "slots" to shortcuts.slotMaps(),
                 "overlay" to shortcuts.overlayStatus() + mapOf("overlayEnabled" to overlayEnabled),
                 "wheelKeys" to listOf(
@@ -97,6 +106,111 @@ internal fun Routing.registerShortcutRoutes(deps: OcaWebDeps) {
     post("/api/shortcuts/overlay/request") {
         SetupActionBus.requestOverlayPermission()
         call.respond(mapOf("ok" to true))
+    }
+
+    // --- Routines ---
+
+    get("/api/routines") {
+        if (shortcuts == null) {
+            call.respond(mapOf("routines" to emptyList<Any>()))
+            return@get
+        }
+        call.respond(mapOf("routines" to shortcuts.listRoutineMaps()))
+    }
+
+    post("/api/routines") {
+        if (shortcuts == null) {
+            call.respond(HttpStatusCode.ServiceUnavailable, mapOf("ok" to false, "error" to "unavailable"))
+            return@post
+        }
+        val body = call.receive<Map<String, Any?>>()
+        call.respond(shortcuts.upsertRoutineFromMap(body))
+    }
+
+    delete("/api/routines/{id}") {
+        if (shortcuts == null) {
+            call.respond(HttpStatusCode.ServiceUnavailable, mapOf("ok" to false, "error" to "unavailable"))
+            return@delete
+        }
+        val id = call.parameters["id"] ?: return@delete call.respond(
+            HttpStatusCode.BadRequest,
+            mapOf("ok" to false, "error" to "missing id"),
+        )
+        call.respond(shortcuts.deleteRoutine(id))
+    }
+
+    post("/api/routines/{id}/run") {
+        if (shortcuts == null) {
+            call.respond(HttpStatusCode.ServiceUnavailable, mapOf("ok" to false, "error" to "unavailable"))
+            return@post
+        }
+        val id = call.parameters["id"] ?: return@post call.respond(
+            HttpStatusCode.BadRequest,
+            mapOf("ok" to false, "error" to "missing id"),
+        )
+        call.respond(shortcuts.runRoutine(id))
+    }
+
+    // --- Scenes ---
+
+    get("/api/scenes") {
+        if (shortcuts == null) {
+            call.respond(mapOf("scenes" to emptyList<Any>()))
+            return@get
+        }
+        call.respond(mapOf("scenes" to shortcuts.listSceneMaps()))
+    }
+
+    post("/api/scenes") {
+        if (shortcuts == null) {
+            call.respond(HttpStatusCode.ServiceUnavailable, mapOf("ok" to false, "error" to "unavailable"))
+            return@post
+        }
+        val body = call.receive<Map<String, Any?>>()
+        call.respond(shortcuts.upsertSceneFromMap(body))
+    }
+
+    delete("/api/scenes/{id}") {
+        if (shortcuts == null) {
+            call.respond(HttpStatusCode.ServiceUnavailable, mapOf("ok" to false, "error" to "unavailable"))
+            return@delete
+        }
+        val id = call.parameters["id"] ?: return@delete call.respond(
+            HttpStatusCode.BadRequest,
+            mapOf("ok" to false, "error" to "missing id"),
+        )
+        call.respond(shortcuts.deleteScene(id))
+    }
+
+    post("/api/scenes/{id}/set") {
+        if (shortcuts == null) {
+            call.respond(HttpStatusCode.ServiceUnavailable, mapOf("ok" to false, "error" to "unavailable"))
+            return@post
+        }
+        val id = call.parameters["id"] ?: return@post call.respond(
+            HttpStatusCode.BadRequest,
+            mapOf("ok" to false, "error" to "missing id"),
+        )
+        val body = call.receive<Map<String, Any?>>()
+        val active = when (val v = body["active"]) {
+            is Boolean -> v
+            is Number -> v.toInt() != 0
+            is String -> v == "1" || v.equals("true", true) || v.equals("on", true)
+            else -> return@post call.respond(mapOf("ok" to false, "error" to "missing active"))
+        }
+        call.respond(shortcuts.setSceneActive(id, active))
+    }
+
+    post("/api/scenes/{id}/reset") {
+        if (shortcuts == null) {
+            call.respond(HttpStatusCode.ServiceUnavailable, mapOf("ok" to false, "error" to "unavailable"))
+            return@post
+        }
+        val id = call.parameters["id"] ?: return@post call.respond(
+            HttpStatusCode.BadRequest,
+            mapOf("ok" to false, "error" to "missing id"),
+        )
+        call.respond(shortcuts.resetScene(id))
     }
 
     get("/api/apps") {

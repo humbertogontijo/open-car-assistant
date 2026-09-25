@@ -95,21 +95,26 @@ Numeric entities carry HA-style `deviceClass` + `unitOfMeasurement` (canonical p
 
 `SettingsMemoryController` stores per-control pins under snake_case catalog ids (`pin_<id>` / `val_<id>`). Values are reapplied to the vehicle on **Boot / session-ready**, **gear changes**, and **screen-on** (via `AssistantRuntime.notifyScreenOn`). APIs: `POST /api/controls/{id}/persist`, bulk capture/reapply via `/api/memory/*`. `LastKnownStore` (`:oca-support`) remains a display-only stale cache.
 
-## Shortcuts (macros + float chip)
+## Shortcuts (flows + scenes + routines)
 
-`:feature-shortcuts` stores named action sequences (set control, launch app, delay, plugin actions) with triggers:
+`:feature-shortcuts` has three building blocks under the web **Shortcuts** section:
 
-- `boot` / `screen` (`on` / `off`; HU wake/sleep, debounced ~5s) / `gear` / `wheel_key`
-- Plugin triggers (e.g. Home Assistant `entity_state`) when the plugin is enabled
+- **Shortcut (flow)** — triggers + conditions + actions. Event triggers: `boot` / `screen` (`on` / `off`; HU wake/sleep, debounced ~5s) / `gear` / `wheel_key` / `wifi_ssid` / `entity_state` / plugin triggers. Actions may `set_control`, `set_scene`, `run_routine`, `launch_app`, `delay_ms`, or plugin actions.
+- **Scene** — snapshot configured entities, write on-values when activated; on deactivate restore snapshot or force a value per target. Builtin **Sentinel** seeds on first use (parking comfort on; HVAC / exterior lights / fog off).
+- **Routine** — reusable fire-once action sequence.
 
-Fixed **pin slots** 1–8 are assigned separately (not as shortcut triggers) and appear in the float-chip dropdown.
+Flows may include a non-event **`ui_card` trigger** that publishes a virtual control (`shortcut_<id>`): with a `set_scene` action the card is a bool bound to that scene; otherwise a command that runs the flow.
+
+APIs: `/api/shortcuts`, `/api/scenes`, `/api/routines`, `/api/apps`. Legacy combined shortcuts migrate once into a routine + a flow that `run_routine`s it (flow id preserved for pin slots).
+
+Fixed **pin slots** 1–8 are assigned to flows and appear in the float-chip dropdown.
 
 A native **quick entry** (hosted by `AssistantService`) is provided by the matched integration via `VehicleIntegration.createQuickEntry()`:
 
 - **Flyme Auto** (`:integrations:platform:flyme`) — status-bar icon through notification extras (`flag_status_icon_*`). Tap fires a callback into the shared dropdown.
 - **Default** — `FloatChipQuickEntry` WindowManager overlay placed below the status bar (touchable on HUs where SystemUI would eat an overlay in the bar band).
 
-The shared dropdown (Open / Cameras / Shortcuts / Background / Exit + pinned slots) lives in `:feature-shortcuts` and is platform-agnostic. Config UI: web **Shortcuts** section (`/api/shortcuts`, `/api/apps`).
+The shared dropdown (Open / Cameras / Shortcuts / Background / Exit + pinned slots) lives in `:feature-shortcuts` and is platform-agnostic.
 
 Wake / `screen` triggers (`on` / `off`) listen for AOSP `ACTION_SCREEN_ON` / `USER_PRESENT` / display + interactive polls, plus optional platform [WakeSignals](../libs/api/src/main/java/cc/opencar/assistant/api/WakeSignals.kt) (Flyme: ECARX `ACC_ON` / `DISPLAY_ON` / `STR_RESUME` / … via `:integrations:platform:flyme`). **Manifest-registered** [FlymeWakeReceiver](../integrations/platform/flyme/src/main/java/cc/opencar/assistant/integrations/platform/flyme/FlymeWakeReceiver.kt) catches those when the process was dead during STR; pending edges are flushed once shortcuts start. Debounced ~5 s. Antora polls `WHEEL_HARD_KEY_*` for press edges and emits `VehicleEvent.WheelKeyPressed`. OEM `BCM_FUNC_CUSTOM_KEY` is exposed as Controles control `wheel_custom_key`. **Custom AVAS / lock sounds** live under the Som section (app storage `sounds/avas`, `sounds/lock`) via `/api/sounds`; preview/playback uses app `MediaPlayer`. OEM AVAS style/volume remain the VHAL ints `esm_sound` / `esm_volume` — there is no confirmed vendor wav drop-in path.
 

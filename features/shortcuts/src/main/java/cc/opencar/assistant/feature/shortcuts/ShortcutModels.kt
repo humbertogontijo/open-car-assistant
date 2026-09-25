@@ -139,6 +139,23 @@ sealed class ShortcutAction {
         )
     }
 
+    /** Activate / deactivate / toggle a [Scene]. `active == null` toggles. */
+    data class SetScene(val sceneId: String, val active: Boolean? = null) : ShortcutAction() {
+        override fun toMap() = mapOf(
+            "type" to "set_scene",
+            "sceneId" to sceneId,
+            "active" to active,
+        )
+    }
+
+    /** Run a reusable [Routine] by id. */
+    data class RunRoutine(val routineId: String) : ShortcutAction() {
+        override fun toMap() = mapOf(
+            "type" to "run_routine",
+            "routineId" to routineId,
+        )
+    }
+
     companion object {
         const val MAX_DELAY_MS = 60_000L
         const val MAX_ACTIONS = 10
@@ -166,6 +183,25 @@ sealed class ShortcutAction {
                     val pluginId = m["pluginId"] as? String ?: return null
                     val action = m["action"] as? String ?: return null
                     Plugin(pluginId, action, readParams(m["params"]))
+                }
+                "set_scene" -> {
+                    val sceneId = m["sceneId"] as? String ?: return null
+                    val active = when (val v = m["active"]) {
+                        null -> null
+                        is Boolean -> v
+                        is Number -> v.toInt() != 0
+                        is String -> when (v.trim().lowercase()) {
+                            "", "null", "toggle" -> null
+                            "0", "false", "off" -> false
+                            else -> true
+                        }
+                        else -> null
+                    }
+                    SetScene(sceneId, active)
+                }
+                "run_routine" -> {
+                    val routineId = m["routineId"] as? String ?: return null
+                    RunRoutine(routineId)
                 }
                 else -> null
             }
@@ -208,6 +244,17 @@ sealed class ShortcutTrigger {
             "type" to "entity_state",
             "entityId" to entityId,
             "value" to value,
+        )
+    }
+
+    /**
+     * Not an event trigger — presence publishes a virtual control card for this flow.
+     * [group] is the nav section id (default assistant).
+     */
+    data class UiCard(val group: String = "assistant") : ShortcutTrigger() {
+        override fun toMap() = mapOf(
+            "type" to "ui_card",
+            "group" to group.ifBlank { "assistant" },
         )
     }
 
@@ -257,6 +304,10 @@ sealed class ShortcutTrigger {
                     val id = m["entityId"] as? String ?: return null
                     val value = m["value"]?.toString()?.takeIf { it.isNotBlank() }
                     EntityState(id, value)
+                }
+                "ui_card" -> {
+                    val group = (m["group"] as? String)?.takeIf { it.isNotBlank() } ?: "assistant"
+                    UiCard(group)
                 }
                 "plugin" -> {
                     val pluginId = m["pluginId"] as? String ?: return null
