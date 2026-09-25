@@ -24,6 +24,7 @@ class CameraPreviewSession(private val context: Context) : AutoCloseable {
         var surfaceTexture: SurfaceTexture? = null,
         var width: Int = 0,
         var height: Int = 0,
+        var fps: Int = 0,
     )
 
     private val slots = ConcurrentHashMap<String, Slot>()
@@ -36,6 +37,25 @@ class CameraPreviewSession(private val context: Context) : AutoCloseable {
     fun captureMode(): String = mode
     fun openCameraIds(): List<String> = slots.keys.toList()
     fun surfaceTexture(cameraId: String): SurfaceTexture? = slots[cameraId]?.surfaceTexture
+
+    fun previewSize(cameraId: String): Pair<Int, Int>? {
+        val slot = slots[cameraId] ?: return null
+        if (slot.width <= 0 || slot.height <= 0) return null
+        return slot.width to slot.height
+    }
+
+    fun previewSizes(orderedIds: List<String>): List<Pair<Int, Int>> =
+        orderedIds.map { id -> previewSize(id) ?: (640 to 480) }
+
+    /** Max preview fps across open cameras (from Camera1 fps ranges). */
+    fun previewFps(orderedIds: List<String>): Int {
+        var maxFps = 0
+        for (id in orderedIds) {
+            val slot = slots[id] ?: continue
+            maxFps = maxOf(maxFps, slot.fps)
+        }
+        return if (maxFps > 0) maxFps else MosaicPreviewSession.DEFAULT_FPS
+    }
 
     /**
      * Open every id concurrently. Returns false if any open fails
@@ -107,6 +127,9 @@ class CameraPreviewSession(private val context: Context) : AutoCloseable {
         "previewRunning" to running.get(),
         "captureMode" to mode,
         "openCameras" to slots.keys.toList(),
+        "previews" to slots.map { (id, s) ->
+            mapOf("id" to id, "width" to s.width, "height" to s.height, "fps" to s.fps)
+        },
         "lastError" to lastError,
     )
 
@@ -120,6 +143,7 @@ class CameraPreviewSession(private val context: Context) : AutoCloseable {
             val params = cam.parameters
             val (pw, ph) = choosePreviewSize(params.supportedPreviewSizes)
             params.setPreviewSize(pw, ph)
+            val fps = choosePreviewFps(params)
             runCatching { cam.parameters = params }
             val st = if (android.os.Build.VERSION.SDK_INT >= 26) {
                 SurfaceTexture(/* singleBuffered = */ false)
@@ -128,9 +152,9 @@ class CameraPreviewSession(private val context: Context) : AutoCloseable {
             }
             st.setDefaultBufferSize(pw, ph)
             cam.setPreviewTexture(st)
-            slots[id] = Slot(id, camIndex, cam, st, pw, ph)
+            slots[id] = Slot(id, camIndex, cam, st, pw, ph, fps)
             cam.startPreview()
-            Log.i(TAG, "Camera1 open cam=$id idx=$camIndex ${pw}x${ph}")
+            Log.i(TAG, "Camera1 open cam=$id idx=$camIndex ${pw}x${ph}@${fps}fps")
             true
         } catch (t: Throwable) {
             lastError = t.message
@@ -154,15 +178,30 @@ class CameraPreviewSession(private val context: Context) : AutoCloseable {
         slots.clear()
     }
 
+    /** Prefer the largest supported preview size (native, no artificial downscale). */
     @Suppress("DEPRECATION")
     private fun choosePreviewSize(sizes: List<Camera.Size>?): Pair<Int, Int> {
         if (sizes.isNullOrEmpty()) return 640 to 480
-        val best = sizes
-            .filter { it.width <= 1280 && it.height <= 720 }
-            .minByOrNull { kotlin.math.abs(it.width * it.height - 640 * 360) }
-            ?: sizes.minByOrNull { it.width * it.height }
-            ?: sizes.first()
+        val best = sizes.maxByOrNull { it.width.toLong() * it.height } ?: sizes.first()
         return best.width to best.height
+    }
+
+    @Suppress("DEPRECATION")
+    private fun choosePreviewFps(params: Camera.Parameters): Int {
+        val ranges = params.supportedPreviewFpsRange
+        if (!ranges.isNullOrEmpty()) {
+            val best = ranges.maxByOrNull { it[Camera.Parameters.PREVIEW_FPS_MAX_INDEX] }
+            if (best != null) {
+                params.setPreviewFpsRange(
+                    best[Camera.Parameters.PREVIEW_FPS_MIN_INDEX],
+                    best[Camera.Parameters.PREVIEW_FPS_MAX_INDEX],
+                )
+                // Camera1 fps ranges are in thousandths.
+                return (best[Camera.Parameters.PREVIEW_FPS_MAX_INDEX] / 1000)
+                    .coerceIn(MosaicPreviewSession.MIN_FPS, MosaicPreviewSession.MAX_FPS)
+            }
+        }
+        return MosaicPreviewSession.DEFAULT_FPS
     }
 
     @Suppress("DEPRECATION")

@@ -130,6 +130,7 @@ class AssistantRuntime(private val app: OcaApp) {
         androidSettings = AndroidSettingsController(app, sess.androidVolumeGroups()).also {
             // Best-effort (shell/privileged); opens nothing if Secure write is denied.
             it.tryEnableMediaListener()
+            it.start(scope)
         }
         locationTracker = LocationTrackerController(
             app,

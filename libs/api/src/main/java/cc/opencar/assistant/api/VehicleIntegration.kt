@@ -74,12 +74,6 @@ interface VehicleSession {
     fun hasBinding(property: VehicleProperty): Boolean = false
 
     /**
-     * Platform mosaic/live stream tuning from `platform.json` (`dvr`).
-     * Not user-configurable — integrations set what the HU can sustain.
-     */
-    fun dvrStreamConfig(): DvrStreamConfig = DvrStreamConfig.DEFAULT
-
-    /**
      * Cabin volume groups from `platform.json` → `android.volumeGroups`
      * (after `extends` merge). Empty when the platform does not declare any.
      */

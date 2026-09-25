@@ -3,8 +3,8 @@ loadCss("/static/js/ui/cards/media-player.css");
 
 import { html, nothing } from "../../lit.js";
 import { fmt } from "../../api.js";
-import { t } from "../../i18n.js";
-import { setControl, mediaStateLabel } from "../../actions.js";
+import { t, entityLabel, entityValueLabel } from "../../i18n.js";
+import { setControl } from "../../actions.js";
 import { icon, hideBtn, cardSpan } from "./shared.js";
 
 export function mediaAttr(c, camel, snake) {
@@ -25,8 +25,7 @@ export function mediaPlayerCard(c, restore) {
     t("media_player.nothing", "Nothing playing");
   const artist = mediaAttr(c, "mediaArtist", "media_artist") || "";
   const album = mediaAttr(c, "mediaAlbum", "media_album") || "";
-  const stateLabel =
-    mediaStateLabel(c.value) || c.valueLabel || fmt(c.value);
+  const stateLabel = entityValueLabel(c) || fmt(c.value);
   const locked = c.status !== "ok" && c.status !== "cached";
   const sub = [artist, album].filter(Boolean).join(" · ");
   const volMaxRaw = mediaAttr(c, "volumeMax", "volume_max");
@@ -62,7 +61,7 @@ export function mediaPlayerCard(c, restore) {
       <div class="ctrl-head">
         <div class="ctrl-icon">${icon(c.icon || "sound")}</div>
         <div class="ctrl-meta">
-          <h3>${c.label}</h3>
+          <h3>${entityLabel(c)}</h3>
           <p class="hint media-state">${stateLabel}</p>
         </div>
         <div class="card-actions">${hideBtn(c.id, restore)}</div>

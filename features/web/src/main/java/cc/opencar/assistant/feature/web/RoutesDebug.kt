@@ -131,7 +131,14 @@ internal fun Routing.registerDebugRoutes(deps: OcaWebDeps) {
                 "variant" to variantId,
                 "capabilities" to capabilities,
                 "catalogSize" to session.catalog().size,
-                "cameras" to session.cameras().map { it.label },
+                "cameras" to session.cameras().map {
+                    mapOf(
+                        "id" to it.cameraId,
+                        "entityId" to it.id,
+                        "label" to it.label,
+                        "role" to it.role,
+                    )
+                },
                 "probe" to (probe.cached()?.summary()),
             ),
         )

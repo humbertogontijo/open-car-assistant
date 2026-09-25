@@ -14,14 +14,17 @@ import kotlinx.coroutines.flow.first
  * Install model is user-space `/data` only. Antora uses VenusVehicleServer
  * gRPC for VHAL. Platforms that need CarPropertyManager do that in their
  * integration (`CarPropertyBackend`); core setup never elevates to priv-app.
+ *
+ * Copy is resolved client-side from `/api/i18n` via [labelKey] / [hintKey] /
+ * [titleKey] / [detailKey] / [actionKey] fields.
  */
 object SetupStatus {
     data class PermCheck(
         val id: String,
-        val label: String,
+        val labelKey: String,
         val granted: Boolean,
         val kind: String, // runtime | install
-        val hint: String,
+        val hintKey: String,
     )
 
     private val CHECKS = listOf(
@@ -43,12 +46,12 @@ object SetupStatus {
             val granted = ContextCompat.checkSelfPermission(context, id) == PackageManager.PERMISSION_GRANTED
             PermCheck(
                 id = id,
-                label = i18n.t(labelKey),
+                labelKey = labelKey,
                 granted = granted,
                 kind = kind,
-                hint = when (kind) {
-                    "runtime" -> i18n.t("setup.hint.runtime")
-                    else -> i18n.t("setup.hint.install")
+                hintKey = when (kind) {
+                    "runtime" -> "setup.hint.runtime"
+                    else -> "setup.hint.install"
                 },
             )
         }
@@ -77,30 +80,30 @@ object SetupStatus {
             "permissions" to permissions.map {
                 mapOf(
                     "id" to it.id,
-                    "label" to it.label,
+                    "labelKey" to it.labelKey,
                     "granted" to it.granted,
                     "kind" to it.kind,
-                    "hint" to it.hint,
+                    "hintKey" to it.hintKey,
                 )
             },
             "steps" to listOf(
                 mapOf(
                     "id" to "runtime",
-                    "title" to i18n.t("setup.step.runtime"),
+                    "titleKey" to "setup.step.runtime",
                     "done" to runtimeOk,
-                    "detail" to i18n.t("setup.step.runtime.detail"),
+                    "detailKey" to "setup.step.runtime.detail",
                 ),
                 mapOf(
                     "id" to "telemetry",
-                    "title" to i18n.t("setup.step.telemetry"),
+                    "titleKey" to "setup.step.telemetry",
                     "done" to hasBasicTelemetry,
-                    "detail" to i18n.t("setup.step.telemetry.detail"),
+                    "detailKey" to "setup.step.telemetry.detail",
                 ),
             ),
             "actions" to mapOf(
-                "grant" to i18n.t("setup.action.grant"),
-                "host" to i18n.t("setup.action.host"),
-                "refresh" to i18n.t("setup.action.refresh"),
+                "grantKey" to "setup.action.grant",
+                "hostKey" to "setup.action.host",
+                "refreshKey" to "setup.action.refresh",
             ),
             "adbHints" to listOf(
                 "./tools/oca-setup -i ${session.integrationId} -H <ip> setup",

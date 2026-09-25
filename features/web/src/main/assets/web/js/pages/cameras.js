@@ -1,8 +1,8 @@
 import { html, nothing } from "../lit.js";
-import { state, patch, patchSilent } from "../store.js";
+import { state, patch, patchSilent, entitiesByGroup } from "../store.js";
 import { t } from "../i18n.js";
 import { api } from "../api.js";
-import { prefCard, prefSegment, boolToggle } from "../ui/cards.js";
+import { prefCard, prefSegment, boolToggle, entityGrid } from "../ui/cards.js";
 import {
   cameraPlayerView,
   cameraTimelineView,
@@ -149,6 +149,7 @@ export { applyCameraPlayerSrc };
 export function pageCameras() {
   const dvr = (state.status && state.status.dvr) || {};
   const dvrActive = dvr.mode === "dvr" || (!!dvr.recording && dvr.mode !== "off");
+  const cameraEntities = entitiesByGroup("cameras");
   const storages = dvr.storages || [];
   const storageId = dvr.storageId || "app";
   const selected =
@@ -194,6 +195,17 @@ export function pageCameras() {
 
   return html`
     <h1>${t("section.cameras.title", "Câmeras")}</h1>
+
+    ${cameraEntities.length
+      ? html`
+          <div class="cameras-sources" style="margin-bottom:16px">
+            <p class="sub" style="margin:0 0 8px">
+              ${t("cameras.sources", "Cameras")}
+            </p>
+            ${entityGrid(cameraEntities)}
+          </div>
+        `
+      : nothing}
 
     <div class="cameras-stage">
       ${cameraPlayerView({

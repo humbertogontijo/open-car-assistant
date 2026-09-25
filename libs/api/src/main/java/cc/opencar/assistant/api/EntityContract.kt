@@ -15,8 +15,8 @@ package cc.opencar.assistant.api
  *
  * | Field | Role |
  * |-------|------|
- * | `id` | Stable catalog id (`climate`, `sensor_soc`, …) — public contract |
- * | `domain` | Same as [EntityType.id] (`sensor`, `climate`, `lock`, …) |
+ * | `id` | Stable catalog id (`climate.cabin`, `sensor.soc`, …) — HA-shaped `domain.object_id` |
+ * | `domain` | Same as [EntityType.id] (`sensor`, `climate`, `cover`, `switch`, …) |
  * | `entity` | Alias of `domain` (legacy UI field) |
  * | `state` / `value` | Current state string (HA `state` / OCA `value`) |
  * | `friendlyName` / `label` | Localized display name |

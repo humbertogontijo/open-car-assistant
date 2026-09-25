@@ -6,7 +6,7 @@ import {
   state,
   patch,
 } from "../store.js";
-import { t } from "../i18n.js";
+import { t, entityLabel } from "../i18n.js";
 import { api } from "../api.js";
 import { pageHead } from "../ui/cards.js";
 import { familySections } from "./group.js";
@@ -18,18 +18,18 @@ import {
 } from "../ui/dashboard.js";
 
 var ENERGY_HERO_IDS = [
-  "sensor_soc",
-  "sensor_hybrid_soc",
-  "sensor_range",
-  "sensor_range_ev",
-  "sensor_fuel",
-  "sensor_charge_plug",
-  "charge_current",
-  "sensor_charge_energy",
-  "sensor_charge_eta",
+  "sensor.soc",
+  "sensor.hybrid_soc",
+  "sensor.range",
+  "sensor.range_ev",
+  "sensor.fuel",
+  "sensor.charge_plug",
+  "charger.vehicle",
+  "sensor.charge_energy",
+  "sensor.charge_eta",
 ];
 
-var ENERGY_SPARK_IDS = ["sensor_soc", "sensor_charge_energy", "sensor_avg_energy"];
+var ENERGY_SPARK_IDS = ["sensor.soc", "sensor.charge_energy", "sensor.avg_energy"];
 
 export async function loadEnergyDash() {
   if (state._energyDashLoading) return;
@@ -72,11 +72,11 @@ export function pageEnergy() {
     : (state.entities || []).filter(function (e) {
         return (
           (e.group === "energy" ||
-            e.id === "sensor_soc" ||
-            e.id === "sensor_hybrid_soc" ||
-            e.id === "sensor_range" ||
-            e.id === "sensor_range_ev" ||
-            e.id === "sensor_fuel") &&
+            e.id === "sensor.soc" ||
+            e.id === "sensor.hybrid_soc" ||
+            e.id === "sensor.range" ||
+            e.id === "sensor.range_ev" ||
+            e.id === "sensor.fuel") &&
           (e.status === "ok" || e.status === "cached")
         );
       });
@@ -90,7 +90,7 @@ export function pageEnergy() {
     const pts = sparks[id];
     if (!pts || pts.length < 2) return null;
     const ent = pickEntities(pool, [id])[0];
-    const title = (ent && (ent.friendlyName || ent.label)) || id;
+    const title = (ent && (ent.friendlyName || entityLabel(ent))) || id;
     return dashSparkline(pts, { title: title });
   }).filter(Boolean);
 

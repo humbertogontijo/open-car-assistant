@@ -2,7 +2,7 @@ import { loadCss } from "./load-css.js";
 loadCss("/static/js/ui/dashboard.css");
 
 import { html, svg, nothing, unsafeHTML } from "../lit.js";
-import { t } from "../i18n.js";
+import { t, entityLabel, entityValueLabel } from "../i18n.js";
 import { fmt } from "../api.js";
 import { formatDisplayNumber, unitLabelFor } from "../units.js";
 import { iconSvg } from "../icons.js";
@@ -35,15 +35,18 @@ export function pickEntities(items, ids) {
 
 export function displayValue(e) {
   if (!e) return "—";
-  if (e.valueLabel) return e.valueLabel;
   if (e.value == null || e.value === "") return "—";
+  const mapped = entityValueLabel(e);
+  if (e.valueMapId || e.binary || (e.options && e.options.length)) {
+    if (mapped && mapped !== String(e.value)) return mapped;
+  }
   const n = parseFloat(e.value);
   if (!isNaN(n) && e.unitOfMeasurement) {
     const shown = formatDisplayNumber(e.unitOfMeasurement, n, e.input || "sensor");
     const unit = unitLabelFor(e);
     return unit ? shown + " " + unit : shown;
   }
-  if (e.unitLabel) return fmt(e.value) + " " + e.unitLabel;
+  if (mapped) return mapped;
   return fmt(e.value);
 }
 
@@ -56,7 +59,7 @@ export function dashSummary(entities, opts) {
       return html`<div class="dash-gauge" data-id=${e.id}>
         <div class="dash-gauge-icon">${icon(e.icon || "sensor")}</div>
         <div class="dash-gauge-body">
-          <div class="dash-gauge-label">${e.friendlyName || e.label || e.id}</div>
+          <div class="dash-gauge-label">${e.friendlyName || entityLabel(e)}</div>
           <div class="dash-gauge-value">${displayValue(e)}</div>
         </div>
       </div>`;

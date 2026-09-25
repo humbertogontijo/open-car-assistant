@@ -4,7 +4,7 @@ loadCss("/static/js/ui/cards/bool.css"); // segmentToggle shares .toggle-group
 
 import { html, nothing, classMap, live } from "../../lit.js";
 import { fmt } from "../../api.js";
-import { t } from "../../i18n.js";
+import { t, optionLabel as resolveOptionLabel } from "../../i18n.js";
 import { state, patch } from "../../store.js";
 import { pinChip } from "./shared.js";
 
@@ -23,11 +23,11 @@ function nextOptionValue(opts, val) {
   return opts[(i + 1) % opts.length].value;
 }
 
-function optionLabel(opts, val) {
+function lookupOptionLabel(opts, val) {
   const o = opts.find(function (x) {
     return String(x.value) === String(val);
   });
-  return o ? o.label : fmt(val);
+  return o ? resolveOptionLabel(o) : fmt(val);
 }
 
 export function decodeOpts(raw) {
@@ -110,7 +110,7 @@ export function segmentToggle(opts) {
               opts.onSelect(o.value);
             }}
           >
-            ${o.label}
+            ${resolveOptionLabel(o)}
           </button>
         `;
       })}
@@ -131,7 +131,7 @@ export function choiceSelect(opts) {
   const pinTitle = t("persist.back_hint", "Applied only after the car restarts");
   const match = hasPin && hasCurrent && String(current) === String(pinnedVal);
   const label = hasCurrent
-    ? optionLabel(list, current)
+    ? lookupOptionLabel(list, current)
     : t("persist.pick_short", "Select…");
   const open = state.openChoiceId === choiceKey;
   const query = open && searchable ? String(state.choiceSearchQuery || "") : "";
@@ -139,7 +139,7 @@ export function choiceSelect(opts) {
   const filtered = !q
     ? list
     : list.filter(function (o) {
-        const lab = String(o.label || "").toLowerCase();
+        const lab = String(resolveOptionLabel(o) || "").toLowerCase();
         const val = String(o.value != null ? o.value : "").toLowerCase();
         return lab.indexOf(q) >= 0 || val.indexOf(q) >= 0;
       });
@@ -249,7 +249,7 @@ export function choiceSelect(opts) {
                     opts.onSelect(o.value);
                   }}
                 >
-                  ${o.label}
+                  ${resolveOptionLabel(o)}
                 </button>
               `;
             })
@@ -257,7 +257,7 @@ export function choiceSelect(opts) {
               ${t("common.no_results", "No matches")}
             </p>`}
       </div>
-      ${hasPin && !match ? pinChip(optionLabel(list, pinnedVal)) : nothing}
+      ${hasPin && !match ? pinChip(lookupOptionLabel(list, pinnedVal)) : nothing}
     </div>
   `;
 }

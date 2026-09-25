@@ -1,6 +1,6 @@
 import { html, svg, nothing } from "../lit.js";
 import { state, patch } from "../store.js";
-import { t } from "../i18n.js";
+import { t, entityLabel, entityValueLabel, optionLabel } from "../i18n.js";
 import { api, fmt } from "../api.js";
 import { prefSegment, choiceSelect } from "../ui/cards.js";
 import { formatDisplayNumber, unitLabelFor } from "../units.js";
@@ -18,6 +18,8 @@ function historyEntityMeta(id) {
     options: (e && e.options) || [],
     unitLabel: (e && e.unitLabel) || "",
     unitOfMeasurement: (e && e.unitOfMeasurement) || null,
+    valueMapId: e && e.valueMapId,
+    binary: e && e.binary,
   };
 }
 
@@ -66,7 +68,7 @@ function historyEntityLabel(id) {
   const e = (state.entities || []).find(function (x) {
     return x.id === id;
   });
-  if (e && (e.label || e.i18n)) return e.label || t(e.i18n, id);
+  if (e) return entityLabel(e);
   if (String(id).indexOf("sensor_") === 0) {
     return t("sensor." + String(id).slice("sensor_".length), id);
   }
@@ -75,15 +77,24 @@ function historyEntityLabel(id) {
 
 function historyFormatValue(value, meta) {
   if (value == null || value === "") return "—";
+  if (meta) {
+    const mapped = entityValueLabel(
+      Object.assign({}, meta, { value: value }),
+      value,
+    );
+    if (meta.valueMapId || meta.binary || (meta.options && meta.options.length) || meta.input === "bool") {
+      if (mapped && mapped !== String(value)) return mapped;
+    }
+  }
   if (meta && meta.options && meta.options.length) {
     const hit = meta.options.find(function (o) {
       return String(o.value) === String(value);
     });
-    if (hit) return hit.label || String(value);
+    if (hit) return optionLabel(hit);
   }
   if (meta && meta.input === "bool") {
     const on = value === "1" || value === "true" || value === "on";
-    return on ? t("value.on", "On") : t("value.off", "Off");
+    return on ? t("common.on", "On") : t("common.off", "Off");
   }
   const n = parseFloat(value);
   if (!isNaN(n) && meta && meta.unitOfMeasurement) {

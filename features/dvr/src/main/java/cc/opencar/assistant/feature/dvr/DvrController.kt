@@ -74,7 +74,6 @@ class DvrController(
         storageId = prefs.getString(KEY_STORAGE, STORAGE_APP) ?: STORAGE_APP
         maxTotalMb = prefs.getInt(KEY_MAX_TOTAL_MB, DEFAULT_MAX_TOTAL_MB).coerceIn(256, 65536)
         maxAgeDays = prefs.getInt(KEY_MAX_AGE_DAYS, DEFAULT_MAX_AGE_DAYS).coerceAtLeast(0)
-        applyPlatformStreamConfig()
         mosaic.onStopped = {
             h264?.stop()
             h264 = null
@@ -85,12 +84,6 @@ class DvrController(
         mode = if (savedMode == MODE_DVR) MODE_DVR else MODE_OFF
         ensureStorageMounted()
         writerExec.execute { runCamera2Probe() }
-    }
-
-    /** Pull fps / mosaic height from the active platform (not user prefs). */
-    private fun applyPlatformStreamConfig() {
-        val cfg = session.dvrStreamConfig()
-        mosaic.applyQuality(cfg.fps, cfg.mosaicHeight)
     }
 
     private fun ensureMosaicStarted(): Boolean {
@@ -115,7 +108,7 @@ class DvrController(
         val pipe = SharedH264Pipeline(
             mosaic.mosaicWidth(),
             mosaic.mosaicHeight(),
-            mosaic.targetFps,
+            mosaic.sourceFps(),
         )
         val ids = mosaic.cameraIds()
         val ok = pipe.start(ids.size) { textures ->
@@ -157,6 +150,12 @@ class DvrController(
             emptyList()
         }
     }
+
+    /** Camera2 ids currently open in the mosaic hub. */
+    fun openCameraIds(): List<String> =
+        if (mosaic.isRunning()) mosaic.cameraIds() else emptyList()
+
+    fun isMosaicRunning(): Boolean = mosaic.isRunning()
 
     fun isRecording(): Boolean = recording.get()
 
@@ -846,7 +845,17 @@ class DvrController(
                 "h264" to h264?.status(),
                 "camera2Probe" to camera2ProbeReport,
             ),
-            "cameras" to cameras().map { mapOf("id" to it.cameraId, "label" to it.label) },
+            "cameras" to cameras().map { src ->
+                val size = singlePreview.previewSize(src.cameraId)
+                mapOf(
+                    "id" to src.cameraId,
+                    "entityId" to src.id,
+                    "label" to src.label,
+                    "role" to src.role,
+                    "width" to size?.first,
+                    "height" to size?.second,
+                )
+            },
             "storageId" to storageId,
             "storages" to targets,
             "storageNote" to storageNote,
@@ -877,11 +886,14 @@ class DvrController(
                 "maxTotalMb" to maxTotalMb,
                 "maxAgeDays" to maxAgeDays,
             ),
-            "streamConfig" to mapOf(
-                "fps" to mosaic.targetFps,
-                "mosaicHeight" to mosaic.targetHeight,
+            "stream" to mapOf(
+                "size" to "${mosaic.mosaicWidth()}x${mosaic.mosaicHeight()}",
+                "width" to mosaic.mosaicWidth(),
+                "height" to mosaic.mosaicHeight(),
+                "fps" to (h264?.measuredFps() ?: mosaic.sourceFps()),
+                "sourceFps" to mosaic.sourceFps(),
                 "frameIntervalMs" to frameIntervalMs(),
-                "source" to "platform",
+                "source" to "cameras",
             ),
             "usageBytes" to usage.first,
             "usageCount" to usage.second,

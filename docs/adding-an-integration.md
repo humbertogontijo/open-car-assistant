@@ -33,7 +33,7 @@ libs/api/                       # :integration-api — SPI
 ## Steps
 
 1. Create `integrations/<platform-id>/` as above.
-2. Fill `platform.json` (`backend`: `vhal`, `"extends": ["aosp", "android"]`). Prefer config over Kotlin for properties / match. Put the full HU property catalog under `properties` (`id`, `key`, `access`, `areas`, optional `entity`). Use `access: "rw"` (or `"w"`) for product-writable props. Copy structure from **`ihu629g`** (simple) rather than Antora when starting out; regenerate Antora-scale catalogs with `tools/gen-platform-properties`.
+2. Fill `platform.json` (`backend`: `vhal`, `"extends": ["aosp", "android"]`). Prefer config over Kotlin for properties / match. Put the full HU property catalog under `properties` (`id`, `key`, `access`, `areas`, optional `entity`). Use `access: "rw"` (or `"w"`) for product-writable props. Copy structure from **`ihu629g`** (simple) rather than Antora when starting out; regenerate Antora-scale catalogs with `tools/gen-platform-properties`. For surround cameras, add `cameras: [{ "role": "front", "cameraId": "0" }, …]` (roles: front/right/rear/left) — mosaic size/fps come from the cameras, not a `dvr` quality block.
 3. Implement `VehicleIntegration` (+ optional `warm`, `createQuickEntry`, `wakeSignals`) on `VehiclePropertyBackend` / `CarPropertyBackend`. Prefer implementing `observe()` when the transport can push property changes; leave it null so the session polls (~1s). The product UI is event-driven (`session.telemetry()` / `events()` → `/api/events` WebSocket) either way.
 4. Product writes are gated by `access` `w`/`rw` (derived allowlist). OEM-specific Android bits (e.g. `VOLUME_GROUP/*`) go under `android.volumeGroups` in the integration file — shared wifi/bt/brightness live in `platform/android.json`.
 5. Register the class in `META-INF/services/cc.opencar.assistant.api.VehicleIntegration` (one FQCN per line).
@@ -75,10 +75,10 @@ JSON shape:
 
 - **Reuse common keys** for shared controls (`control.*`, `opt.*`, `nav.*`, `sensor.*`). Integrations do not need to redefine them.
 - **Override** a common key in the integration pack when the platform wording differs.
-- **valueMaps** map live numeric/string values → i18n keys (resolved for segments, telemetry, and `valueLabel` on controls).
+- **valueMaps** map live numeric/string values → i18n keys. The app serves packs via `GET /api/i18n`; the **web client** resolves them at render time (`t()` / `valueLabel()` / `entityLabel()`). Entity APIs send `labelKey`, `hintKey`, `options[].labelKey`, `valueMapId`, and raw `value` — not translated strings.
 - `platform.json` `driveModeEnum` values should be **i18n keys** (e.g. `"6": "drive_mode.normal"`), not localized literals.
 - Product `EntityDef` uses `labelKey` / `hintKey` defaults `control.<id>` / `control.<id>.hint`.
-- Locale: `GET /api/i18n`, `POST /api/locale`, Sistema → Idioma (pt-BR / en).
+- Locale: `GET /api/i18n`, `POST /api/locale`, Sistema → Idioma (pt-BR / en). Locale switch reloads the dictionary; cards re-render from keys without a catalog rebuild.
 - New OEM enum literals belong in `platform.json` / valueMaps, not in `EntityRegistry`.
 
 ## Variants vs new modules

@@ -44,31 +44,31 @@ class EntityHistoryRecorder(
             }
             session.telemetry().collectLatest { snap ->
                 val now = System.currentTimeMillis()
-                record("sensor_gear", "home", "sensor", snap.gear?.toString(), now)
-                record("sensor_speed", "home", "sensor", snap.speedKmh?.let { "%.0f".format(it) }, now)
+                record("sensor.gear", "home", "sensor", snap.gear?.toString(), now)
+                record("sensor.speed", "home", "sensor", snap.speedKmh?.let { "%.0f".format(it) }, now)
                 record(
-                    "sensor_soc", "home", "sensor",
+                    "sensor.soc", "home", "sensor",
                     (snap.evBatteryPercent ?: snap.hybridSocPercent)?.let { "%.0f".format(it) },
                     now,
                 )
-                record("sensor_fuel", "home", "sensor", snap.fuelPercent?.let { "%.0f".format(it) }, now)
-                record("sensor_range", "home", "sensor", snap.rangeKm?.let { "%.0f".format(it) }, now)
-                record("sensor_range_ev", "home", "sensor", snap.rangeEvKm?.let { "%.0f".format(it) }, now)
-                record("sensor_range_fuel", "home", "sensor", snap.rangeFuelKm?.let { "%.0f".format(it) }, now)
-                record("sensor_odometer", "home", "sensor", snap.odometerKm?.let { "%.0f".format(it) }, now)
-                record("drive_mode", "drive", "drive_mode", snap.driveMode, now)
+                record("sensor.fuel", "home", "sensor", snap.fuelPercent?.let { "%.0f".format(it) }, now)
+                record("sensor.range", "home", "sensor", snap.rangeKm?.let { "%.0f".format(it) }, now)
+                record("sensor.range_ev", "home", "sensor", snap.rangeEvKm?.let { "%.0f".format(it) }, now)
+                record("sensor.range_fuel", "home", "sensor", snap.rangeFuelKm?.let { "%.0f".format(it) }, now)
+                record("sensor.odometer", "home", "sensor", snap.odometerKm?.let { "%.0f".format(it) }, now)
+                record("drivetrain.vehicle", "drive", "drivetrain", snap.driveMode, now)
                 record(
-                    "climate", "controls", "climate",
+                    "climate.cabin", "controls", "climate",
                     snap.hvacTempC?.let { "%.1f".format(it) },
                     now,
                 )
                 record(
-                    "sensor_temp_ambient", "controls", "climate",
+                    "sensor.temp_ambient", "controls", "climate",
                     snap.tempAmbientC?.let { "%.0f".format(it) },
                     now,
                 )
                 record(
-                    "sensor_battery_temp", "energy", "energy",
+                    "sensor.battery_temp", "energy", "energy",
                     snap.batteryTempC?.let { "%.0f".format(it) },
                     now,
                 )
@@ -78,22 +78,22 @@ class EntityHistoryRecorder(
                     now,
                 )
                 record(
-                    "sensor_charge_plug", "energy", "charging",
+                    "sensor.charge_plug", "energy", "charging",
                     snap.chargePlugConnected?.let { if (it) "1" else "0" },
                     now,
                 )
                 record(
-                    "sensor_hybrid_soc", "energy", "energy",
+                    "sensor.hybrid_soc", "energy", "energy",
                     snap.hybridSocPercent?.let { "%.0f".format(it) },
                     now,
                 )
                 record(
-                    "sensor_avg_energy", "energy", "energy",
+                    "sensor.avg_energy", "energy", "energy",
                     snap.avgEnergyKwh100km?.let { "%.1f".format(it) },
                     now,
                 )
                 record(
-                    "sensor_avg_fuel", "energy", "energy",
+                    "sensor.avg_fuel", "energy", "energy",
                     snap.avgFuelL100km?.let { "%.1f".format(it) },
                     now,
                 )

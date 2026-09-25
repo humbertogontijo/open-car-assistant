@@ -103,3 +103,35 @@ class DvrStorageMathTest {
         assertFalse(deleted.contains("active.mp4"))
     }
 }
+
+class MosaicLayoutTest {
+    @Test
+    fun fourEqualTilesMake2x2Canvas() {
+        val tiles = listOf(
+            640 to 480,
+            640 to 480,
+            640 to 480,
+            640 to 480,
+        )
+        assertEquals(1280 to 960, MosaicLayout.canvasSize(tiles))
+        assertEquals(2, MosaicLayout.colsFor(4))
+    }
+
+    @Test
+    fun mixedSizesUseMaxPerColumnAndRow() {
+        val tiles = listOf(
+            640 to 480,
+            800 to 480,
+            640 to 360,
+            640 to 480,
+        )
+        // cols=2: col0 max(640,640)=640, col1 max(800,640)=800 → 1440
+        // rows=2: row0 max(480,480)=480, row1 max(360,480)=480 → 960
+        assertEquals(1440 to 960, MosaicLayout.canvasSize(tiles))
+    }
+
+    @Test
+    fun emptyFallsBack() {
+        assertEquals(640 to 480, MosaicLayout.canvasSize(emptyList()))
+    }
+}

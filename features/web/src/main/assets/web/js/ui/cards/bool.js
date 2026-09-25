@@ -1,7 +1,6 @@
 import { loadCss } from "../load-css.js";
 loadCss("/static/js/ui/cards/bool.css");
 
-import { t } from "../../i18n.js";
 import { segmentToggle } from "./choice.js";
 
 export function isOn(v) {
@@ -10,8 +9,8 @@ export function isOn(v) {
 
 export function boolOpts() {
   return [
-    { value: "0", label: t("value.off", "Off") },
-    { value: "1", label: t("value.on", "On") },
+    { value: "0", labelKey: "common.off" },
+    { value: "1", labelKey: "common.on" },
   ];
 }
 

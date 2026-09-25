@@ -24,10 +24,24 @@
     "GEAR_EVENTS",
     "IGNITION_EVENTS"
   ],
-  "dvr": {
-    "fps": 5,
-    "mosaicHeight": 720
-  },
+  "cameras": [
+    {
+      "role": "front",
+      "cameraId": "0"
+    },
+    {
+      "role": "right",
+      "cameraId": "1"
+    },
+    {
+      "role": "rear",
+      "cameraId": "2"
+    },
+    {
+      "role": "left",
+      "cameraId": "3"
+    }
+  ],
   "variants": [
     {
       "id": "phev",
@@ -152,7 +166,8 @@
       "changeMode": "on_change",
       "areas": [
         0
-      ]
+      ],
+      "entity": "parking_brake"
     },
     {
       "id": "0x11200405",
@@ -193,11 +208,12 @@
     {
       "id": "0x11200b45",
       "key": "MIRROR_FOLD",
-      "access": "r",
+      "access": "rw",
       "changeMode": "on_change",
       "areas": [
         0
-      ]
+      ],
+      "entity": "mirror_fold"
     },
     {
       "id": "0x11200f05",
@@ -705,25 +721,27 @@
     {
       "id": "0x13200514",
       "key": "HVAC_ELECTRIC_DEFROSTER_ON",
-      "access": "r",
+      "access": "rw",
       "changeMode": "on_change",
       "areas": [
         2
-      ]
+      ],
+      "entity": "hvac_electric_defrost"
     },
     {
       "id": "0x13200bc4",
       "key": "WINDOW_LOCK",
-      "access": "r",
+      "access": "rw",
       "changeMode": "on_change",
       "areas": [
         1344
-      ]
+      ],
+      "entity": "window_lock"
     },
     {
       "id": "0x13400bc0",
       "key": "WINDOW_POS",
-      "access": "r",
+      "access": "rw",
       "changeMode": "on_change",
       "areas": [
         16,
@@ -732,12 +750,13 @@
         1024,
         65536,
         131072
-      ]
+      ],
+      "entity": "window_pos"
     },
     {
       "id": "0x13400bc1",
       "key": "WINDOW_MOVE",
-      "access": "r",
+      "access": "rw",
       "changeMode": "on_change",
       "areas": [
         65536,
@@ -807,11 +826,12 @@
     {
       "id": "0x15200512",
       "key": "HVAC_AUTO_RECIRC_ON",
-      "access": "r",
+      "access": "rw",
       "changeMode": "on_change",
       "areas": [
         117
-      ]
+      ],
+      "entity": "hvac_auto_recirc"
     },
     {
       "id": "0x1540010a",
@@ -943,7 +963,7 @@
     {
       "id": "0x16200b02",
       "key": "DOOR_LOCK",
-      "access": "r",
+      "access": "rw",
       "changeMode": "on_change",
       "areas": [
         1,
@@ -955,7 +975,7 @@
     {
       "id": "0x16400b00",
       "key": "DOOR_POS",
-      "access": "r",
+      "access": "rw",
       "changeMode": "on_change",
       "areas": [
         1,
@@ -968,11 +988,12 @@
     {
       "id": "0x16400b01",
       "key": "DOOR_MOVE",
-      "access": "r",
+      "access": "rw",
       "changeMode": "on_change",
       "areas": [
         536870912
-      ]
+      ],
+      "entity": "trunk_move"
     },
     {
       "id": "0x17600309",
@@ -1173,11 +1194,12 @@
     {
       "id": "0x2120701a",
       "key": "SETTING_FUNC_PBC_DOUBLE_EPB_SWITCH",
-      "access": "r",
+      "access": "rw",
       "changeMode": "on_change",
       "areas": [
         0
-      ]
+      ],
+      "entity": "epb"
     },
     {
       "id": "0x2120701f",
@@ -1259,11 +1281,12 @@
     {
       "id": "0x21207107",
       "key": "DM_FUNC_STEERING_WHEEL_FEEL_SYNC_DRIVEMODE",
-      "access": "r",
+      "access": "rw",
       "changeMode": "on_change",
       "areas": [
         0
-      ]
+      ],
+      "entity": "steer_sync_drive_mode"
     },
     {
       "id": "0x21207164",
@@ -1429,11 +1452,12 @@
     {
       "id": "0x2120720b",
       "key": "SETTING_FUNC_HUD_ANGLE_ADJUST",
-      "access": "r",
+      "access": "rw",
       "changeMode": "on_change",
       "areas": [
         0
-      ]
+      ],
+      "entity": "hud_angle"
     },
     {
       "id": "0x2120720c",
@@ -1487,11 +1511,12 @@
     {
       "id": "0x2120727c",
       "key": "CHARGE_FUNC_EXTERNAL_CHARGING_LIGHT",
-      "access": "r",
+      "access": "rw",
       "changeMode": "on_change",
       "areas": [
         0
-      ]
+      ],
+      "entity": "charge_external_light"
     },
     {
       "id": "0x21207281",
@@ -1680,8 +1705,7 @@
       "changeMode": "on_change",
       "areas": [
         0
-      ],
-      "entity": "steer_heavy"
+      ]
     },
     {
       "id": "0x2120748e",
@@ -1690,8 +1714,7 @@
       "changeMode": "on_change",
       "areas": [
         0
-      ],
-      "entity": "steer_medium"
+      ]
     },
     {
       "id": "0x2120748f",
@@ -1700,8 +1723,7 @@
       "changeMode": "on_change",
       "areas": [
         0
-      ],
-      "entity": "steer_soft"
+      ]
     },
     {
       "id": "0x212074a7",
@@ -2158,11 +2180,12 @@
     {
       "id": "0x21407185",
       "key": "SETTING_FUNC_STEERING_ASSISTANCE_LEVEL",
-      "access": "r",
+      "access": "rw",
       "changeMode": "on_change",
       "areas": [
         0
-      ]
+      ],
+      "entity": "steer_assist_level"
     },
     {
       "id": "0x21407191",
@@ -2460,11 +2483,12 @@
     {
       "id": "0x214073bc",
       "key": "BCM_FUNC_TRUNK_DOOR_STATUS",
-      "access": "r",
+      "access": "rw",
       "changeMode": "on_change",
       "areas": [
         0
-      ]
+      ],
+      "entity": "trunk_status"
     },
     {
       "id": "0x214073cd",
@@ -3035,11 +3059,12 @@
     {
       "id": "0x21407643",
       "key": "SETTING_FUNC_HUD_DISPLAY_MODE",
-      "access": "r",
+      "access": "rw",
       "changeMode": "on_change",
       "areas": [
         0
-      ]
+      ],
+      "entity": "hud_display_mode"
     },
     {
       "id": "0x21407646",
@@ -5604,7 +5629,7 @@
     {
       "id": "0x2420716d",
       "key": "BCM_FUNC_REAR_MIRROR_ADJUST",
-      "access": "r",
+      "access": "rw",
       "changeMode": "on_change",
       "areas": [
         1,
@@ -5771,12 +5796,13 @@
     {
       "id": "0x254070b5",
       "key": "HVAC_FUNC_AUTO_SEAT_VENTILATION",
-      "access": "r",
+      "access": "rw",
       "changeMode": "on_change",
       "areas": [
         1,
         4
-      ]
+      ],
+      "entity": "hvac_auto_seat_vent"
     },
     {
       "id": "0x254071c3",

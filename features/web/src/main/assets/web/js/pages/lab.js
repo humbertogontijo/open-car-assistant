@@ -1,6 +1,6 @@
 import { html, nothing, repeat } from "../lit.js";
 import { state, patch, notify } from "../store.js";
-import { t } from "../i18n.js";
+import { t, entityLabel, entityValueLabel } from "../i18n.js";
 import { api, fmt } from "../api.js";
 import { prefSegment } from "../ui/cards.js";
 
@@ -12,10 +12,10 @@ function probeRows() {
   if (tab === "entities") {
     rows = (state.entities || []).map(function (e) {
       return {
-        name: e.id || e.label || "",
+        name: e.id || entityLabel(e) || "",
         family: e.entity || e.group || "",
         status: e.status || "",
-        value: e.valueLabel || e.value || "",
+        value: entityValueLabel(e) || e.value || "",
         permission: e.group || "",
         entity: e.id || "",
       };

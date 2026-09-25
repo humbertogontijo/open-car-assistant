@@ -49,15 +49,18 @@ export function setupOverlayTemplate() {
           return html`<div class="setup-step ${st.done ? "done" : ""}">
             <div class="mark">${st.done ? "✓" : "·"}</div>
             <div class="body">
-              <h3>${st.title}</h3>
-              <p>${st.detail}</p>
+              <h3>${t(st.titleKey || st.title, st.title || st.id)}</h3>
+              <p>${t(st.detailKey || st.detail, st.detail || "")}</p>
             </div>
           </div>`;
         })}
         <ul class="setup-perms">
           ${(s.permissions || []).map(function (p) {
             return html`<li>
-              <span>${p.label} <span class="mono">(${p.kind})</span></span>
+              <span
+                >${t(p.labelKey || p.label, p.label || p.id)}
+                <span class="mono">(${p.kind})</span></span
+              >
               <span class="badge ${p.granted ? "ok" : "warn"}"
                 >${p.granted ? "OK" : "Pendente"}</span
               >
@@ -76,7 +79,7 @@ export function setupOverlayTemplate() {
               });
             }}
           >
-            ${actions.grant || t("setup.action.grant", "Conceder permissões")}
+            ${t(actions.grantKey || "setup.action.grant", actions.grant || "Conceder permissões")}
           </button>
           <button
             class="btn ghost"
@@ -90,7 +93,7 @@ export function setupOverlayTemplate() {
               }
             }}
           >
-            ${actions.host || t("setup.action.host", "Comando no PC")}
+            ${t(actions.hostKey || "setup.action.host", actions.host || "Comando no PC")}
           </button>
         </div>
         <p class="sub">ADB / host</p>
@@ -126,7 +129,7 @@ export function setupOverlayTemplate() {
               });
             }}
           >
-            ${actions.refresh || t("setup.action.refresh", "Atualizar")}
+            ${t(actions.refreshKey || "setup.action.refresh", actions.refresh || "Atualizar")}
           </button>
         </div>
       </div>

@@ -2,9 +2,10 @@ package cc.opencar.assistant.integrations.common
 
 import android.content.Context
 import cc.opencar.assistant.api.AndroidVolumeGroup
+import cc.opencar.assistant.api.CameraRoleConfig
+import cc.opencar.assistant.api.CameraSource
 import cc.opencar.assistant.api.Capability
 import cc.opencar.assistant.api.CatalogEntry
-import cc.opencar.assistant.api.DvrStreamConfig
 import cc.opencar.assistant.api.EntityRegistry
 import cc.opencar.assistant.api.PlatformVariant
 import cc.opencar.assistant.api.VehicleProperty
@@ -27,7 +28,8 @@ data class PlatformConfig(
     val properties: List<PropertyDef> = emptyList(),
     val android: AndroidConfig = AndroidConfig(),
     val driveModeEnum: Map<Int, String> = emptyMap(),
-    val dvr: DvrStreamConfig = DvrStreamConfig.DEFAULT,
+    /** Camera2 id → surround role map (`platform.json` → `cameras`). */
+    val cameras: List<CameraRoleConfig> = emptyList(),
 ) {
     data class Binding(val nativeId: Int, val areaId: Int = 0, val functionId: Int? = null)
 
@@ -119,7 +121,41 @@ data class PlatformConfig(
     fun androidVolumeGroups(): List<AndroidVolumeGroup> =
         android.volumeGroups.map { it.toApi() }
 
+    /**
+     * Bind available Camera2 ids to product roles from [cameras].
+     * When [cameras] is empty, falls back to unlabeled enumeration (compat).
+     * Role order for mosaic tiles: front, right, rear, left, then any extras.
+     */
+    fun resolveCameras(availableIds: Collection<String>): List<CameraSource> {
+        if (cameras.isEmpty()) {
+            return availableIds.mapIndexed { i, id ->
+                CameraSource(
+                    id = id,
+                    label = "Camera $i ($id)",
+                    cameraId = id,
+                )
+            }
+        }
+        val available = availableIds.toSet()
+        val byRole = cameras.associateBy { it.role }
+        val ordered = (CAMERA_ROLE_ORDER.mapNotNull { byRole[it] } +
+            cameras.filter { it.role !in CAMERA_ROLE_ORDER_SET })
+            .distinctBy { it.role }
+        return ordered.filter { it.cameraId in available }.map { cfg ->
+            val label = cfg.role.replaceFirstChar { c -> c.uppercase() }
+            CameraSource(
+                id = cfg.entityId,
+                label = label,
+                cameraId = cfg.cameraId,
+                role = cfg.role,
+            )
+        }
+    }
+
     companion object {
+        val CAMERA_ROLE_ORDER = listOf("front", "right", "rear", "left")
+        private val CAMERA_ROLE_ORDER_SET = CAMERA_ROLE_ORDER.toSet()
+
         fun load(context: Context, assetPath: String = "platform.json"): PlatformConfig {
             val text = context.assets.open(assetPath).bufferedReader().use { it.readText() }
             return parse(text) { name ->
@@ -290,14 +326,17 @@ data class PlatformConfig(
                     enumMap[k.toInt()] = eObj.getString(k)
                 }
             }
-            val dvrObj = root.optJSONObject("dvr")
-            val dvr = if (dvrObj != null) {
-                DvrStreamConfig(
-                    fps = dvrObj.optInt("fps", DvrStreamConfig.DEFAULT.fps),
-                    mosaicHeight = dvrObj.optInt("mosaicHeight", DvrStreamConfig.DEFAULT.mosaicHeight),
-                )
-            } else {
-                DvrStreamConfig.DEFAULT
+            val cameras = mutableListOf<CameraRoleConfig>()
+            val camArr = root.optJSONArray("cameras")
+            if (camArr != null) {
+                for (i in 0 until camArr.length()) {
+                    val o = camArr.optJSONObject(i) ?: continue
+                    val role = o.optString("role", "").trim()
+                    val cameraId = o.optString("cameraId", "").trim()
+                    if (role.isNotEmpty() && cameraId.isNotEmpty()) {
+                        cameras += CameraRoleConfig(role = role, cameraId = cameraId)
+                    }
+                }
             }
             return PlatformConfig(
                 id = root.getString("id"),
@@ -309,7 +348,7 @@ data class PlatformConfig(
                 properties = properties,
                 android = android,
                 driveModeEnum = enumMap,
-                dvr = dvr,
+                cameras = cameras,
             )
         }
 

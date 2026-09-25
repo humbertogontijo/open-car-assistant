@@ -7,6 +7,15 @@ import { iconSvg } from "../../icons.js";
 import { unitLabelFor } from "../../units.js";
 import { hideEntity, unhideEntity } from "../../actions.js";
 
+/** Grid span overrides by domain (default 1×1). */
+export const DOMAIN_SPAN = {
+  climate: { cols: 1, rows: 2 },
+  media_player: { cols: 1, rows: 2 },
+  charger: { cols: 1, rows: 2 },
+  light: { cols: 1, rows: 2 },
+  cover: { cols: 1, rows: 1 },
+};
+
 export function icon(name) {
   return unsafeHTML(iconSvg(name || "sensor"));
 }
@@ -69,14 +78,13 @@ export function hideBtn(id, restore) {
 
 /**
  * Dashboard grid span by domain (frontend-only).
- * Default 1×1; climate composite + media_player use 1×2 (two rows).
  * @returns {{ cols: number, rows: number }}
  */
 export function cardSpan(c) {
   if (!c) return { cols: 1, rows: 1 };
-  if (c.id === "climate" || c.input === "climate") return { cols: 1, rows: 2 };
   const domain = c.domain || c.entity || c.input;
-  if (domain === "media_player" || c.input === "media_player") {
+  if (DOMAIN_SPAN[domain]) return DOMAIN_SPAN[domain];
+  if (c.input === "climate" || c.input === "media_player" || c.input === "light") {
     return { cols: 1, rows: 2 };
   }
   return { cols: 1, rows: 1 };

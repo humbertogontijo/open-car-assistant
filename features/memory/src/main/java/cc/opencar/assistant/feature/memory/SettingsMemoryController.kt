@@ -2,6 +2,7 @@ package cc.opencar.assistant.feature.memory
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -63,32 +64,81 @@ class SettingsMemoryController(
         }
     }
 
-    /** Fold old atomic hvac_* pins into climate when climate is not yet pinned. */
+    /**
+     * Fold old atomic hvac_* / `climate` pins into `climate.cabin`.
+     * HVAC modes are off/manual/auto — legacy power-on becomes `manual`, not `on`
+     * (bare `on` only toggles power and skips auto=0).
+     */
     private suspend fun migrateLegacyClimatePins() {
         val prefs = store.data.first()
-        if (prefs[booleanPreferencesKey(pinKey("climate"))] == true) return
+        val cabinPin = booleanPreferencesKey(pinKey(CLIMATE_CABIN))
+        val cabinVal = stringPreferencesKey(valueKey(CLIMATE_CABIN))
+
+        // Already on climate.cabin — normalize leftover "on" mode tokens.
+        if (prefs[cabinPin] == true) {
+            val raw = prefs[cabinVal] ?: return
+            val fixed = normalizeClimatePinMode(raw)
+            if (fixed != raw) store.edit { it[cabinVal] = fixed }
+            return
+        }
+
+        // Rename climate → climate.cabin (old id is no longer in pinIds).
+        if (prefs[booleanPreferencesKey(pinKey("climate"))] == true) {
+            val raw = prefs[stringPreferencesKey(valueKey("climate"))]
+            store.edit { e ->
+                e[cabinPin] = true
+                if (raw != null) e[cabinVal] = normalizeClimatePinMode(raw)
+                clearLegacyClimateKeys(e)
+            }
+            return
+        }
+
         val powerPinned = prefs[booleanPreferencesKey(pinKey("hvac_power"))] == true
         val tempPinned = prefs[booleanPreferencesKey(pinKey("hvac_temp"))] == true
         if (!powerPinned && !tempPinned) return
         val mode = when {
             powerPinned -> {
                 val raw = prefs[stringPreferencesKey(valueKey("hvac_power"))]
-                if (raw == "0" || raw.equals("false", true) || raw.equals("off", true)) "off" else "on"
+                if (raw == "0" || raw.equals("false", true) || raw.equals("off", true)) {
+                    "off"
+                } else {
+                    "manual"
+                }
             }
             else -> null
         }
         val temp = if (tempPinned) prefs[stringPreferencesKey(valueKey("hvac_temp"))] else null
         store.edit { e ->
-            e[booleanPreferencesKey(pinKey("climate"))] = true
+            e[cabinPin] = true
             when {
                 mode != null && temp != null ->
-                    e[stringPreferencesKey(valueKey("climate"))] = "hvac_mode:$mode;temperature:$temp"
-                mode != null -> e[stringPreferencesKey(valueKey("climate"))] = mode
-                temp != null -> e[stringPreferencesKey(valueKey("climate"))] = "temperature:$temp"
+                    e[cabinVal] = "hvac_mode:$mode;temperature:$temp"
+                mode != null -> e[cabinVal] = mode
+                temp != null -> e[cabinVal] = "temperature:$temp"
             }
-            for (legacy in LEGACY_CLIMATE_IDS) {
-                e.remove(booleanPreferencesKey(pinKey(legacy)))
-                e.remove(stringPreferencesKey(valueKey(legacy)))
+            clearLegacyClimateKeys(e)
+        }
+    }
+
+    private fun clearLegacyClimateKeys(e: MutablePreferences) {
+        for (legacy in LEGACY_CLIMATE_IDS) {
+            e.remove(booleanPreferencesKey(pinKey(legacy)))
+            e.remove(stringPreferencesKey(valueKey(legacy)))
+        }
+        e.remove(booleanPreferencesKey(pinKey("climate")))
+        e.remove(stringPreferencesKey(valueKey("climate")))
+    }
+
+    /** Map legacy `on` power tokens to product mode `manual`. */
+    private fun normalizeClimatePinMode(raw: String): String {
+        if (raw.equals("on", true)) return "manual"
+        return raw.split(';').joinToString(";") { token ->
+            val t = token.trim()
+            when {
+                t.equals("on", true) -> "manual"
+                t.equals("hvac_mode:on", true) || t.equals("hvac_mode_on", true) ->
+                    "hvac_mode:manual"
+                else -> t
             }
         }
     }
@@ -170,8 +220,8 @@ class SettingsMemoryController(
         for (id in pinIds) {
             if (prefs[booleanPreferencesKey(pinKey(id))] != true) continue
             val raw = prefs[stringPreferencesKey(valueKey(id))] ?: continue
-            // Multi-token climate pins: "hvac_mode:on;temperature:22"
-            if (id == "climate" && raw.contains(';')) {
+            // Multi-token climate pins: "hvac_mode:manual;temperature:22"
+            if ((id == CLIMATE_CABIN || id == "climate") && raw.contains(';')) {
                 for (token in raw.split(';').map { it.trim() }.filter { it.isNotEmpty() }) {
                     applyControl(id, token)
                 }
@@ -188,6 +238,8 @@ class SettingsMemoryController(
         fun requiredCapability(): Capability = Capability.WRITE_SETTINGS
         /** Match shortcut screen debounce so wake storms do not reapply repeatedly. */
         const val WAKE_REAPPLY_DEBOUNCE_MS = 5_000L
+
+        private const val CLIMATE_CABIN = "climate.cabin"
 
         private val LEGACY_CLIMATE_IDS = listOf(
             "hvac_power", "hvac_ac", "hvac_auto", "hvac_recirc",

@@ -11,26 +11,20 @@ import { familySections } from "./group.js";
 import { dashSummary, pickEntities, withoutIds } from "../ui/dashboard.js";
 
 var DRIVE_HERO_IDS = [
-  "sensor_speed",
-  "sensor_gear",
-  "drive_mode",
-  "regen",
+  "sensor.speed",
+  "sensor.gear",
 ];
 
 export function pageDrive() {
   const group = "drive";
   const viewing = isShowingHidden(group);
   const items = viewing ? hiddenEntitiesByGroup(group) : entitiesByGroup(group);
-  // Status strip pulls home sensors + drive writables (one entity per property).
+  // Status strip: telemetry only. Drive composites stay in the card grid below.
   const pool = viewing
     ? items
     : (state.entities || []).filter(function (e) {
         return (
-          (e.group === "drive" ||
-            e.id === "sensor_speed" ||
-            e.id === "sensor_gear" ||
-            e.id === "drive_mode" ||
-            e.id === "regen") &&
+          (e.id === "sensor.speed" || e.id === "sensor.gear") &&
           (e.status === "ok" || e.status === "cached")
         );
       });

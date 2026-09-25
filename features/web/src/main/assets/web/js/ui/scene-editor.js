@@ -7,7 +7,7 @@ import { repeat } from "../lit.js";
 import { api } from "../api.js";
 import { state, notify } from "../store.js";
 import { prefCard, boolToggle, choiceSelect, boolOpts } from "./cards.js";
-import { t } from "../i18n.js";
+import { t, entityLabel, optionLabel } from "../i18n.js";
 
 function writableControls() {
   return (state.controls || state.entities || []).filter(function (c) {
@@ -34,7 +34,8 @@ export function valueOptionsForControl(c) {
     return c.options.map(function (o) {
       return {
         value: String(o.value),
-        label: o.label != null ? String(o.label) : String(o.value),
+        label: optionLabel(o),
+        labelKey: o.labelKey,
       };
     });
   }
@@ -52,14 +53,14 @@ export function valueOptionsForControl(c) {
       { value: "idle", label: t("media_player.idle", "Idle") },
     ];
   }
-  if (c.id === "climate" || c.input === "climate") {
+  if (c.domain === "climate" || c.id === "climate.cabin" || c.id === "climate" || c.input === "climate") {
     const modes = (c.attributes && c.attributes.hvac_modes) || [
-      "off", "auto", "cool", "heat", "fan_only",
+      "off", "manual", "auto",
     ];
     return modes.map(function (m) {
       const key = String(m);
       return {
-        value: key === "off" || key === "on" ? key : "hvac_mode:" + key,
+        value: key === "off" ? key : "hvac_mode:" + key,
         label: t("climate.mode." + key, key),
       };
     });
@@ -223,7 +224,7 @@ function targetRow(edit, raw, i, controls, opts) {
     <div class="shortcut-action">
       ${choiceSelect({
         options: controls.map(function (c) {
-          return { value: c.id, label: c.label || c.id };
+          return { value: c.id, label: entityLabel(c) };
         }),
         current: trow.entityId || "",
         choiceKey: "scene-target-entity-" + i,

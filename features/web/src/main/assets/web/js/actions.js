@@ -65,7 +65,6 @@ function applyTransportHold(row) {
   }
   const updated = Object.assign({}, row, {
     value: held,
-    valueLabel: mediaStateLabel(held) || row.valueLabel,
   });
   if (updated.state !== undefined) updated.state = held;
   return updated;
@@ -89,7 +88,6 @@ export function mergeTransportHold(list) {
 function optimisticControlValue(id, value) {
   if (!id || value == null) return;
   setTransportHold(id, value);
-  const label = mediaStateLabel(value);
   function bump(list) {
     if (!list || !list.length) return list;
     let next = null;
@@ -98,7 +96,6 @@ function optimisticControlValue(id, value) {
       if (!row || row.id !== id) continue;
       if (next == null) next = list.slice();
       const updated = Object.assign({}, row, { value: value });
-      if (label) updated.valueLabel = label;
       if (updated.state !== undefined) updated.state = value;
       next[i] = updated;
       break;

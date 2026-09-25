@@ -5,7 +5,6 @@ import android.hardware.camera2.CameraManager
 import android.util.Log
 import cc.opencar.assistant.api.CameraSource
 import cc.opencar.assistant.api.CatalogEntry
-import cc.opencar.assistant.api.DvrStreamConfig
 import cc.opencar.assistant.api.PlatformVariant
 import cc.opencar.assistant.api.PropertyValue
 import cc.opencar.assistant.api.ReadOutcome
@@ -165,14 +164,12 @@ class Ihu629gSession(
     override fun cameras(): List<CameraSource> {
         return try {
             val cm = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-            cm.cameraIdList.mapIndexed { i, id -> CameraSource(id, "Camera $i", id) }
+            platform.resolveCameras(cm.cameraIdList.toList())
         } catch (t: Throwable) {
             Log.w(TAG, "cameras: ${t.message}")
             emptyList()
         }
     }
-
-    override fun dvrStreamConfig(): DvrStreamConfig = platform.dvr
 
     override fun close() {
         telemetryJob?.cancel()
@@ -181,8 +178,17 @@ class Ihu629gSession(
         backend.close()
     }
 
-    private fun resolve(property: VehicleProperty): Pair<Int, Int>? =
-        bindings[property] ?: platform.bindings[property.key]?.let { it.nativeId to it.areaId }
+    private fun resolve(property: VehicleProperty): Pair<Int, Int>? {
+        bindings[property]?.let { (id, area) ->
+            val preferred = property.defaultAreaId
+            return id to if (preferred != 0) preferred else area
+        }
+        platform.bindings[property.key]?.let {
+            val preferred = property.defaultAreaId
+            return it.nativeId to if (preferred != 0) preferred else it.areaId
+        }
+        return null
+    }
 
     private fun decode(property: VehicleProperty, raw: Any?): PropertyValue? {
         if (raw == null) return null

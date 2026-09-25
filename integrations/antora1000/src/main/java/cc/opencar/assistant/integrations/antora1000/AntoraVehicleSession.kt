@@ -5,7 +5,6 @@ import android.hardware.camera2.CameraManager
 import android.util.Log
 import cc.opencar.assistant.api.CameraSource
 import cc.opencar.assistant.api.CatalogEntry
-import cc.opencar.assistant.api.DvrStreamConfig
 import cc.opencar.assistant.api.PlatformVariant
 import cc.opencar.assistant.api.PropertyValue
 import cc.opencar.assistant.api.ReadOutcome
@@ -200,16 +199,12 @@ class AntoraVehicleSession(
     override fun cameras(): List<CameraSource> {
         return try {
             val cm = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-            cm.cameraIdList.mapIndexed { index, id ->
-                CameraSource(id = id, label = "Camera $index ($id)", cameraId = id)
-            }
+            platform.resolveCameras(cm.cameraIdList.toList())
         } catch (t: Throwable) {
             Log.w(TAG, "camera enum failed: ${t.message}")
             emptyList()
         }
     }
-
-    override fun dvrStreamConfig(): DvrStreamConfig = platform.dvr
 
     override fun androidVolumeGroups() = platform.androidVolumeGroups()
 
@@ -268,15 +263,23 @@ class AntoraVehicleSession(
     }
 
     private fun resolve(property: VehicleProperty): Pair<Int, Int>? {
-        bindings[property]?.let { return it }
-        bindings.entries.firstOrNull { it.key.key == property.key }?.value?.let { return it }
+        bindings[property]?.let { (id, area) ->
+            val preferred = property.defaultAreaId
+            return id to if (preferred != 0) preferred else area
+        }
+        bindings.entries.firstOrNull { it.key.key == property.key }?.value?.let { (id, area) ->
+            val preferred = property.defaultAreaId
+            return id to if (preferred != 0) preferred else area
+        }
         val native = property.nativeId?.toInt()
         if (native != null) return native to property.defaultAreaId
         val fromCatalog = catalogEntries.firstOrNull {
             it.property.key == property.key || it.name == property.key
         }
         val id = fromCatalog?.property?.nativeId?.toInt() ?: return null
-        return id to (fromCatalog.areaIds.firstOrNull() ?: 0)
+        val preferred = property.defaultAreaId
+        val catalogArea = fromCatalog.areaIds.firstOrNull() ?: 0
+        return id to if (preferred != 0) preferred else catalogArea
     }
 
     private fun readSnapshot(): TelemetrySnapshot {

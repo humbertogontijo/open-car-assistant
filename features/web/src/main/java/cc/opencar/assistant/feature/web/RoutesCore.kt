@@ -34,7 +34,7 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
                 "locale" to i18n.locale,
                 "locales" to I18nBundle.SUPPORTED,
                 "remote" to (host != "127.0.0.1" && host != "localhost" && host != "::1"),
-                "telemetry" to telemetryPayload(snap, i18n),
+                "telemetry" to telemetryPayload(snap),
                 "setup" to SetupStatus.snapshot(context, session, prefs),
                 "plugins" to deps.pluginDetailMaps(),
                 "dvr" to deps.dvr.status(),
@@ -66,7 +66,6 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
         val loc = I18nBundle.normalize(raw)
         prefs.edit().putString(I18nBundle.PREF_LOCALE, loc).apply()
         I18nBundle.invalidateCache()
-        CatalogResponseCache.invalidate()
         val i18n = I18nBundle.load(context, session.integrationId, loc)
         call.respond(
             mapOf(
@@ -94,7 +93,7 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
         val includeHidden = call.request.queryParameters["includeHidden"] == "1"
         val all = CatalogResponseCache.entities {
             val virtual = deps.shortcuts?.virtualEntityMaps().orEmpty()
-            (ControlCatalog.entities(session, context, memory, deps.androidSettings, deps.locationTracker) + virtual).map { row ->
+            (ControlCatalog.entities(session, context, memory, deps.androidSettings, deps.locationTracker, deps.dvr) + virtual).map { row ->
                 val id = row["id"] as? String
                 EntityContract.enrich(row) + ("hidden" to (id != null && id in hidden))
             }
@@ -104,7 +103,7 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
     get("/api/entities/hidden") {
         val hidden = deps.entityVisibility.hiddenIds()
         val virtual = deps.shortcuts?.virtualEntityMaps().orEmpty()
-        val all = ControlCatalog.entities(session, context, memory, deps.androidSettings, deps.locationTracker) + virtual
+        val all = ControlCatalog.entities(session, context, memory, deps.androidSettings, deps.locationTracker, deps.dvr) + virtual
         call.respond(
             mapOf(
                 "ids" to hidden.toList().sorted(),
@@ -118,7 +117,7 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
         val id = call.parameters["id"] ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("ok" to false))
         val hidden = deps.entityVisibility.hiddenIds()
         val virtual = deps.shortcuts?.virtualEntityMaps().orEmpty()
-        val row = (ControlCatalog.entities(session, context, memory, deps.androidSettings, deps.locationTracker) + virtual)
+        val row = (ControlCatalog.entities(session, context, memory, deps.androidSettings, deps.locationTracker, deps.dvr) + virtual)
             .firstOrNull { it["id"] == id }
             ?: return@get call.respond(HttpStatusCode.NotFound, mapOf("ok" to false, "error" to "not found"))
         call.respond(EntityContract.enrich(row) + ("hidden" to (id in hidden)))
@@ -248,7 +247,7 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
             ?: (end - 24L * 60 * 60 * 1000)
         val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 2000
         val virtual = deps.shortcuts?.virtualEntityMaps().orEmpty()
-        val entityMeta = (ControlCatalog.entities(session, context, memory, deps.androidSettings, deps.locationTracker) + virtual)
+        val entityMeta = (ControlCatalog.entities(session, context, memory, deps.androidSettings, deps.locationTracker, deps.dvr) + virtual)
             .firstOrNull { it["id"] == entityId }
             ?.let { EntityContract.enrich(it) }
         call.respond(

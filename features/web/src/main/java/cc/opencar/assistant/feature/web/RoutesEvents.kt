@@ -2,7 +2,6 @@ package cc.opencar.assistant.feature.web
 
 import cc.opencar.assistant.api.EntityRegistry
 import cc.opencar.assistant.api.VehicleEvent
-import cc.opencar.assistant.support.I18nBundle
 import com.google.gson.Gson
 import io.ktor.server.routing.Routing
 import io.ktor.server.websocket.webSocket
@@ -23,18 +22,15 @@ import kotlinx.coroutines.launch
 internal fun Routing.registerEventRoutes(deps: OcaWebDeps) {
     val session = deps.session
     val gson = Gson()
-    val context = deps.context
 
     webSocket("/api/events") {
         try {
             send(Frame.Text(gson.toJson(mapOf("t" to "hello"))))
-            // Locale is fixed for the life of the socket; clients refresh after /api/locale.
-            val i18n = I18nBundle.load(context, session.integrationId)
             val telemetryJob = launch {
                 session.telemetry().distinctUntilChanged().collect { snap ->
                     val payload = mapOf(
                         "t" to "telemetry",
-                        "telemetry" to telemetryPayload(snap, i18n),
+                        "telemetry" to telemetryPayload(snap),
                         "dvr" to deps.dvr.status(),
                     )
                     send(Frame.Text(gson.toJson(payload)))

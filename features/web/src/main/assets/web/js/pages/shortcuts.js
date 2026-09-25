@@ -5,7 +5,7 @@ import { api } from "../api.js";
 import { state, notify, findControl } from "../store.js";
 import { prefCard, segmentToggle, choiceSelect, boolToggle, prefSegment } from "../ui/cards.js";
 import { runPref } from "../actions.js";
-import { t } from "../i18n.js";
+import { t, entityLabel } from "../i18n.js";
 import { sceneEditorCard, saveScene, blankScene, entityValueField, valueOptionsForControl } from "../ui/scene-editor.js";
 
 var ignoreTypeClicksUntil = 0;
@@ -426,7 +426,7 @@ function conditionRow(c, i, entities) {
       <div style="margin-top:8px">
         ${choiceSelect({
           options: entities.map(function (e) {
-            return { value: e.id, label: e.label || e.id };
+            return { value: e.id, label: entityLabel(e) };
           }),
           current: c.entityId || "",
           choiceKey: "sc-cond-entity-" + i,
@@ -737,7 +737,7 @@ function actionRow(a, i, controls, apps) {
     mid = html`
       ${choiceSelect({
         options: controls.map(function (c) {
-          return { value: c.id, label: c.label || c.id };
+          return { value: c.id, label: entityLabel(c) };
         }),
         current: a.entityId || "",
         choiceKey: "sc-action-entity-" + i,
@@ -1035,7 +1035,7 @@ function triggerRow(tr, i, controls) {
       <div style="margin-top:8px">
         ${choiceSelect({
           options: ents.map(function (c) {
-            return { value: c.id, label: c.label || c.id };
+            return { value: c.id, label: entityLabel(c) };
           }),
           current: tr.entityId || "",
           choiceKey: "sc-trig-entity-" + i,

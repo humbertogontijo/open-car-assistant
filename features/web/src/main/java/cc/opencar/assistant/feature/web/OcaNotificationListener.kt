@@ -87,7 +87,25 @@ class OcaNotificationListener : NotificationListenerService() {
     }
 
     private fun publish(controller: MediaController?) {
-        snapshot = MediaSnapshot.from(controller)
+        val next = MediaSnapshot.from(controller)
+        val prev = snapshot
+        snapshot = next
+        // Push live playback to the web shell — without this, pause/play from the
+        // car OEM UI only appears after an unrelated catalog reload.
+        if (next.playback != prev.playback) {
+            WebEventHub.emitEntity(
+                AndroidSettingsController.ID_MEDIA_PLAYER,
+                next.playback,
+                status = "ok",
+            )
+        }
+        if (next.title != prev.title ||
+            next.artist != prev.artist ||
+            next.album != prev.album ||
+            next.packageName != prev.packageName
+        ) {
+            WebEventHub.emitCatalog("media_meta")
+        }
     }
 
     companion object {
@@ -130,7 +148,18 @@ class OcaNotificationListener : NotificationListenerService() {
 
         fun refreshFromManager(context: android.content.Context): MediaSnapshot {
             val controller = activeController(context)
-            return MediaSnapshot.from(controller).also { snapshot = it }
+            val next = MediaSnapshot.from(controller)
+            val prev = snapshot
+            snapshot = next
+            // Same push path as the listener callback when catalogs refresh.
+            if (next.playback != prev.playback) {
+                WebEventHub.emitEntity(
+                    AndroidSettingsController.ID_MEDIA_PLAYER,
+                    next.playback,
+                    status = "ok",
+                )
+            }
+            return next
         }
 
         private fun pickBest(controllers: List<MediaController>?): MediaController? {

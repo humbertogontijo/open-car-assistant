@@ -42,10 +42,14 @@ class SharedH264Pipeline(
         Thread(r, "oca-h264-gl").apply { isDaemon = true }
     }
     @Volatile private var cameraTextures: List<SurfaceTexture> = emptyList()
+    @Volatile private var measuredFps: Int = fps
+    private val frameCount = AtomicLong(0)
+    private val measureWindowStartNs = AtomicLong(0)
     var lastError: String? = null
         private set
 
     fun isRunning(): Boolean = running.get()
+    fun measuredFps(): Int = measuredFps
     fun fmp4Init(): ByteArray? = fmp4.initSegment()
     fun fmp4Fragment(seq: Long): ByteArray? = fmp4.fragment(seq)
     fun hlsPlaylist(): String? = fmp4.hlsPlaylist()
@@ -84,10 +88,12 @@ class SharedH264Pipeline(
         }
         running.set(true)
 
-        val intervalMs = (1000L / fps.coerceIn(1, 30)).coerceAtLeast(66L)
+        val intervalMs = (1000L / fps.coerceIn(1, 30)).coerceAtLeast(33L)
         val attached = AtomicBoolean(false)
         val attachError = AtomicReference<String?>(null)
         val latch = CountDownLatch(1)
+        frameCount.set(0)
+        measureWindowStartNs.set(System.nanoTime())
         glJob = glExec.submit {
             var frames = 0
             try {
@@ -107,6 +113,15 @@ class SharedH264Pipeline(
                         encoder.onGlFramePresented()
                         encoder.drain(timeoutUs = 20_000L)
                         frames++
+                        val total = frameCount.incrementAndGet()
+                        val started = measureWindowStartNs.get()
+                        val elapsedNs = System.nanoTime() - started
+                        if (elapsedNs >= 1_000_000_000L) {
+                            measuredFps = ((total * 1_000_000_000L) / elapsedNs).toInt()
+                                .coerceIn(1, 60)
+                            frameCount.set(0)
+                            measureWindowStartNs.set(System.nanoTime())
+                        }
                         if (frames == 1 || frames == 15) {
                             Log.i(TAG, "GL frame=$frames hasInit=${fmp4.initSegment() != null}")
                         }
@@ -249,6 +264,11 @@ class SharedH264Pipeline(
         "running" to running.get(),
         "mode" to if (running.get()) "h264-gl" else "off",
         "gpu" to running.get(),
+        "width" to width,
+        "height" to height,
+        "fps" to fps,
+        "measuredFps" to measuredFps,
+        "size" to "${width}x${height}",
         "encoder" to encoder.codecName(),
         "hasInit" to (fmp4.initSegment() != null),
         "activeMp4" to activeMp4?.name,

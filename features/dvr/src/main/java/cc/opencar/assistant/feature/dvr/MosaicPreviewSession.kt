@@ -6,6 +6,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * Owns concurrent camera opens for the shared mosaic. Composition and encode
  * live in [SharedH264Pipeline] (GLES → MediaCodec).
+ *
+ * Mosaic canvas size and fps are derived from open camera preview sizes / rates.
  */
 class MosaicPreviewSession(
     private val cameras: CameraPreviewSession,
@@ -13,8 +15,9 @@ class MosaicPreviewSession(
     private val running = AtomicBoolean(false)
     private var orderedIds: List<String> = emptyList()
     @Volatile private var captureMode: String = "idle"
-    @Volatile var targetHeight: Int = DEFAULT_HEIGHT
-    @Volatile var targetFps: Int = DEFAULT_FPS
+    @Volatile private var mosaicW: Int = 640
+    @Volatile private var mosaicH: Int = 480
+    @Volatile private var sourceFps: Int = DEFAULT_FPS
     @Volatile var onStopped: (() -> Unit)? = null
     var lastError: String? = null
         private set
@@ -23,16 +26,13 @@ class MosaicPreviewSession(
     fun cameraIds(): List<String> = orderedIds
     fun camerasSession(): CameraPreviewSession = cameras
     fun captureMode(): String = captureMode
-    fun mosaicWidth(): Int = normalizeHeight(targetHeight) * 16 / 9
-    fun mosaicHeight(): Int = normalizeHeight(targetHeight)
+    fun mosaicWidth(): Int = mosaicW
+    fun mosaicHeight(): Int = mosaicH
+    /** Encoder / draw hint from camera preview fps ranges. */
+    fun sourceFps(): Int = sourceFps
 
     fun frameIntervalMs(): Long =
-        (1000L / targetFps.coerceIn(MIN_FPS, MAX_FPS)).coerceAtLeast(66L)
-
-    fun applyQuality(fps: Int, height: Int) {
-        targetFps = fps.coerceIn(MIN_FPS, MAX_FPS)
-        targetHeight = normalizeHeight(height)
-    }
+        (1000L / sourceFps.coerceIn(MIN_FPS, MAX_FPS)).coerceAtLeast(33L)
 
     @Synchronized
     fun start(ids: List<String>): Boolean {
@@ -48,10 +48,15 @@ class MosaicPreviewSession(
             orderedIds = emptyList()
             return false
         }
+        val sizes = cameras.previewSizes(ids)
+        val (w, h) = MosaicLayout.canvasSize(sizes)
+        mosaicW = w
+        mosaicH = h
+        sourceFps = cameras.previewFps(ids).coerceIn(MIN_FPS, MAX_FPS)
         captureMode = "concurrent"
         running.set(true)
         lastError = null
-        Log.i(TAG, "mosaic cameras ready (${ids.size})")
+        Log.i(TAG, "mosaic cameras ready (${ids.size}) ${w}x${h}@${sourceFps}fps")
         return true
     }
 
@@ -64,12 +69,17 @@ class MosaicPreviewSession(
         "captureMode" to captureMode,
         "cameras" to orderedIds,
         "size" to "${mosaicWidth()}x${mosaicHeight()}",
-        "fps" to targetFps,
-        "mosaicHeight" to targetHeight,
+        "width" to mosaicWidth(),
+        "height" to mosaicHeight(),
+        "fps" to sourceFps,
         "frameIntervalMs" to frameIntervalMs(),
         "format" to "h264",
         "lastError" to lastError,
         "camera" to cameras.status(),
+        "tileSizes" to orderedIds.map { id ->
+            val (w, h) = cameras.previewSize(id) ?: (0 to 0)
+            mapOf("id" to id, "width" to w, "height" to h)
+        },
     )
 
     private fun stopInternal() {
@@ -82,15 +92,8 @@ class MosaicPreviewSession(
 
     companion object {
         private const val TAG = "OcaMosaic"
-        const val DEFAULT_FPS = 5
-        const val DEFAULT_HEIGHT = 720
+        const val DEFAULT_FPS = 15
         const val MIN_FPS = 1
-        const val MAX_FPS = 15
-
-        fun normalizeHeight(h: Int): Int = when {
-            h <= 480 -> 480
-            h <= 720 -> 720
-            else -> 1080
-        }
+        const val MAX_FPS = 30
     }
 }

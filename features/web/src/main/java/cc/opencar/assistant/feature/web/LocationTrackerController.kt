@@ -10,7 +10,6 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import cc.opencar.assistant.api.EntityContract
 import cc.opencar.assistant.api.EntityType
-import cc.opencar.assistant.support.I18nBundle
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
@@ -88,19 +87,13 @@ class LocationTrackerController(
         return presence()?.state
     }
 
-    fun entityMaps(i18n: I18nBundle?): List<Map<String, Any?>> {
-        fun label(key: String, fb: String) = i18n?.t(key, fb) ?: fb
+    fun entityMaps(): List<Map<String, Any?>> {
         val presence = presence()
         val state = presence?.state
         val status = when {
             !hasLocationPermission() -> "denied"
             presence == null -> "unavailable"
             else -> "ok"
-        }
-        val valueLabel = when (state) {
-            STATE_HOME -> label("device_tracker.home", "Home")
-            STATE_NOT_HOME -> label("device_tracker.not_home", "Away")
-            else -> null
         }
         val home = homeSnapshot()
         val attrs = linkedMapOf<String, Any?>().apply {
@@ -120,28 +113,21 @@ class LocationTrackerController(
                     "id" to ID,
                     "group" to "vehicle",
                     "entity" to EntityType.DEVICE_TRACKER.id,
-                    "label" to label("device_tracker.vehicle", "Vehicle"),
-                    "hint" to label(
-                        "device_tracker.vehicle.hint",
-                        "GPS presence vs home location",
-                    ),
-                    "description" to label(
-                        "device_tracker.vehicle.hint",
-                        "GPS presence vs home location",
-                    ),
+                    "labelKey" to "device_tracker.vehicle",
+                    "hintKey" to "device_tracker.vehicle.hint",
                     "input" to "sensor",
                     "icon" to "drive",
                     "writable" to false,
                     "value" to state,
-                    "valueLabel" to valueLabel,
+                    "valueMapId" to "device_tracker",
                     "options" to listOf(
                         mapOf(
                             "value" to STATE_HOME,
-                            "label" to label("device_tracker.home", "Home"),
+                            "labelKey" to "device_tracker.home",
                         ),
                         mapOf(
                             "value" to STATE_NOT_HOME,
-                            "label" to label("device_tracker.not_home", "Away"),
+                            "labelKey" to "device_tracker.not_home",
                         ),
                     ),
                     "status" to status,
@@ -197,7 +183,7 @@ class LocationTrackerController(
 
     companion object {
         private const val TAG = "LocationTracker"
-        const val ID = "device_tracker_vehicle"
+        const val ID = "device_tracker.vehicle"
         const val STATE_HOME = "home"
         const val STATE_NOT_HOME = "not_home"
         const val PREF_HOME_LAT = "home_lat"

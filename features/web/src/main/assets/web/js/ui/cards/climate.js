@@ -2,10 +2,11 @@ import { loadCss } from "../load-css.js";
 loadCss("/static/js/ui/cards/climate.css");
 
 import { html, nothing } from "../../lit.js";
-import { t } from "../../i18n.js";
+import { t, entityLabel, entityHint } from "../../i18n.js";
 import { setControl, setPersist } from "../../actions.js";
 import { formatDisplayNumber } from "../../units.js";
 import { icon, displayUnit, pinSnapshot, hideBtn, cardSpan } from "./shared.js";
+import { segmentToggle, choiceSelect } from "./choice.js";
 
 function climateAttr(c, snake) {
   const attrs = c.attributes || {};
@@ -18,9 +19,7 @@ function climateModeLabel(mode) {
   const m = String(mode || "").toLowerCase();
   if (m === "off") return t("climate.mode.off", "Off");
   if (m === "auto") return t("climate.mode.auto", "Auto");
-  if (m === "cool") return t("climate.mode.cool", "Cool");
-  if (m === "heat") return t("climate.mode.heat", "Heat");
-  if (m === "fan_only") return t("climate.mode.fan_only", "Fan");
+  if (m === "manual" || m === "on") return t("climate.mode.manual", "Manual");
   return mode || "—";
 }
 
@@ -31,18 +30,25 @@ function climateMode(c) {
   const raw = c.value != null && c.value !== "" ? c.value : c.state;
   if (raw == null || raw === "") return "off";
   const s = String(raw).toLowerCase();
-  if (
-    s === "off" ||
-    s === "on" ||
-    s === "auto" ||
-    s === "cool" ||
-    s === "heat" ||
-    s === "fan_only" ||
-    s === "defrost"
-  ) {
-    return s;
-  }
+  if (s === "off" || s === "auto" || s === "manual") return s;
+  if (s === "on") return "manual";
   return "off";
+}
+
+function modeOptions(modes) {
+  return modes.map(function (m) {
+    return { value: m, label: climateModeLabel(m) };
+  });
+}
+
+function directionOptions(dirs) {
+  return dirs.map(function (d) {
+    return {
+      value: String(d),
+      labelKey: "opt.hvac_fan_direction." + d,
+      label: String(d),
+    };
+  });
 }
 
 export function climateCard(c, restore) {
@@ -52,7 +58,7 @@ export function climateCard(c, restore) {
   const modesRaw = climateAttr(c, "hvac_modes");
   const modes = Array.isArray(modesRaw)
     ? modesRaw.map(String)
-    : ["off", "auto", "cool", "heat", "fan_only"];
+    : ["off", "manual", "auto"];
   const tempMin = Number(
     climateAttr(c, "min_temp") != null ? climateAttr(c, "min_temp") : c.min != null ? c.min : 16,
   );
@@ -83,9 +89,17 @@ export function climateCard(c, restore) {
   const fanMax = Array.isArray(fanModesRaw) && fanModesRaw.length
     ? Math.max.apply(null, fanModesRaw.map(Number).filter(function (n) { return !isNaN(n); }))
     : 8;
+  const dirRaw = climateAttr(c, "fan_direction");
+  const fanDirection =
+    dirRaw != null && dirRaw !== "" && !isNaN(Number(dirRaw)) ? String(Number(dirRaw)) : null;
+  const dirsRaw = climateAttr(c, "fan_directions");
+  const fanDirections = Array.isArray(dirsRaw) && dirsRaw.length
+    ? dirsRaw.map(Number).filter(function (n) { return !isNaN(n); })
+    : [0, 1, 2, 3, 4];
   const acOn = Number(climateAttr(c, "ac") || 0) !== 0;
   const recircOn = Number(climateAttr(c, "recirc") || 0) !== 0;
   const unit = displayUnit(c) || "°C";
+  const hint = entityHint(c);
   const pinned = !!c.persistEnabled && pinSnapshot(c) != null;
   const pinTitle = pinned
     ? t("persist.unpin", "Unpin reboot value")
@@ -102,7 +116,6 @@ export function climateCard(c, restore) {
     let next = temp + delta;
     if (!isNaN(tempMin)) next = Math.max(tempMin, next);
     if (!isNaN(tempMax)) next = Math.min(tempMax, next);
-    // Avoid float drift (e.g. 22.5000001)
     next = Math.round(next / tempStep) * tempStep;
     send("temperature:" + next);
   }
@@ -114,23 +127,6 @@ export function climateCard(c, restore) {
     send("fan_mode:" + n);
   }
 
-  const modeChips = modes.map(function (m) {
-    const active = m === mode;
-    return html`
-      <button
-        type="button"
-        class="climate-mode-chip ${active ? "active" : ""}"
-        ?disabled=${locked}
-        aria-pressed=${active ? "true" : "false"}
-        @click=${function () {
-          send(m === "off" || m === "on" ? m : "hvac_mode:" + m);
-        }}
-      >
-        ${climateModeLabel(m)}
-      </button>
-    `;
-  });
-
   return html`
     <div
       class="ctrl-card climate-card ${powered ? "is-on" : ""} ${locked ? "locked" : ""} ${pinned ? "pinned" : ""}"
@@ -141,8 +137,8 @@ export function climateCard(c, restore) {
       <div class="ctrl-head">
         <div class="ctrl-icon">${icon(c.icon || "climate")}</div>
         <div class="ctrl-meta">
-          <h3>${c.label}</h3>
-          <p class="hint climate-state">${climateModeLabel(mode)}</p>
+          <h3>${entityLabel(c)}</h3>
+          ${hint ? html`<p class="hint">${hint}</p>` : nothing}
         </div>
         <div class="card-actions">
           ${hideBtn(c.id, restore)}
@@ -174,9 +170,17 @@ export function climateCard(c, restore) {
         </div>
       </div>
       <div class="ctrl-body climate-body">
-        <div class="climate-modes" role="group" aria-label=${t("climate.modes", "HVAC mode")}>
-          ${modeChips}
-        </div>
+        ${segmentToggle({
+          options: modeOptions(modes),
+          current: mode,
+          locked: locked,
+          choiceKey: "climate:" + c.id + ":mode",
+          onSelect: function (v) {
+            if (locked) return;
+            send(v === "off" ? v : "hvac_mode:" + v);
+          },
+        })}
+
         <div class="climate-temp-row">
           <div class="climate-temp-readout">
             <span class="climate-temp-target">
@@ -205,6 +209,7 @@ export function climateCard(c, restore) {
             >+</button>
           </div>
         </div>
+
         <div
           class="climate-fan-slider"
           role="group"
@@ -230,6 +235,18 @@ export function climateCard(c, restore) {
             }}
           />
         </div>
+
+        ${choiceSelect({
+          options: directionOptions(fanDirections),
+          current: fanDirection,
+          locked: locked,
+          choiceKey: "climate:" + c.id + ":dir",
+          onSelect: function (v) {
+            if (locked) return;
+            send("fan_direction:" + v);
+          },
+        })}
+
         <div class="climate-toggles" role="group" aria-label=${t("climate.toggles", "Climate options")}>
           <button
             type="button"
@@ -245,13 +262,6 @@ export function climateCard(c, restore) {
             aria-pressed=${recircOn ? "true" : "false"}
             @click=${function () { send("recirc:" + (recircOn ? "0" : "1")); }}
           >${t("control.hvac_recirc", "Recirc")}</button>
-          <button
-            type="button"
-            class="climate-toggle ${powered ? "active" : ""}"
-            ?disabled=${locked}
-            aria-pressed=${powered ? "true" : "false"}
-            @click=${function () { send(powered ? "off" : "on"); }}
-          >${powered ? t("climate.power.off", "Off") : t("climate.power.on", "On")}</button>
         </div>
       </div>
     </div>

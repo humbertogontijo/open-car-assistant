@@ -4,7 +4,7 @@
 import { api } from "./api.js";
 import { state, patchSilent, notify } from "./store.js";
 import { isTimelineBusy } from "./pages/index.js";
-import { heldTransportValue, mergeTransportHold, mediaStateLabel } from "./actions.js";
+import { heldTransportValue, mergeTransportHold } from "./actions.js";
 
 let socket = null;
 let reconnectTimer = 0;
@@ -63,11 +63,6 @@ function patchEntityRow(id, value, status) {
       if (value !== undefined) {
         updated.value = value;
         if (updated.state !== undefined) updated.state = value;
-        const label = mediaStateLabel(value);
-        if (label) updated.valueLabel = label;
-        else if (value === "playing" || value === "paused" || value === "idle") {
-          updated.valueLabel = undefined;
-        }
       }
       if (status != null) updated.status = status;
       next[i] = updated;

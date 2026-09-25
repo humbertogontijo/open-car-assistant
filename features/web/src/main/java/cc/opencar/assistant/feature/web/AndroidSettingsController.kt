@@ -15,7 +15,12 @@ import cc.opencar.assistant.api.AndroidVolumeGroup
 import cc.opencar.assistant.api.EntityContract
 import cc.opencar.assistant.api.EntityType
 import cc.opencar.assistant.feature.memory.ExternalSettingsApplier
-import cc.opencar.assistant.support.I18nBundle
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 /**
  * Android radios, brightness, and HA-style media_player for automations.
@@ -63,10 +68,28 @@ class AndroidSettingsController(
         }
     }
 
+    private var mediaWatchJob: Job? = null
+
     val cabinVolIds: Set<String> = volumeGroups.map { it.entityId }.toSet()
     val allIds: Set<String> = BASE_IDS + cabinVolIds
     val writableIds: Set<String> =
         BASE_IDS + volumeGroups.filter { it.keyWritable }.map { it.entityId }
+
+    /**
+     * Poll MediaSession when the notification listener is missing or silent —
+     * OEM pause/play otherwise only shows up after an unrelated catalog reload.
+     * Listener callbacks still push immediately via [OcaNotificationListener.publish].
+     */
+    fun start(scope: CoroutineScope) {
+        mediaWatchJob?.cancel()
+        mediaWatchJob = scope.launch(Dispatchers.Default) {
+            while (isActive) {
+                val hasListener = OcaNotificationListener.instance != null
+                delay(if (hasListener) 2_500L else 1_000L)
+                runCatching { mediaSnapshot() }
+            }
+        }
+    }
 
     fun status(): Map<String, Any?> {
         val w = wifi
@@ -294,11 +317,9 @@ class AndroidSettingsController(
     }
 
     fun entityMaps(
-        i18n: I18nBundle?,
         persist: Map<String, Map<String, Any?>>,
     ): List<Map<String, Any?>> {
         val st = status()
-        fun label(key: String, fb: String) = i18n?.t(key, fb) ?: fb
         val canWrite = st["canWriteSettings"] == true
         val brightness = brightnessOrNull()
         val media = mediaSnapshot()
@@ -306,24 +327,20 @@ class AndroidSettingsController(
         val wifiBt = listOf(
             boolEntity(
                 id = ID_WIFI,
-                label = label("control.android_wifi", "Wi‑Fi"),
-                hint = label("control.android_wifi.hint", "Pin to reapply on boot / gear"),
+                labelKey = "control.android.wifi",
+                hintKey = "control.android.wifi.hint",
                 enabled = st["wifiEnabled"] == true,
                 available = st["wifiAvailable"] == true,
                 pin = persist[ID_WIFI],
-                onLabel = label("common.on", "On"),
-                offLabel = label("common.off", "Off"),
                 group = "android",
             ),
             boolEntity(
                 id = ID_BT,
-                label = label("control.android_bluetooth", "Bluetooth"),
-                hint = label("control.android_bluetooth.hint", "Pin to reapply on boot / gear"),
+                labelKey = "control.android.bluetooth",
+                hintKey = "control.android.bluetooth.hint",
                 enabled = st["bluetoothEnabled"] == true,
                 available = st["bluetoothAvailable"] == true,
                 pin = persist[ID_BT],
-                onLabel = label("common.on", "On"),
-                offLabel = label("common.off", "Off"),
                 group = "android",
             ),
         )
@@ -333,20 +350,12 @@ class AndroidSettingsController(
                 "id" to ID_BRIGHTNESS,
                 "group" to "android",
                 "entity" to EntityType.ANDROID.id,
-                "label" to label("control.android_brightness", "Brightness"),
-                "hint" to label(
-                    "control.android_brightness.hint",
-                    "Screen brightness (0–255). Needs Modify system settings.",
-                ),
-                "description" to label(
-                    "control.android_brightness.hint",
-                    "Screen brightness (0–255). Needs Modify system settings.",
-                ),
+                "labelKey" to "control.android.brightness",
+                "hintKey" to "control.android.brightness.hint",
                 "input" to "int",
                 "icon" to "display",
                 "writable" to canWrite,
                 "value" to (brightness?.toString() ?: "0"),
-                "valueLabel" to (brightness?.toString()),
                 "min" to BRIGHTNESS_MIN,
                 "max" to BRIGHTNESS_MAX,
                 "step" to 5,
@@ -356,28 +365,22 @@ class AndroidSettingsController(
                 "history" to false,
                 "persistEnabled" to (persist[ID_BRIGHTNESS]?.get("enabled") == true),
                 "persistValue" to (persist[ID_BRIGHTNESS]?.get("value") as? String),
-                "persistLabel" to (persist[ID_BRIGHTNESS]?.get("value") as? String),
             ),
         )
 
         val playbackOpts = listOf(
-            mapOf("value" to "playing", "label" to label("media_player.playing", "Playing")),
-            mapOf("value" to "paused", "label" to label("media_player.paused", "Paused")),
-            mapOf("value" to "idle", "label" to label("media_player.idle", "Idle")),
+            mapOf("value" to "playing", "labelKey" to "media_player.playing"),
+            mapOf("value" to "paused", "labelKey" to "media_player.paused"),
+            mapOf("value" to "idle", "labelKey" to "media_player.idle"),
         )
         val commandOpts = listOf(
-            mapOf("value" to "play", "label" to label("media_player.play", "Play")),
-            mapOf("value" to "pause", "label" to label("media_player.pause", "Pause")),
-            mapOf("value" to "play_pause", "label" to label("media_player.play_pause", "Play/Pause")),
-            mapOf("value" to "next", "label" to label("media_player.next", "Next")),
-            mapOf("value" to "previous", "label" to label("media_player.previous", "Previous")),
-            mapOf("value" to "stop", "label" to label("media_player.stop", "Stop")),
+            mapOf("value" to "play", "labelKey" to "media_player.play"),
+            mapOf("value" to "pause", "labelKey" to "media_player.pause"),
+            mapOf("value" to "play_pause", "labelKey" to "media_player.play_pause"),
+            mapOf("value" to "next", "labelKey" to "media_player.next"),
+            mapOf("value" to "previous", "labelKey" to "media_player.previous"),
+            mapOf("value" to "stop", "labelKey" to "media_player.stop"),
         )
-        val playbackLabel = when (media.playback) {
-            "playing" -> label("media_player.playing", "Playing")
-            "paused" -> label("media_player.paused", "Paused")
-            else -> label("media_player.idle", "Idle")
-        }
         // Always expose a volume range for the card UI (CarVolumeGroup 0).
         val vol = mediaCabinVolume.read()
         val mediaAttrs = linkedMapOf<String, Any?>().apply {
@@ -402,20 +405,13 @@ class AndroidSettingsController(
                 "group" to "android",
                 "entity" to EntityType.MEDIA_PLAYER.id,
                 "domain" to EntityType.MEDIA_PLAYER.id,
-                "label" to label("control.media_player_vehicle", "Media player"),
-                "hint" to label(
-                    "control.media_player_vehicle.hint",
-                    "Active session (Spotify, radio, …). Metadata needs notification access.",
-                ),
-                "description" to label(
-                    "control.media_player_vehicle.hint",
-                    "Active session (Spotify, radio, …). Metadata needs notification access.",
-                ),
+                "labelKey" to "control.media_player.vehicle",
+                "hintKey" to "control.media_player.vehicle.hint",
                 "input" to "media_player",
                 "icon" to "sound",
                 "writable" to true,
                 "value" to media.playback,
-                "valueLabel" to playbackLabel,
+                "valueMapId" to "media_player",
                 "mediaTitle" to media.title,
                 "mediaArtist" to media.artist,
                 "mediaAlbum" to media.album,
@@ -433,7 +429,6 @@ class AndroidSettingsController(
                 "attributes" to mediaAttrs,
                 "persistEnabled" to (persist[ID_MEDIA_PLAYER]?.get("enabled") == true),
                 "persistValue" to (persist[ID_MEDIA_PLAYER]?.get("value") as? String),
-                "persistLabel" to (persist[ID_MEDIA_PLAYER]?.get("value") as? String),
             ),
         )
 
@@ -441,21 +436,17 @@ class AndroidSettingsController(
             val cv = cabinVolumes.getValue(def.entityId)
             val stVol = cv.read()
             val pin = persist[def.entityId]
-            val labelKey = "control.${def.entityId}"
-            val hintKey = "control.${def.entityId}.hint"
             EntityContract.enrich(
                 mapOf(
                     "id" to def.entityId,
                     "group" to "sound",
                     "entity" to EntityType.ANDROID.id,
-                    "label" to label(labelKey, def.entityId),
-                    "hint" to label(hintKey, "Cabin volume group ${def.groupId}"),
-                    "description" to label(hintKey, "Cabin volume group ${def.groupId}"),
+                    "labelKey" to "control.${def.entityId}",
+                    "hintKey" to "control.${def.entityId}.hint",
                     "input" to "int",
                     "icon" to "sound",
                     "writable" to def.keyWritable,
                     "value" to stVol.current.toString(),
-                    "valueLabel" to stVol.current.toString(),
                     "min" to stVol.min,
                     "max" to stVol.max,
                     "step" to 1,
@@ -465,7 +456,6 @@ class AndroidSettingsController(
                     "history" to false,
                     "persistEnabled" to (pin?.get("enabled") == true),
                     "persistValue" to (pin?.get("value") as? String),
-                    "persistLabel" to (pin?.get("value") as? String),
                 ),
             )
         }
@@ -475,13 +465,11 @@ class AndroidSettingsController(
 
     private fun boolEntity(
         id: String,
-        label: String,
-        hint: String,
+        labelKey: String,
+        hintKey: String,
         enabled: Boolean,
         available: Boolean,
         pin: Map<String, Any?>?,
-        onLabel: String,
-        offLabel: String,
         group: String,
     ): Map<String, Any?> {
         val value = if (enabled) "1" else "0"
@@ -492,21 +480,19 @@ class AndroidSettingsController(
                 "id" to id,
                 "group" to group,
                 "entity" to EntityType.ANDROID.id,
-                "label" to label,
-                "hint" to hint,
-                "description" to hint,
+                "labelKey" to labelKey,
+                "hintKey" to hintKey,
                 "input" to "bool",
                 "icon" to "system",
                 "writable" to available,
                 "value" to value,
-                "valueLabel" to if (enabled) onLabel else offLabel,
+                "binary" to true,
                 "status" to if (available) "ok" else "unavailable",
                 "needsPrivilege" to false,
                 "stale" to false,
                 "history" to false,
                 "persistEnabled" to pinEnabled,
                 "persistValue" to pVal,
-                "persistLabel" to pVal,
             ),
         )
     }
@@ -527,11 +513,11 @@ class AndroidSettingsController(
 
     companion object {
         private const val TAG = "AndroidSettings"
-        const val ID_WIFI = "android_wifi"
-        const val ID_BT = "android_bluetooth"
-        const val ID_BRIGHTNESS = "android_brightness"
+        const val ID_WIFI = "android.wifi"
+        const val ID_BT = "android.bluetooth"
+        const val ID_BRIGHTNESS = "android.brightness"
         /** HU active media session — HA-style media_player domain. */
-        const val ID_MEDIA_PLAYER = "media_player_vehicle"
+        const val ID_MEDIA_PLAYER = "media_player.vehicle"
         private const val BRIGHTNESS_MIN = 1
         private const val BRIGHTNESS_MAX = 255
         /** Pause(1)|Prev(16)|Next(32)|Stop(4096)|Play(16384)|Volume(4) — HA subset. */

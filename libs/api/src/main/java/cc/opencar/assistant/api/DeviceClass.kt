@@ -1,7 +1,7 @@
 package cc.opencar.assistant.api
 
 /**
- * Semantic measurement class, aligned with Home Assistant `device_class`.
+ * Semantic measurement / device class, aligned with Home Assistant `device_class`.
  * Used for icon defaults, history charts, and (deferred) MQTT/HA discovery — not for display text.
  */
 enum class DeviceClass(val id: String) {
@@ -18,6 +18,11 @@ enum class DeviceClass(val id: String) {
     PRESSURE("pressure"),
     HUMIDITY("humidity"),
     ENUM("enum"),
+    // Cover device classes (HA cover.*)
+    WINDOW("window"),
+    SHADE("shade"),
+    GARAGE("garage"),
+    DOOR("door"),
     ;
 
     companion object {

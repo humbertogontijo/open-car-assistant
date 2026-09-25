@@ -1,0 +1,100 @@
+# Car-native composites & covers
+
+Product controls are **composites** (multi-property systems), **covers** (open/close + optional position), or thin **widget** atomics (`switch` / `select` / `number` / `sensor`). Entity ids are Home Assistant–shaped: `domain.object_id`.
+
+## Composites
+
+| EntityType | Product id | Binding attributes (platform.json `entity`) |
+|---|---|---|
+| `climate` | `climate.cabin` | Core cabin: power, temp, cabin fan, vent direction, ac, auto, recirc, indoor temp. Modes: `off` / `manual` / `auto` (from `hvac_power` + `hvac_auto` — no heat/cool/fan_only). |
+
+### HVAC zones (Antora)
+
+VHAL HVAC uses `VehicleAreaSeat` bitmasks, but **this catalog is single-setpoint**:
+
+| Property | Areas (decoded) | Meaning |
+|---|---|---|
+| `HVAC_TEMPERATURE_SET` | `R1_L (1)` only | One cabin target temp — no passenger setpoint |
+| `HVAC_POWER_ON` | `R1_L+R1_R (5)` | Front-row power |
+| `HVAC_AUTO_ON` / `HVAC_FAN_DIRECTION` | `R1_L (1)` | Driver / primary |
+| `HVAC_FAN_SPEED` | `5`, `117` | Front or whole-cabin zone (not L/R independent) |
+| `HVAC_AC_ON` / recirc / max_* | `117` (`AREA_HVAC_ZONE`) | Cabin-wide |
+| `HVAC_SEAT_VENTILATION` | `1`, `4` | True dual-zone → `fan.seat_*`, not climate |
+
+No `HVAC_DUAL` / sync property. If a future platform lists multiple `HVAC_TEMPERATURE_SET` areas, add `climate.passenger` (etc.) the same way covers are instanced per area — keep one card per zone, shared cabin toggles via `attributeAreas` where needed.
+
+## Fans & locks
+
+| Domain | Product id | Binding | Notes |
+|---|---|---|---|
+| `fan` | `fan.seat_driver` / `fan.seat_passenger` | `hvac_seat_vent` @ seat areas 1 / 4 | Levels 0–3; not the climate cabin fan |
+| `lock` | `lock.central` | `central_lock` | Door lock actuator |
+| `lock` | `lock.windows` | `window_lock` | Window switch lock |
+
+Access *policy* toggles (`switch.approach_unlock`, `away_lock`, …) stay switches — not `lock`.
+
+HVAC extras as atomics (not climate attrs): `switch.hvac_max_defrost`, `hvac_max_ac`, `hvac_eco`, `hvac_auto_dry`, `hvac_rapid_cool` / `heat`, `hvac_electric_defrost`, `hvac_auto_recirc`, `hvac_auto_seat_vent`.
+
+| `drivetrain` | `drivetrain.vehicle` | `gear`, `drive_mode`, `regen`, `battery_hold` / `save` / `mode` |
+| `chassis` | `chassis.vehicle` | `brake_pedal_mode`, `esc_sport`, `hdc`, `auto_hold`, Wave-1: `epb`, `parking_brake` |
+| `steering` | `steering.vehicle` | `steer_assist_level`, `steer_sync_drive_mode`, `intelligent_steer`, `wheel_custom_key` |
+| `charger` | `charger.vehicle` | charge cluster + Wave-1 `charge_external_light` |
+| `ev_battery` | `ev_battery.main` | `ev_battery_percent`, `ev_battery_level_raw`, `battery_temp_c`, `hybrid_soc` |
+| `hud` | `hud.main` | `hud_active` / `snow` / `ar` + Wave-1 `hud_display_mode`, `hud_angle` |
+| `light` | `light.ambient` | `color` ← `ambience_main_color`, `brightness` ← `ambience_intensity` |
+| `camera` | `camera.front` / `rear` / `left` / `right` | Camera2 via `platform.json` → `cameras[]` (not VHAL); mosaic is DVR-only |
+
+## Covers
+
+| Product id | Binding | Position | Notes |
+|---|---|---|---|
+| `cover.window_driver` … `_rear_right` | `window_pos` @ seat areas | 0–100 int32 | open if position > 1 |
+| `cover.sunroof` | `window_pos` @ `0x10000` | 0–100 | glass |
+| `cover.sunshade` | `window_pos` @ `0x20000` | 0–100 | curtain |
+| `cover.trunk` | write `trunk_move` (DOOR_MOVE); read `trunk_status` | none | status 0/1 = closed |
+
+Sibling atomics: `switch.window_lock`, `switch.auto_close_window`, `switch.sunroof_tilt`, `number.trunk_open_height`.
+
+Mirrors are atomics (`switch.mirror_fold`, `switch.mirror_auto_fold`). Doors are not product entities on Antora: `DOOR_POS` is ajar-only, `DOOR_MOVE` is the liftgate, lock UX is `switch.central_lock`.
+
+Legacy aliases (`climate`, `hvac_power`, `window.driver`, …) resolve via `EntityRegistry.resolve` / `aliasAttribute`.
+
+## Wave-1 table (Antora)
+
+| VHAL key | id | Binding key | Product | HU access |
+|---|---|---|---|---|
+| `SETTING_FUNC_STEERING_ASSISTANCE_LEVEL` | `0x21407185` | `steer_assist_level` | `steering.vehicle.assist_level` | rw |
+| `DM_FUNC_STEERING_WHEEL_FEEL_SYNC_DRIVEMODE` | `0x21207107` | `steer_sync_drive_mode` | `steering.vehicle.sync_drive_mode` | rw |
+| `SETTING_FUNC_PBC_DOUBLE_EPB_SWITCH` | `0x2120701a` | `epb` | `chassis.vehicle.epb` | rw |
+| `PARKING_BRAKE_ON` | `0x11200402` | `parking_brake` | `chassis.vehicle.parking_brake` | r |
+| `SETTING_FUNC_HUD_DISPLAY_MODE` | `0x21407643` | `hud_display_mode` | `hud.main.display_mode` | rw |
+| `SETTING_FUNC_HUD_ANGLE_ADJUST` | `0x2120720b` | `hud_angle` | `hud.main.angle` | rw |
+| `HVAC_ELECTRIC_DEFROSTER_ON` | `0x13200514` | `hvac_electric_defrost` | `climate.cabin.electric_defrost` | rw |
+| `HVAC_AUTO_RECIRC_ON` | `0x15200512` | `hvac_auto_recirc` | `climate.cabin.auto_recirc` | rw |
+| `HVAC_FUNC_AUTO_SEAT_VENTILATION` | `0x254070b5` | `hvac_auto_seat_vent` | `climate.cabin.auto_seat_vent` | rw |
+| `CHARGE_FUNC_EXTERNAL_CHARGING_LIGHT` | `0x2120727c` | `charge_external_light` | `charger.vehicle.external_light` | rw |
+| `WINDOW_LOCK` / `WINDOW_POS` | `0x13200bc4` / `0x13400bc0` | `window_lock` / `window_pos` | `switch.window_lock` / `cover.window_*` | rw |
+| `DOOR_MOVE` | `0x16400b01` | `trunk_move` | `cover.trunk` (OPEN=1 CLOSE=0) | rw |
+| `BCM_FUNC_TRUNK_DOOR_STATUS` | `0x214073bc` | `trunk_status` | `cover.trunk` readback | rw |
+| `BCM_FUNC_SUNROOF_TILT` | `0x23207156` | `sunroof_tilt` | `switch.sunroof_tilt` | rw |
+| `MIRROR_FOLD` | `0x11200b45` | `mirror_fold` | `switch.mirror_fold` | rw |
+| `SETTING_FUNC_MIRROR_AUTO_FOLDING` | `0x24207024` | `mirror_auto_fold` | `switch.mirror_auto_fold` | rw |
+
+`DOOR_LOCK` / `DOOR_POS` / `BCM_FUNC_REAR_MIRROR_ADJUST` stay unbound.
+
+Access values restored from the HU `CarPropertyConfig` dump when promoting (`rw` unless the HU reports read-only).
+
+## Wave 2 candidates (not bound)
+
+- Exterior light enum mirrors, rain/wiper helpers, welcome/music ambient modes
+- ADAS sibling volumes already atomic — keep atomic (no mega-`adas`)
+- Continuous telemetry / factory / profile CRUD — leave unbound
+- CarConfig letter / `CB_*` junk and hex-only unknowns — never promote
+
+## AdaptAPI gaps
+
+AdaptAPI FUNC names often match `platform.json` `key`, but some AutoSettings FUNCs have **no VHAL id** on this HU yet. Do not invent hex IDs.
+
+## Exterior UI
+
+Covers are `cover.*` cards (position slider when `current_position` is present). Sibling switches/numbers sit beside them on Controles → Exterior.

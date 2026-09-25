@@ -1,6 +1,6 @@
 import { html, nothing } from "../../lit.js";
 import { fmt } from "../../api.js";
-import { t } from "../../i18n.js";
+import { t, entityValueLabel } from "../../i18n.js";
 import { setControl } from "../../actions.js";
 import { formatDisplayNumber } from "../../units.js";
 import { displayUnit, pinSnapshot, pinChip } from "./shared.js";
@@ -122,7 +122,7 @@ export function inputWidget(c) {
   }
 
   return html`<span class="mono"
-    >${c.valueLabel ||
+    >${entityValueLabel(c) ||
       (function () {
         const n = parseFloat(val);
         if (!isNaN(n) && c.unitOfMeasurement) {

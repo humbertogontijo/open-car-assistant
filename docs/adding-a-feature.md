@@ -27,7 +27,7 @@ Integrations and plugins stay plug-and-play; see [adding-an-integration.md](addi
 
 5. **Product UI (if user-facing)**
    - Page under `features/web` assets (`pages/` + `index.html` nav).
-   - Strings in `libs/support/src/main/assets/i18n/common/{en,pt-BR}.json`.
+   - Strings in `libs/support/src/main/assets/i18n/common/{en,pt-BR}.json` (served via `/api/i18n`; resolved client-side with `t()` / `entityLabel()`).
 
 6. **Verify**
    - `./gradlew :app:assembleDebug`
@@ -44,11 +44,13 @@ Integrations and plugins stay plug-and-play; see [adding-an-integration.md](addi
 Adding a visible control card usually touches:
 
 1. [EntityRegistry.kt](../libs/api/src/main/java/cc/opencar/assistant/api/EntityRegistry.kt) — `EntityDef` (and optional `WellKnownProperties` binding constant for sessions)
-2. Common i18n (`control.<id>` / options) — **required**: only described controls become product entities
+2. Common i18n (`control.<id>` / options) — **required**: only described controls become product entities. Keys ship in entity payloads (`labelKey`); the web client translates them.
 3. Optional pin map in [SettingsMemoryController.kt](../features/memory/src/main/java/cc/opencar/assistant/feature/memory/SettingsMemoryController.kt)
 4. Each platform’s `platform.json` property entry (`entity` binding key + `access`)
 
-For a **composite** (like `climate`), add one `EntityDef` with `bindingKey = null` and `attributes` → binding keys; keep `platform.json` entity fields as the atomic keys (`hvac_power`, `hvac_temp_c`, …). Domain selects the card family in the web UI.
+For a **composite** (like `climate` or `drivetrain`), add one `EntityDef` with `bindingKey = null` and `attributes` → binding keys; keep `platform.json` entity fields as the atomic keys (`hvac_power`, `drive_mode`, …). Domain selects the card family in the web UI. See [composites.md](composites.md) for the car-native type set and Wave-1 bindings.
+
+**Camera entities** (`camera.front` / `rear` / `left` / `right`) are virtual (Camera2), not VHAL: declare roles in `platform.json` → `cameras[]` (`role` + `cameraId`), register defs in `EntityRegistry`, and let ControlCatalog merge them when DVR is available. Mosaic/live stream stays under `/api/dvr/*` — do not add a mosaic entity.
 
 Discover candidates in Lab → **VHAL catalog** → filter **Missing** (see [contributor-debug.md](contributor-debug.md)). The full HU property list lives in each integration’s `platform.json` → `properties` (shared AOSP stubs via `"extends": ["aosp"]`); it is for probing / gap tracking until you attach an `entity`.
 

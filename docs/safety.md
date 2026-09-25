@@ -54,6 +54,6 @@ DVR runs in the foreground `AssistantService` (`camera` FGS type). Modes:
 
 Save targets: app files, internal Movies/`OpenCarAssistant`, and mounted SD/USB volumes under `OpenCarAssistant/` (continuous files always in a `dvr/` subdir).
 
-**Shared mosaic stream:** GPU path only — camera `SurfaceTexture` → GLES → HW `MediaCodec` → H.264. Live UI: **HLS** (`/api/dvr/live.m3u8` + CMAF) via **hls.js** on one `<video>`. DVR: `MediaMuxer` `.mp4`. Status: `stream.format`, `h264.*`, `camera2Probe`.
+**Shared mosaic stream:** GPU path only — camera `SurfaceTexture` → GLES → HW `MediaCodec` → H.264. Mosaic output size is computed from each camera’s native preview size and the grid layout (no platform `dvr.fps` / `mosaicHeight`). Live UI: **HLS** (`/api/dvr/live.m3u8` + CMAF) via **hls.js** on one `<video>`. DVR: `MediaMuxer` `.mp4`. Status: measured `stream.size` / `fps`, `h264.*`, `camera2Probe`. Role entities (`camera.front`, …) come from `platform.json` → `cameras[]`.
 
 **Camera2 probe (Antora, measured):** all four ids `0–3` open concurrently with preview Surfaces (`allOpened=true`, hardware level `limited`, preview `640x480`). No `LOGICAL_MULTI_CAMERA` ids reported. Vendor mosaic Surface not found via Camera2 caps — appside merge still required.

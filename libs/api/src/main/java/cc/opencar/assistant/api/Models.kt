@@ -64,21 +64,19 @@ data class CameraSource(
     val id: String,
     val label: String,
     val cameraId: String,
+    /** Surround role from `platform.json` → `cameras[]` (`front` / `rear` / `left` / `right`). */
+    val role: String? = null,
 )
 
 /**
- * Platform-declared mosaic stream tuning (not a user preference).
- * Loaded from integration `platform.json` → `dvr`.
+ * Platform-declared Camera2 id bound to a product camera role.
+ * Loaded from integration `platform.json` → `cameras`.
  */
-data class DvrStreamConfig(
-    /** Target mosaic / live frame rate. */
-    val fps: Int = 5,
-    /** Mosaic output height in px (480 / 720 / 1080); width is 16:9. */
-    val mosaicHeight: Int = 720,
+data class CameraRoleConfig(
+    val role: String,
+    val cameraId: String,
 ) {
-    companion object {
-        val DEFAULT = DvrStreamConfig()
-    }
+    val entityId: String get() = "camera.$role"
 }
 
 /**

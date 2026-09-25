@@ -5,16 +5,16 @@ import { entityGrid, pageHead } from "../ui/cards.js";
 import { dashSummary, pickEntities } from "../ui/dashboard.js";
 
 var HOME_HERO_IDS = [
-  "sensor_soc",
-  "sensor_range",
-  "sensor_speed",
-  "sensor_gear",
-  "drive_mode",
-  "sensor_fuel",
+  "sensor.soc",
+  "sensor.range",
+  "sensor.speed",
+  "sensor.gear",
+  "drivetrain.vehicle",
+  "sensor.fuel",
 ];
 
 export function pageHome() {
-  // Dashboard sensors (group=home) + drive_mode (single entity for that property).
+  // Dashboard sensors (group=home) + drivetrain composite.
   const viewing = isShowingHidden("home");
   const items = viewing
     ? hiddenEntitiesByGroup("home").filter(function (e) {
@@ -27,7 +27,7 @@ export function pageHome() {
     ? items
     : (state.entities || []).filter(function (e) {
         if (!(e.status === "ok" || e.status === "cached")) return false;
-        if (e.id === "drive_mode") return true;
+        if (e.id === "drivetrain.vehicle" || e.id === "drivetrain") return true;
         return e.group === "home" && (e.entity === "sensor" || e.domain === "sensor");
       });
   const hero = pickEntities(heroPool, HOME_HERO_IDS);

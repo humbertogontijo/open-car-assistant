@@ -94,7 +94,7 @@ Detects via fingerprint match for `ihu629` / `geometry`. Uses **CarPropertyManag
 
 The product UI in `:feature-web` assets uses a shared **Alive Design** token set (`themes.css`) applied app-wide: frosted surfaces, ice-blue accent, Dock sidebar with linear SVG icons (`icons/sprite.svg`), slim status chips, and glass setup overlay. Spacing/radius/touch (≥48px) are theme-agnostic across `dark` / `light` / `contrast`.
 
-Rendering is **lit-html** (vendored ESM under `web/js/vendor/`) driven by a small reactive store (`store.js` `patch` / `subscribe`). Section templates live under `web/js/sections/`; control widgets under `web/js/ui/`. Live updates arrive on `/api/events` WebSocket (`telemetry` / `entity` / `catalog`); the client bootstraps once via HTTP `refresh()` and does **not** soft-poll. In-session scroll is remembered per section in memory only (not `localStorage`); process kill still starts at Home. Theme/locale/units prefs remain in `localStorage` (and `/api/prefs`). Static assets are served with `Cache-Control: no-store` (no `?v=` query busting).
+Rendering is **lit-html** (vendored ESM under `web/js/vendor/`) driven by a small reactive store (`store.js` `patch` / `subscribe`). Section templates live under `web/js/sections/`; control widgets under `web/js/ui/`. Live updates arrive on `/api/events` WebSocket (`telemetry` / `entity` / `catalog`); the client bootstraps once via HTTP `refresh()` and does **not** soft-poll. In-session scroll is remembered per section in memory only (not `localStorage`); process kill still starts at Home. Theme/locale/units prefs remain in `localStorage` (and `/api/prefs`). **Product i18n is client-side**: packs live in APK assets (`I18nBundle`), exposed via `GET /api/i18n`; entity/control APIs send keys + raw values (`labelKey`, `hintKey`, `options[].labelKey`, `valueMapId`) and `web/js/i18n.js` resolves copy at render (`entityLabel` / `entityValueLabel` / `t()`). Static assets are served with `Cache-Control: no-store` (no `?v=` query busting).
 
 Control cards are typed primarily by **domain** (`EntityType`); `EntityDef.input` is a soft widget hint (`bool`, `choice`, `int`, `float`, `text`, `sensor`, `climate`, `media_player`). Choice with ≤3 options renders as pills; more than three uses a styled dropdown. Each writable card can **pin** a boot value; live writes go to VHAL, persist writes go to DataStore only. Composite entities (`climate`, `media_player_vehicle`) use dedicated card templates.
 
@@ -108,12 +108,12 @@ Product entities are the **portable contract** across platforms. See [`EntityCon
 
 | Concept | OCA | Notes |
 |---------|-----|--------|
-| Entity id | Registry id (`climate`, `sensor_soc`, …) | Stable; used by UI, history, shortcuts, scenes, routines |
-| Domain | [`EntityType`](../libs/api/src/main/java/cc/opencar/assistant/api/EntityType.kt) (`sensor`, `climate`, `lock`, …) | Exposed as `domain` (+ legacy `entity`) on `/api/entities`; **selects card family** |
+| Entity id | Registry id (`climate.cabin`, `sensor.soc`, …) | Stable HA-shaped `domain.object_id`; used by UI, history, shortcuts, scenes, routines |
+| Domain | [`EntityType`](../libs/api/src/main/java/cc/opencar/assistant/api/EntityType.kt) (`climate`, `cover`, `switch`, …) | Exposed as `domain` (+ legacy `entity`) on `/api/entities`; **selects card family** via client `DOMAIN_CARDS` map. See [composites.md](composites.md). |
 | State + attributes | `state`/`value` + `attributes` map | Also `friendlyName`, `available`, `deviceClass`, `unitOfMeasurement` |
 | Availability | Binding + diagnose status | Entity omitted / `unavailable` when the platform has no binding — like HA not registering the entity |
 | Device class / UoM | [`DeviceClass`](../libs/api/src/main/java/cc/opencar/assistant/api/DeviceClass.kt), [`UnitOfMeasurement`](../libs/api/src/main/java/cc/opencar/assistant/api/UnitOfMeasurement.kt) | Icons, history charts, future MQTT/HA discovery |
-| Binding key | `platform.json` `properties[].entity` | Atomic: same as product id. Composite (`climate`): attribute → key (`temperature` → `hvac_temp_c`) |
+| Binding key | `platform.json` `properties[].entity` | Atomic: same as product id. Composite: attribute → key (`temperature` → `hvac_temp_c`, `assist_level` → `steer_assist_level`) |
 | Live update | `composite` + `update` on `/api/entities` | Atomics: WS `entity` value patch. Composites: `update=catalog` only (never apply binding attr-raw as product state) |
 
 **Rules for multi-make portability**
@@ -168,7 +168,9 @@ Wake / `screen` triggers (`on` / `off`) listen for AOSP `ACTION_SCREEN_ON` / `US
 
 ## DVR / cameras
 
-One capture path: Camera → GLES mosaic → HW H.264 (`:feature-dvr`). Live clients and the DVR writer share [`SharedMosaicHub`](../features/dvr/src/main/java/cc/opencar/assistant/feature/dvr/SharedMosaicHub.kt) refcounts so stopping recording does not tear down HLS. Continuous mode persists as `mode=dvr`; ACC wake starts / sleep stops (debounced ~5 s, same as shortcuts). Rotating MP4 (~5 min / 100 MB) under `dvr/` with wall-clock meta in app-private `files/dvr-meta/`. Web: day-scoped scrubber + Cut remux (`/api/dvr/timeline`, `/play`, `/cut`, `/live.m3u8`). Pure helpers: `DvrTimelineMath` / `DvrStorageMath` (JVM unit tests) and `dvr-timeline.js`.
+One capture path: Camera → GLES mosaic → HW H.264 (`:feature-dvr`). Live clients and the DVR writer share [`SharedMosaicHub`](../features/dvr/src/main/java/cc/opencar/assistant/feature/dvr/SharedMosaicHub.kt) refcounts so stopping recording does not tear down HLS. Continuous mode persists as `mode=dvr`; ACC wake starts / sleep stops (debounced ~5 s, same as shortcuts). Rotating MP4 (~5 min / 100 MB) under `dvr/` with wall-clock meta in app-private `files/dvr-meta/`. Web: day-scoped scrubber + Cut remux (`/api/dvr/timeline`, `/play`, `/cut`, `/live.m3u8`). Pure helpers: `DvrTimelineMath` / `DvrStorageMath` / `MosaicLayout` (JVM unit tests) and `dvr-timeline.js`.
+
+**Camera entities** (`EntityType.CAMERA`): one product id per surround role — `camera.front` / `camera.rear` / `camera.left` / `camera.right`. Roles map to Camera2 ids via `platform.json` → `cameras[]` (not VHAL). Emitted on `/api/entities` when present; mosaic is DVR-only (no `camera.mosaic` entity). Mosaic canvas size and fps are derived from each camera’s native preview size/rate and the grid layout — there is no platform `dvr` fps/mosaicHeight knob.
 
 ## Safety
 
