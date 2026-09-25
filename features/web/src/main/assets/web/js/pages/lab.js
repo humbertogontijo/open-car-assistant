@@ -59,7 +59,7 @@ function cappedProbeRows() {
   };
 }
 
-export function sectionLab() {
+export function pageLab() {
   const lab = state.lab || {};
   const tab = state.labTab || "vhal";
   const p = tab === "obd2" ? state.obd2 : tab === "entities" ? null : state.probe;

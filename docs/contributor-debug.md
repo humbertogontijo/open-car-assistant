@@ -77,7 +77,7 @@ Lab → **VHAL catalog** lists every property from `platform.json` → `properti
 | **Bound (cards)** | Props already mapped to a product control (`entity`) |
 | **Missing** | On the car / in `properties`, but not yet a card |
 
-**Product entities** (cards) stay curated: add a human description in i18n (`control.<id>` / hint), a `ControlDef` in [ControlCatalog.kt](../features/web/src/main/java/cc/opencar/assistant/feature/web/ControlCatalog.kt), a `WellKnownProperties` entry, and a `platform.json` property with `entity` (+ `access: "rw"` if writable). See [adding-a-feature.md](adding-a-feature.md) “New product controls”.
+**Product entities** (cards) stay curated: add a human description in i18n (`control.<id>` / hint), an `EntityDef` in [EntityRegistry.kt](../libs/api/src/main/java/cc/opencar/assistant/api/EntityRegistry.kt), optional binding-key constant on `WellKnownProperties`, and a `platform.json` property with `entity` (+ `access: "rw"` if writable). See [adding-a-feature.md](adding-a-feature.md) “New product controls”.
 
 Probe summary includes `boundEntities` / `unbound` counts. Re-probe after updating `platform.json` (`force=1`).
 

@@ -1,3 +1,6 @@
+import { loadCss } from "./load-css.js";
+loadCss("/static/js/ui/scene-editor.css");
+
 import { html, nothing } from "../lit.js";
 import { live } from "../lit.js";
 import { repeat } from "../lit.js";
@@ -49,6 +52,18 @@ export function valueOptionsForControl(c) {
       { value: "idle", label: t("media_player.idle", "Idle") },
     ];
   }
+  if (c.id === "climate" || c.input === "climate") {
+    const modes = (c.attributes && c.attributes.hvac_modes) || [
+      "off", "auto", "cool", "heat", "fan_only",
+    ];
+    return modes.map(function (m) {
+      const key = String(m);
+      return {
+        value: key === "off" || key === "on" ? key : "hvac_mode:" + key,
+        label: t("climate.mode." + key, key),
+      };
+    });
+  }
   const maps = (state.i18n && state.i18n.valueMaps) || {};
   const mapId = c.valueMapId || null;
   if (mapId && maps[mapId]) {
@@ -96,8 +111,7 @@ export function entityValueField(opts) {
   }
   return html`
     <input
-      class="field"
-      style=${opts.inputStyle || "width:100%;margin-top:4px"}
+      class="field scene-editor-field tight"
       placeholder=${opts.placeholder || ""}
       .value=${live(current)}
       @input=${function (ev) {
@@ -138,22 +152,21 @@ export function sceneEditorCard(opts) {
     body: html`
       <label class="hint">${t("shortcuts.name", "Name")}</label>
       <input
-        class="field"
-        style="width:100%;margin:4px 0 12px"
+        class="field scene-editor-field"
         .value=${live(edit.name || "")}
         @input=${function (ev) {
           edit.name = ev.target.value;
           opts.onChange && opts.onChange();
         }}
       />
-      <div style="margin-bottom:12px">
+      <div class="scene-editor-enabled">
         ${boolToggle(edit.enabled !== false, function (val) {
           edit.enabled = val === "1";
           opts.onChange && opts.onChange();
           notify();
         })}
       </div>
-      <h3 style="margin:0 0 8px;font-size:1rem">${t("scenes.targets", "Targets")}</h3>
+      <h3 class="scene-editor-section-title">${t("scenes.targets", "Targets")}</h3>
       <div>
         ${repeat(
           targets,
@@ -166,9 +179,8 @@ export function sceneEditorCard(opts) {
         )}
       </div>
       <button
-        class="btn"
+        class="btn scene-editor-add"
         type="button"
-        style="margin-top:4px"
         @click=${function () {
           edit.targets = (edit.targets || []).concat([blankTarget()]);
           opts.onChange && opts.onChange();
@@ -177,11 +189,10 @@ export function sceneEditorCard(opts) {
       >
         ${t("scenes.add_target", "Add target")}
       </button>
-      <div class="row" style="gap:8px;margin-top:16px;width:100%">
+      <div class="row scene-editor-actions">
         <button
           class="btn primary"
           type="button"
-          style="flex:1"
           @click=${function () {
             opts.onSave && opts.onSave();
           }}
@@ -191,7 +202,6 @@ export function sceneEditorCard(opts) {
         <button
           class="btn ghost"
           type="button"
-          style="flex:1"
           @click=${function () {
             opts.onCancel && opts.onCancel();
           }}
@@ -210,7 +220,7 @@ function targetRow(edit, raw, i, controls, opts) {
   const ctrl = controlById(trow.entityId);
   const valueOpts = valueOptionsForControl(ctrl);
   return html`
-    <div class="shortcut-action" style="margin-bottom:10px;padding:10px;border:1px solid var(--border, #333);border-radius:8px">
+    <div class="shortcut-action">
       ${choiceSelect({
         options: controls.map(function (c) {
           return { value: c.id, label: c.label || c.id };
@@ -231,8 +241,8 @@ function targetRow(edit, raw, i, controls, opts) {
           notify();
         },
       })}
-      <label class="hint" style="margin-top:8px;display:block">${t("scenes.on_value", "On value")}</label>
-      <div style="margin-top:4px">
+      <label class="hint">${t("scenes.on_value", "On value")}</label>
+      <div class="field-gap">
         ${entityValueField({
           options: valueOpts,
           current: trow.onValue,
@@ -244,8 +254,8 @@ function targetRow(edit, raw, i, controls, opts) {
           },
         })}
       </div>
-      <label class="hint" style="margin-top:8px;display:block">${t("scenes.off_policy", "Off")}</label>
-      <div style="margin-top:4px">
+      <label class="hint">${t("scenes.off_policy", "Off")}</label>
+      <div class="field-gap">
         ${choiceSelect({
           options: [
             { value: "restore", label: t("scenes.off.restore", "Restore snapshot") },
@@ -271,8 +281,8 @@ function targetRow(edit, raw, i, controls, opts) {
       </div>
       ${policy === "set"
         ? html`
-            <label class="hint" style="margin-top:8px;display:block">${t("scenes.off_value", "Off value")}</label>
-            <div style="margin-top:4px">
+            <label class="hint">${t("scenes.off_value", "Off value")}</label>
+            <div class="field-gap">
               ${entityValueField({
                 options: valueOpts,
                 current: off.value != null ? off.value : "0",
@@ -287,9 +297,8 @@ function targetRow(edit, raw, i, controls, opts) {
           `
         : nothing}
       <button
-        class="btn ghost"
+        class="btn ghost btn-remove"
         type="button"
-        style="margin-top:8px"
         @click=${function () {
           edit.targets.splice(i, 1);
           opts.onChange && opts.onChange();

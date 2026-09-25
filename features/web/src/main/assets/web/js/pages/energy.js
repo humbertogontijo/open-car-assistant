@@ -24,7 +24,7 @@ var ENERGY_HERO_IDS = [
   "sensor_range_ev",
   "sensor_fuel",
   "sensor_charge_plug",
-  "sensor_charge_a",
+  "charge_current",
   "sensor_charge_energy",
   "sensor_charge_eta",
 ];
@@ -62,7 +62,7 @@ export async function loadEnergyDash() {
   }
 }
 
-export function sectionEnergy() {
+export function pageEnergy() {
   const group = "energy";
   const viewing = isShowingHidden(group);
   const items = viewing ? hiddenEntitiesByGroup(group) : entitiesByGroup(group);
@@ -107,7 +107,7 @@ export function sectionEnergy() {
           ${sparkBlocks.length
             ? html`<div class="dash-sparks">${sparkBlocks}</div>`
             : nothing}
-          <h2 class="section-label" style="margin:20px 0 10px">
+          <h2 class="page-label" style="margin:20px 0 10px">
             ${t("dash.energy.controls", "Charge & hybrid")}
           </h2>
           ${familySections(rest)}

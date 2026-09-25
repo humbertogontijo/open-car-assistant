@@ -258,12 +258,12 @@ function activeCard(plugin) {
 function labeledGrid(label, cards) {
   if (!cards || !cards.length) return nothing;
   return html`
-    <h2 class="section-label">${label}</h2>
+    <h2 class="page-label">${label}</h2>
     <div class="grid">${cards}</div>
   `;
 }
 
-export function sectionPlugins() {
+export function pagePlugins() {
   if (state.pluginEditId == null) state.pluginEditId = null;
   const plugins = pluginList();
   const editId = state.pluginEditId;

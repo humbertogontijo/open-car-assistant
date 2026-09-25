@@ -122,8 +122,7 @@ data class Scene(
             builtin = true,
             targets = listOf(
                 SceneTarget("parking_comfort", "1", SceneOff.Set("0")),
-                SceneTarget("hvac_power", "0", SceneOff.Restore),
-                SceneTarget("hvac_ac", "0", SceneOff.Restore),
+                SceneTarget("climate", "off", SceneOff.Restore),
                 SceneTarget("exterior_light", "0", SceneOff.Restore),
                 SceneTarget("rear_fog", "0", SceneOff.Restore),
             ),

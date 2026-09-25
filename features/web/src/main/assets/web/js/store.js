@@ -14,7 +14,7 @@ export const state = {
   setup: null,
   probe: null,
   lab: null,
-  section: "home",
+  page: "home",
   token: "",
   showSetup: false,
   i18n: { locale: "pt-BR", locales: ["pt-BR", "en"], strings: {}, valueMaps: {} },

@@ -1428,7 +1428,7 @@ function slotsGrid() {
     );
   }
   return html`
-    <h2 class="section-label">${t("shortcuts.slots.title", "Pin slots")}</h2>
+    <h2 class="page-label">${t("shortcuts.slots.title", "Pin slots")}</h2>
     <div class="grid">${cards}</div>
   `;
 }
@@ -1919,7 +1919,7 @@ function flowsTab() {
   }
 
   return html`
-    <div class="section-head" style="margin-top:0">
+    <div class="page-head" style="margin-top:0">
       <button
         class="btn primary"
         type="button"
@@ -2009,7 +2009,7 @@ function scenesTab() {
     : nothing;
 
   return html`
-    <div class="section-head" style="margin-top:0">
+    <div class="page-head" style="margin-top:0">
       <button
         class="btn primary"
         type="button"
@@ -2054,7 +2054,7 @@ function routinesTab() {
   }
 
   return html`
-    <div class="section-head" style="margin-top:0">
+    <div class="page-head" style="margin-top:0">
       <button
         class="btn primary"
         type="button"
@@ -2069,7 +2069,7 @@ function routinesTab() {
   `;
 }
 
-export function sectionShortcuts() {
+export function pageShortcuts() {
   ensureShortcutsState();
   const tab = state.shortcutsTab || "flows";
   let body = flowsTab();
@@ -2077,7 +2077,7 @@ export function sectionShortcuts() {
   else if (tab === "routines") body = routinesTab();
 
   return html`
-    <div class="section-head">
+    <div class="page-head">
       <h1>${t("section.shortcuts.title", "Shortcuts")}</h1>
     </div>
     ${state.shortcutMessage

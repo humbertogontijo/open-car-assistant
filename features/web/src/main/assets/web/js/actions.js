@@ -180,7 +180,7 @@ export async function unhideEntity(id) {
 }
 
 /**
- * Pref handlers previously in bindSection.
+ * Pref handlers previously in bindPage.
  * @param {string} pref
  * @param {string} next
  * @param {object} [extra]
@@ -260,7 +260,7 @@ export async function runPref(pref, next, extra) {
       }
       notify();
     }
-    const { loadRecordings, stopCameraLive } = await import("./sections/cameras.js");
+    const { loadRecordings, stopCameraLive } = await import("./pages/cameras.js");
     await loadRecordings();
     await stopCameraLive();
     return;
@@ -283,7 +283,7 @@ export async function runPref(pref, next, extra) {
     } catch (e) {
       notify();
     }
-    const { loadRecordings } = await import("./sections/cameras.js");
+    const { loadRecordings } = await import("./pages/cameras.js");
     await loadRecordings();
     return;
   }
@@ -317,7 +317,7 @@ export async function runPref(pref, next, extra) {
   }
   if (pref === "hist-range") {
     patch({ historyRangeHours: parseInt(next, 10) || 24 });
-    const { loadHistoryPoints } = await import("./sections/history.js");
+    const { loadHistoryPoints } = await import("./pages/history.js");
     await loadHistoryPoints();
     notify();
     return;
@@ -354,7 +354,7 @@ export async function runPref(pref, next, extra) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ enabled: next === "1" }),
     });
-    const { loadShortcuts } = await import("./sections/shortcuts.js");
+    const { loadShortcuts } = await import("./pages/shortcuts.js");
     await loadShortcuts();
     notify();
     return;
@@ -369,7 +369,7 @@ export async function runPref(pref, next, extra) {
         shortcutId: next || null,
       }),
     });
-    const { loadShortcuts } = await import("./sections/shortcuts.js");
+    const { loadShortcuts } = await import("./pages/shortcuts.js");
     await loadShortcuts();
     notify();
     return;

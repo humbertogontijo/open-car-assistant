@@ -1,12 +1,12 @@
 export {
-  sectionShortcuts,
+  pageShortcuts,
   loadShortcuts,
   quickEntryCard,
-} from "./sections/shortcuts.js";
-import { quickEntryCard } from "./sections/shortcuts.js";
+} from "./pages/shortcuts.js";
+import { quickEntryCard } from "./pages/shortcuts.js";
 import { render } from "./lit.js";
 
-/** @deprecated String HTML for sections.js until System migrates to lit. */
+/** Render quick-entry card to an HTML string (System settings embed). */
 export function quickEntryCardHtml() {
   const el = document.createElement("div");
   render(quickEntryCard(), el);

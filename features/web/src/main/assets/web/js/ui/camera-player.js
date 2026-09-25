@@ -4,6 +4,9 @@
  *   dvr   → wall-clock timeline scrub over closed oca_dvr_*.mp4
  * Cut mode draws a draggable range on the scrubber; /api/dvr/cut remuxes it.
  */
+import { loadCss } from "./load-css.js";
+loadCss("/static/js/ui/camera-player.css");
+
 import { html, nothing } from "../lit.js";
 import { state, patch } from "../store.js";
 import { t } from "../i18n.js";
@@ -788,7 +791,7 @@ export async function playAt(wallUtcMs, startLive) {
     });
     // Seal may have grown the timeline — refresh quietly.
     try {
-      const { loadRecordings } = await import("../sections/cameras.js");
+      const { loadRecordings } = await import("../pages/cameras.js");
       await loadRecordings();
     } catch (e) {}
   } catch (e) {
@@ -1000,7 +1003,7 @@ let timelinePaintTimer = null;
 function ensureTimelinePaintClock() {
   if (timelinePaintTimer != null) return;
   timelinePaintTimer = setInterval(function () {
-    if (state.section !== "cameras" && state.section !== "dvr") return;
+    if (state.page !== "cameras" && state.page !== "dvr") return;
     const tl = state.dvrTimeline || {};
     const onToday = selectedDayKey() === todayKey();
     if (

@@ -34,7 +34,7 @@ interface VehicleIntegration {
 }
 ```
 
-Features never hardcode VHAL hex IDs. They use `WellKnownProperties` / `VehicleProperty(namespace, key)`. The integration maps those to native IDs.
+Features never hardcode VHAL hex IDs. They use `EntityRegistry.property(key)` / `VehicleProperty(namespace, key)` (binding-key constants remain on `WellKnownProperties` for sessions). The integration maps those to native IDs.
 
 ### Poll vs push (vehicle state)
 
@@ -96,9 +96,9 @@ The product UI in `:feature-web` assets uses a shared **Alive Design** token set
 
 Rendering is **lit-html** (vendored ESM under `web/js/vendor/`) driven by a small reactive store (`store.js` `patch` / `subscribe`). Section templates live under `web/js/sections/`; control widgets under `web/js/ui/`. Live updates arrive on `/api/events` WebSocket (`telemetry` / `entity` / `catalog`); the client bootstraps once via HTTP `refresh()` and does **not** soft-poll. In-session scroll is remembered per section in memory only (not `localStorage`); process kill still starts at Home. Theme/locale/units prefs remain in `localStorage` (and `/api/prefs`). Static assets are served with `Cache-Control: no-store` (no `?v=` query busting).
 
-Control cards are typed by `ControlDef.input` (`bool`, `choice`, `int`, `float`, `text`, `sensor`). Choice with ≤3 options renders as pills; more than three uses a styled dropdown. Each writable card can **pin** a boot value; live writes go to VHAL, persist writes go to DataStore only.
+Control cards are typed primarily by **domain** (`EntityType`); `EntityDef.input` is a soft widget hint (`bool`, `choice`, `int`, `float`, `text`, `sensor`, `climate`, `media_player`). Choice with ≤3 options renders as pills; more than three uses a styled dropdown. Each writable card can **pin** a boot value; live writes go to VHAL, persist writes go to DataStore only. Composite entities (`climate`, `media_player_vehicle`) use dedicated card templates.
 
-`ControlDef.group` is the **OEM nav section id** (Início / Controles / Condução / Energia / Iluminação / ADAS / Assistente / Tela / Som / Conexão / Meu Veículo). `EntityType` remains the family subsection header inside a tab. Energia is capability-gated (`CHARGING` / `HYBRID_ENERGY`). Android Wi‑Fi/BT + ADB/storage cards live under Conexão. Assistente binds voice VHAL (`vr_activated`); more OEM voice props TBD via Lab.
+`EntityDef.group` is the **OEM nav section id** (Início / Controles / Condução / Energia / Iluminação / ADAS / Assistente / Tela / Som / Conexão / Meu Veículo). `EntityType` (domain) selects the card family; `input` is a soft widget hint inside simple domains. Energia is capability-gated (`CHARGING` / `HYBRID_ENERGY`). Android Wi‑Fi/BT + ADB/storage cards live under Conexão. Assistente binds voice VHAL (`vr_activated`); more OEM voice props TBD via Lab.
 
 Numeric entities carry HA-style `deviceClass` + `unitOfMeasurement` (canonical platform ids from `:integration-api`). Cards convert to the user’s preferred unit per dimension (temperature, distance, speed, fuel economy, energy economy) via `web/js/units.js`, including L/100km ↔ km/L / mpg and kWh/100km ↔ km/kWh.
 
@@ -108,17 +108,19 @@ Product entities are the **portable contract** across platforms. See [`EntityCon
 
 | Concept | OCA | Notes |
 |---------|-----|--------|
-| Entity id | Catalog id (`sensor_soc`, `hvac_temp`, …) | Stable; used by UI, history, shortcuts, scenes, routines |
-| Domain | [`EntityType`](../libs/api/src/main/java/cc/opencar/assistant/api/EntityType.kt) (`sensor`, `climate`, `lock`, …) | Exposed as `domain` (+ legacy `entity`) on `/api/entities` |
+| Entity id | Registry id (`climate`, `sensor_soc`, …) | Stable; used by UI, history, shortcuts, scenes, routines |
+| Domain | [`EntityType`](../libs/api/src/main/java/cc/opencar/assistant/api/EntityType.kt) (`sensor`, `climate`, `lock`, …) | Exposed as `domain` (+ legacy `entity`) on `/api/entities`; **selects card family** |
 | State + attributes | `state`/`value` + `attributes` map | Also `friendlyName`, `available`, `deviceClass`, `unitOfMeasurement` |
 | Availability | Binding + diagnose status | Entity omitted / `unavailable` when the platform has no binding — like HA not registering the entity |
 | Device class / UoM | [`DeviceClass`](../libs/api/src/main/java/cc/opencar/assistant/api/DeviceClass.kt), [`UnitOfMeasurement`](../libs/api/src/main/java/cc/opencar/assistant/api/UnitOfMeasurement.kt) | Icons, history charts, future MQTT/HA discovery |
+| Binding key | `platform.json` `properties[].entity` | Atomic: same as product id. Composite (`climate`): attribute → key (`temperature` → `hvac_temp_c`) |
+| Live update | `composite` + `update` on `/api/entities` | Atomics: WS `entity` value patch. Composites: `update=catalog` only (never apply binding attr-raw as product state) |
 
 **Rules for multi-make portability**
 
-1. Features and automations reference **catalog entity ids** only — never VHAL hex or OEM property names.
-2. Integrations map [`WellKnownProperties`](../libs/api/src/main/java/cc/opencar/assistant/api/WellKnownProperties.kt) → native IDs in `platform.json`; one product [`ControlCatalog`](../features/web/src/main/java/cc/opencar/assistant/feature/web/ControlCatalog.kt), no per-make catalog forks.
-3. Builtin scenes/routines must tolerate missing targets (platform without that binding).
+1. Features and automations reference **registry entity ids** only — never VHAL hex or OEM property names.
+2. Integrations bind keys in `platform.json`; product surface is one [`EntityRegistry`](../libs/api/src/main/java/cc/opencar/assistant/api/EntityRegistry.kt) with [`ControlCatalog`](../features/web/src/main/java/cc/opencar/assistant/feature/web/ControlCatalog.kt) as the API facade — no per-make catalog forks.
+3. Builtin scenes/routines must tolerate missing targets (platform without that binding). Legacy HVAC aliases (`hvac_power`, …) resolve to the composite `climate` entity.
 4. Nav sections compose the same entities into dashboards (`home`, `energy`, `controls`, `drive`, …) — specialized layouts, not a separate Lovelace layer.
 
 **Outbound HA discovery** (MQTT / publish OCA as an HA device) is deferred until this contract stays stable. Inbound bridge remains `:plugin-homeassistant`.
@@ -140,7 +142,7 @@ Product entities are the **portable contract** across platforms. See [`EntityCon
 | **Blueprint** | Builtin scenes (e.g. **Sentinel**) | Ship templates keyed only to catalog entity ids; skip unbound targets |
 
 - **Shortcut (flow)** — triggers + conditions + actions. Event triggers: `boot` / `screen` (`on` / `off`; HU wake/sleep, debounced ~5s) / `gear` / `wheel_key` / `wifi_ssid` / `entity_state` / plugin triggers. Conditions (`entity_equals` / `gear_equals` / `wifi_ssid`) are AND-gated after a trigger match. Actions may `set_control`, `set_scene`, `run_routine`, `launch_app`, `delay_ms`, or plugin actions.
-- **Scene** — snapshot configured entities, write on-values when activated; on deactivate restore snapshot or force a value per target. Builtin **Sentinel** seeds on first use (parking comfort on; HVAC / exterior lights / fog off). An external write to any target of an **active** scene deactivates that scene (user left the mode). On **boot**, every scene still marked active is restored (off-path) before boot shortcuts run.
+- **Scene** — snapshot configured entities, write on-values when activated; on deactivate restore snapshot or force a value per target. Builtin **Sentinel** seeds on first use (parking comfort on; climate off; exterior lights / fog off). An external write to any target of an **active** scene deactivates that scene (user left the mode). On **boot**, every scene still marked active is restored (off-path) before boot shortcuts run.
 - **Routine** — reusable fire-once action sequence. Optional AND conditions (same types as flows) are evaluated on **every** run (API, nested `run_routine`); empty = always pass.
 
 **Device tracker / home zone:** `device_tracker_vehicle` (My Vehicle) exposes GPS presence as HA-style `home` / `not_home` vs a home lat/lon/radius stored in `/api/prefs` (`homeLat`, `homeLon`, `homeRadiusM`; set via Settings or `POST /api/location/home/here`). Use an `entity_equals` condition with entity `device_tracker_vehicle` and value `home` to gate routines/flows. Requires `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION`.
@@ -149,7 +151,7 @@ Product entities are the **portable contract** across platforms. See [`EntityCon
 
 Flows may include a non-event **`ui_card` trigger** that publishes a virtual control (`shortcut_<id>`): with a `set_scene` action the card is a bool bound to that scene; otherwise a command that runs the flow.
 
-**Portable automations:** only reference catalog entity ids that appear in ControlCatalog. Prefer builtins / shared templates over platform-specific VHAL. Future HA-like polish (not required for first platforms): run modes (`single` / `restart`), last-run traces — avoid full Choose/YAML complexity on the HU.
+**Portable automations:** only reference registry entity ids that appear in EntityRegistry. Prefer builtins / shared templates over platform-specific VHAL. Future HA-like polish (not required for first platforms): run modes (`single` / `restart`), last-run traces — avoid full Choose/YAML complexity on the HU.
 
 APIs: `/api/shortcuts`, `/api/scenes`, `/api/routines`, `/api/apps`. Legacy combined shortcuts migrate once into a routine + a flow that `run_routine`s it (flow id preserved for pin slots).
 

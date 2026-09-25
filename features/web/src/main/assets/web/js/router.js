@@ -1,16 +1,16 @@
 /**
- * Path-based section router (@lit-labs/router) for lit-html (no LitElement).
+ * Path-based page router (@lit-labs/router) for lit-html (no LitElement).
  * Ensures URLPattern polyfill on Chrome < 95 (IVI is Chrome 83).
  */
 import { URLPattern as URLPatternPolyfill } from "./vendor/urlpattern.js";
 import { Router } from "./vendor/lit-router.js";
-import { sectionView } from "./sections/index.js";
+import { pageView } from "./pages/index.js";
 import {
-  SECTION_IDS,
-  sectionPath,
-  pathToSection,
-  isKnownSection,
-} from "./sections/ids.js";
+  PAGE_IDS,
+  pagePath,
+  pathToPage,
+  isKnownPage,
+} from "./pages/ids.js";
 
 if (typeof globalThis.URLPattern === "undefined") {
   globalThis.URLPattern = URLPatternPolyfill;
@@ -61,35 +61,35 @@ class AppRouterHost extends EventTarget {
   }
 }
 
-/** @type {null | ((sec: string, prev: string) => void | Promise<void>)} */
+/** @type {null | ((page: string, prev: string) => void | Promise<void>)} */
 let enterHandler = null;
 
 /** @type {string} */
-let lastSection = "home";
+let lastPage = "home";
 
 export function setRouteEnterHandler(fn) {
   enterHandler = fn;
 }
 
-function routeConfig(sec) {
-  var path = sectionPath(sec);
+function routeConfig(page) {
+  var path = pagePath(page);
   return {
-    name: sec,
+    name: page,
     path: path,
     enter: function () {
-      var prev = lastSection;
-      lastSection = sec;
-      if (enterHandler) return enterHandler(sec, prev);
+      var prev = lastPage;
+      lastPage = page;
+      if (enterHandler) return enterHandler(page, prev);
     },
     render: function () {
-      return sectionView(sec);
+      return pageView(page);
     },
   };
 }
 
 var host = new AppRouterHost();
 
-var routeList = SECTION_IDS.filter(function (id) {
+var routeList = PAGE_IDS.filter(function (id) {
   return id !== "home";
 }).map(routeConfig);
 
@@ -102,16 +102,15 @@ export const router = new Router(host, routeList, {
 /** Start listening to clicks / popstate and resolve the current path. */
 export function startRouter(onUpdate) {
   if (onUpdate) host.onUpdate = onUpdate;
-  // Avoid treating the initial resolve as a leave from the default "home".
-  lastSection = pathToSection(window.location.pathname || "/");
+  lastPage = pathToPage(window.location.pathname || "/");
   host.connect();
   return router;
 }
 
-/** Navigate to a section; updates history when the path changes. */
-export function gotoSection(sec, options) {
-  if (!isKnownSection(sec)) sec = "home";
-  var path = sectionPath(sec);
+/** Navigate to a page; updates history when the path changes. */
+export function gotoPage(page, options) {
+  if (!isKnownPage(page)) page = "home";
+  var path = pagePath(page);
   var replace = options && options.replace;
   var current = window.location.pathname || "/";
   if (current.length > 1 && current.charAt(current.length - 1) === "/") {
@@ -127,15 +126,14 @@ export function gotoSection(sec, options) {
   return router.goto(path);
 }
 
-/** One-shot `?section=` → path redirect before the router connects. */
-export function applyLegacySectionQuery() {
+/** One-shot `?page=` / legacy `?section=` → path redirect before the router connects. */
+export function applyLegacyPageQuery() {
   try {
     var params = new URLSearchParams(window.location.search || "");
-    var sec = params.get("section");
-    if (!sec || !isKnownSection(sec)) return;
-    var path = sectionPath(sec);
-    window.history.replaceState({}, "", path);
+    var page = params.get("page") || params.get("section");
+    if (!page || !isKnownPage(page)) return;
+    window.history.replaceState({}, "", pagePath(page));
   } catch (e) {}
 }
 
-export { sectionPath, pathToSection, isKnownSection, SECTION_IDS };
+export { pagePath, pathToPage, isKnownPage, PAGE_IDS };

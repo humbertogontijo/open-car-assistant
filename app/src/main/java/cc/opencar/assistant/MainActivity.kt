@@ -141,7 +141,7 @@ class MainActivity : ComponentActivity() {
         if (section.isEmpty()) return
         // Prefer in-page navigation if UI already loaded.
         webView.evaluateJavascript(
-            "(function(){try{if(window.__ocaGoSection){window.__ocaGoSection(" +
+            "(function(){try{if(window.__ocaGoPage){window.__ocaGoPage(" +
                 org.json.JSONObject.quote(section) +
                 ");return true;}return false;}catch(e){return false;}})()",
         ) { result ->

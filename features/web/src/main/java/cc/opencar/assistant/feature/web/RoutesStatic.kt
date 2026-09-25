@@ -10,8 +10,8 @@ import io.ktor.server.response.respondText
 import io.ktor.server.routing.Routing
 import io.ktor.server.routing.get
 
-/** Section path segments that serve the SPA shell (keep in sync with web/js/sections/ids.js). */
-private val SPA_SECTIONS = setOf(
+/** Page path segments that serve the SPA shell (keep in sync with web/js/pages/ids.js). */
+private val SPA_PAGES = setOf(
     "home",
     "history",
     "controls",
@@ -77,7 +77,7 @@ internal fun Routing.registerStaticRoutes(deps: OcaWebDeps) {
 internal fun Routing.registerSpaFallbackRoutes(deps: OcaWebDeps) {
     get("/{section}") {
         val section = call.parameters["section"] ?: return@get
-        if (section !in SPA_SECTIONS) {
+        if (section !in SPA_PAGES) {
             call.respond(HttpStatusCode.NotFound)
             return@get
         }

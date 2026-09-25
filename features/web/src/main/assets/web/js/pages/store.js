@@ -92,7 +92,7 @@ async function installApkFile(file) {
   }
 }
 
-export function sectionStore() {
+export function pageStore() {
   const q = state.storeQuery || "";
   const results = state.storeResults || [];
   const detail = state.storeDetail;
@@ -239,7 +239,7 @@ export function sectionStore() {
   }
 
   return html`
-    <div class="section-head">
+    <div class="page-head">
       <h1>${t("section.store.title", "Loja")}</h1>
       <button
         class="btn"

@@ -1,3 +1,6 @@
+import { loadCss } from "./load-css.js";
+loadCss("/static/js/ui/dashboard.css");
+
 import { html, svg, nothing, unsafeHTML } from "../lit.js";
 import { t } from "../i18n.js";
 import { fmt } from "../api.js";

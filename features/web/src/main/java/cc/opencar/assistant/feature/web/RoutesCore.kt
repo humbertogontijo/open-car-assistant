@@ -1,6 +1,7 @@
 package cc.opencar.assistant.feature.web
 
 import cc.opencar.assistant.api.EntityContract
+import cc.opencar.assistant.api.EntityRegistry
 import cc.opencar.assistant.support.I18nBundle
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
@@ -295,7 +296,12 @@ internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
         if (result.isSuccess) {
             CatalogResponseCache.invalidate()
             WebEventHub.emitCatalog("control_write")
-            WebEventHub.emitEntity(id, value, status = "ok")
+            // Composites refresh via catalog only — never patch product value with
+            // structured write tokens (temperature:22) or attr-raw.
+            val product = EntityRegistry.resolve(id)
+            if (product == null || !product.isComposite) {
+                WebEventHub.emitEntity(id, value, status = "ok")
+            }
             deps.shortcuts?.onControlWritten(id)
         }
         call.respond(

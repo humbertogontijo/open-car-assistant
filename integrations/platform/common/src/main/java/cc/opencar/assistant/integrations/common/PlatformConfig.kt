@@ -5,9 +5,9 @@ import cc.opencar.assistant.api.AndroidVolumeGroup
 import cc.opencar.assistant.api.Capability
 import cc.opencar.assistant.api.CatalogEntry
 import cc.opencar.assistant.api.DvrStreamConfig
+import cc.opencar.assistant.api.EntityRegistry
 import cc.opencar.assistant.api.PlatformVariant
 import cc.opencar.assistant.api.VehicleProperty
-import cc.opencar.assistant.api.WellKnownProperties
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -472,17 +472,8 @@ data class PlatformConfig(
     }
 }
 
-/** Resolve well-known property key string to VehicleProperty. */
 fun wellKnownByKey(key: String): VehicleProperty? {
-    return try {
-        val field = WellKnownProperties::class.java.getDeclaredField(key.uppercase().replace('-', '_'))
-        field.isAccessible = true
-        field.get(WellKnownProperties) as? VehicleProperty
-    } catch (_: Throwable) {
-        WellKnownProperties::class.java.declaredFields
-            .firstOrNull {
-                it.type == VehicleProperty::class.java &&
-                    (it.get(null) as VehicleProperty).key == key
-            }?.get(null) as? VehicleProperty
-    }
+    if (key.isBlank()) return null
+    // Any platform.json binding key is a valid logical property.
+    return EntityRegistry.property(key)
 }

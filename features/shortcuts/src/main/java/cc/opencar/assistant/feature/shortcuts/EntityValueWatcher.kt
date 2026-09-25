@@ -1,6 +1,7 @@
 package cc.opencar.assistant.feature.shortcuts
 
 import android.util.Log
+import cc.opencar.assistant.api.EntityRegistry
 import cc.opencar.assistant.api.VehicleEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -43,7 +44,7 @@ class EntityValueWatcher(
                 launch {
                     eventsFlow.collect { ev ->
                         if (ev !is VehicleEvent.EntityValueChanged) return@collect
-                        deliver(ev.entityId, ev.value)
+                        onSessionEntity(ev.entityId, ev.value)
                     }
                 }
             }
@@ -64,13 +65,30 @@ class EntityValueWatcher(
         watched = ids
         for (id in ids) {
             val value = runCatching { readEntity(id) }.getOrNull()
-            deliver(id, value)
+            applyChange(id, value)
         }
     }
 
-    private fun deliver(entityId: String, value: String?) {
+    /**
+     * Session events use platform binding keys (`hvac_power`). For composites,
+     * re-read the product id so watchers see HVAC mode, not attr-raw.
+     */
+    private suspend fun onSessionEntity(entityId: String, value: String?) {
         val ids = watched
-        if (ids.isNotEmpty() && entityId !in ids) return
+        val product = EntityRegistry.resolveBinding(entityId)
+        if (product != null && product.isComposite) {
+            if (product.id in ids) {
+                applyChange(product.id, runCatching { readEntity(product.id) }.getOrNull())
+            }
+            if (entityId in ids) applyChange(entityId, value)
+            return
+        }
+        if (ids.isEmpty() || entityId in ids) {
+            applyChange(entityId, value)
+        }
+    }
+
+    private fun applyChange(entityId: String, value: String?) {
         if (!last.containsKey(entityId)) {
             last[entityId] = value
             return

@@ -3,15 +3,19 @@ package cc.opencar.assistant.api
 /**
  * Home Assistant–inspired entity contract for the product surface.
  *
- * Integrations map [WellKnownProperties] via `platform.json` → `properties[].entity`;
- * the curated [ControlCatalog] (feature-web) exposes stable catalog **entity ids** used by
+ * Integrations map platform binding keys via `platform.json` → `properties[].entity`;
+ * the curated [EntityRegistry] exposes stable catalog **entity ids** used by
  * UI, history, shortcuts, scenes, and routines. Features never hardcode VHAL hex.
+ *
+ * Composite entities (e.g. `climate`) have one product id with [EntityDef.attributes]
+ * pointing at multiple binding keys (`hvac_power`, `hvac_temp_c`, …). Atomic entities
+ * keep `id == bindingKey`.
  *
  * JSON maps from `/api/entities` (and virtual shortcut cards) include:
  *
  * | Field | Role |
  * |-------|------|
- * | `id` | Stable catalog id (`sensor_soc`, `hvac_temp`, …) — public contract |
+ * | `id` | Stable catalog id (`climate`, `sensor_soc`, …) — public contract |
  * | `domain` | Same as [EntityType.id] (`sensor`, `climate`, `lock`, …) |
  * | `entity` | Alias of `domain` (legacy UI field) |
  * | `state` / `value` | Current state string (HA `state` / OCA `value`) |
@@ -22,14 +26,22 @@ package cc.opencar.assistant.api
  * | `unitOfMeasurement` | HA-aligned [UnitOfMeasurement.id] |
  * | `attributes` | Nested map of semantic extras (device_class, unit, …) |
  * | `group` | OEM nav section id (`home`, `energy`, `controls`, …) |
- * | `input` | Card widget type (`bool`, `choice`, `sensor`, …) |
+ * | `input` | Soft widget hint (`bool`, `choice`, `sensor`, `climate`, …); **domain** selects card family |
+ * | `composite` | `true` when one product id spans many binding keys |
+ * | `update` | Live-update policy: [UPDATE_ENTITY] (default) or [UPDATE_CATALOG] |
+ *
+ * **Live updates:** atomic entities may receive WS `entity` deltas with a new `value`.
+ * Composites use [UPDATE_CATALOG] — binding-key edges invalidate the catalog; the UI
+ * must not apply attr-raw values onto product `state`/`value`.
  *
  * **Availability:** an entity appears only when the platform binds its property
  * (and capability gates allow the section). Unbound = not created — same idea as
- * HA “integration didn’t register the entity.”
+ * HA “integration didn’t register the entity.” Composites appear when any core
+ * attribute binding exists.
  *
  * **Portability:** shortcuts / scenes / routines must reference catalog `id`s only.
- * Builtin scenes (e.g. Sentinel) skip missing targets at runtime.
+ * Builtin scenes (e.g. Sentinel) skip missing targets at runtime. Legacy alias ids
+ * (`hvac_power`) resolve to the composite (`climate`) for set/read.
  *
  * MQTT / HA outbound discovery may publish these fields later; inbound HA bridge
  * remains [plugins/homeassistant].
@@ -48,22 +60,49 @@ object EntityContract {
     const val FIELD_DEVICE_CLASS = "deviceClass"
     const val FIELD_UNIT = "unitOfMeasurement"
     const val FIELD_GROUP = "group"
+    const val FIELD_COMPOSITE = "composite"
+    /** How the web shell should apply live updates for this row. */
+    const val FIELD_UPDATE = "update"
+    /** Patch `value`/`state` from WS `entity` deltas (atomics, media transport). */
+    const val UPDATE_ENTITY = "entity"
+    /** Reload `/api/entities` — never apply binding attr-raw as product state. */
+    const val UPDATE_CATALOG = "catalog"
 
     /** Status values treated as “entity exists and has a usable reading.” */
     fun isAvailable(status: String?): Boolean =
         status == "ok" || status == "cached"
 
+    fun isComposite(row: Map<String, Any?>): Boolean =
+        row[FIELD_COMPOSITE] == true
+
+    /** True when live binding edges must refresh via catalog, not entity value patches. */
+    fun isCatalogUpdate(row: Map<String, Any?>): Boolean =
+        row[FIELD_UPDATE] == UPDATE_CATALOG || isComposite(row)
+
+    fun updatePolicy(composite: Boolean): String =
+        if (composite) UPDATE_CATALOG else UPDATE_ENTITY
+
     /**
      * Adds HA-shaped aliases (`domain`, `state`, `friendlyName`, `available`,
      * `attributes`) without removing legacy keys used by the web shell.
-     * Idempotent: already-enriched rows are returned as-is.
+     * Ensures [FIELD_COMPOSITE] / [FIELD_UPDATE] are always present.
      */
     fun enrich(row: Map<String, Any?>): Map<String, Any?> {
+        val composite = row[FIELD_COMPOSITE] == true
+        val update = (row[FIELD_UPDATE] as? String)
+            ?: updatePolicy(composite)
+
         if (row[FIELD_DOMAIN] != null &&
             row.containsKey(FIELD_AVAILABLE) &&
             row[FIELD_ATTRIBUTES] is Map<*, *>
         ) {
-            return row
+            if (row.containsKey(FIELD_COMPOSITE) && row.containsKey(FIELD_UPDATE)) {
+                return row
+            }
+            return row + mapOf(
+                FIELD_COMPOSITE to composite,
+                FIELD_UPDATE to update,
+            )
         }
         val status = row[FIELD_STATUS] as? String
         val label = row[FIELD_LABEL] as? String
@@ -88,6 +127,8 @@ object EntityContract {
             put("stale", row["stale"])
             put("history", row["history"])
             put("writable", row["writable"])
+            put("composite", composite)
+            put("update", update)
             if (row["virtual"] == true) {
                 put("virtual", true)
                 put("virtual_kind", row["virtualKind"])
@@ -99,6 +140,8 @@ object EntityContract {
             FIELD_STATE to value,
             FIELD_FRIENDLY_NAME to label,
             FIELD_AVAILABLE to isAvailable(status),
+            FIELD_COMPOSITE to composite,
+            FIELD_UPDATE to update,
             FIELD_ATTRIBUTES to attributes,
         )
     }

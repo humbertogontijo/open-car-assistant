@@ -178,7 +178,7 @@ function soundKindCard(kind, title) {
   });
 }
 
-export function sectionSound() {
+export function pageSound() {
   const snap = state.sounds || {};
   const note =
     snap.note ||
@@ -189,7 +189,7 @@ export function sectionSound() {
   return html`
     <h1>${t("section.sound.title", "Som")}</h1>
     ${familySections(entitiesByGroup("sound"))}
-    <h2 class="section-label" style="margin:28px 0 10px">${t("sounds.title", "Custom sounds")}</h2>
+    <h2 class="page-label" style="margin:28px 0 10px">${t("sounds.title", "Custom sounds")}</h2>
     <p class="sub" style="margin:0 0 12px">${note}</p>
     <div class="grid">
       ${soundKindCard("avas", t("sounds.avas", "AVAS"))}

@@ -77,9 +77,9 @@ JSON shape:
 - **Override** a common key in the integration pack when the platform wording differs.
 - **valueMaps** map live numeric/string values → i18n keys (resolved for segments, telemetry, and `valueLabel` on controls).
 - `platform.json` `driveModeEnum` values should be **i18n keys** (e.g. `"6": "drive_mode.normal"`), not localized literals.
-- Product `ControlDef` uses `labelKey` / `hintKey` defaults `control.<id>` / `control.<id>.hint`.
+- Product `EntityDef` uses `labelKey` / `hintKey` defaults `control.<id>` / `control.<id>.hint`.
 - Locale: `GET /api/i18n`, `POST /api/locale`, Sistema → Idioma (pt-BR / en).
-- New OEM enum literals belong in `platform.json` / valueMaps, not in `ControlCatalog`.
+- New OEM enum literals belong in `platform.json` / valueMaps, not in `EntityRegistry`.
 
 ## Variants vs new modules
 

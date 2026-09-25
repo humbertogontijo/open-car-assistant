@@ -137,8 +137,31 @@ class AssistantRuntime(private val app: OcaApp) {
         )
         history = EntityHistoryRecorder(app, sess).also { it.start() }
 
+        val applyControl: suspend (String, String) -> Result<Unit> = { id, value ->
+            when {
+                id in (androidSettings?.writableIds ?: emptySet()) -> {
+                    val ok = androidSettings?.apply(id, value) == true
+                    if (ok) Result.success(Unit)
+                    else Result.failure(IllegalStateException("android apply failed: $id"))
+                }
+                else -> ControlCatalog.set(sess, id, value, app)
+            }
+        }
+        val readControl: suspend (String) -> String? = { id ->
+            locationTracker?.read(id)
+                ?: androidSettings?.read(id)
+                ?: ControlCatalog.currentValue(sess, id)
+        }
+
         if (Capability.WRITE_SETTINGS in capabilities) {
-            memory = SettingsMemoryController(app, sess, true, androidSettings).also { it.start() }
+            memory = SettingsMemoryController(
+                context = app,
+                session = sess,
+                hasWrite = true,
+                applyControl = applyControl,
+                readControl = readControl,
+                extraPinIds = androidSettings?.allIds.orEmpty(),
+            ).also { it.start() }
         }
 
         val pluginHost = object : PluginHost {
@@ -159,25 +182,12 @@ class AssistantRuntime(private val app: OcaApp) {
         shortcuts = ShortcutsController(
             context = app,
             session = sess,
-            setControl = { id, value ->
-                when {
-                    id in (androidSettings?.writableIds ?: emptySet()) -> {
-                        val ok = androidSettings?.apply(id, value) == true
-                        if (ok) Result.success(Unit)
-                        else Result.failure(IllegalStateException("android apply failed: $id"))
-                    }
-                    else -> ControlCatalog.set(sess, id, value, app)
-                }
-            },
+            setControl = applyControl,
             mainActivityClass = MainActivity::class.java,
             quickEntry = matched.createQuickEntry(),
             actionHandlers = actionHandlers,
             triggerSources = triggerSources,
-            readEntity = { id ->
-                locationTracker?.read(id)
-                    ?: androidSettings?.read(id)
-                    ?: ControlCatalog.currentValue(sess, id)
-            },
+            readEntity = readControl,
             readGear = {
                 sess.telemetry().first().gear
             },

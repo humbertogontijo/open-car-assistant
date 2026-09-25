@@ -3,7 +3,7 @@
  */
 import { api } from "./api.js";
 import { state, patchSilent, notify } from "./store.js";
-import { isTimelineBusy } from "./sections/index.js";
+import { isTimelineBusy } from "./pages/index.js";
 import { heldTransportValue, mergeTransportHold, mediaStateLabel } from "./actions.js";
 
 let socket = null;
@@ -25,6 +25,11 @@ function shouldSkipPaint() {
   return false;
 }
 
+function isCatalogOnlyEntity(row) {
+  if (!row) return false;
+  return row.update === "catalog" || row.composite === true;
+}
+
 function patchEntityRow(id, value, status) {
   if (!id) return false;
   // Ignore stale transport while a local play/pause hold is active.
@@ -44,6 +49,15 @@ function patchEntityRow(id, value, status) {
     for (let i = 0; i < list.length; i++) {
       const row = list[i];
       if (!row || row.id !== id) continue;
+      // Catalog-only composites: never apply binding attr-raw as product state.
+      if (isCatalogOnlyEntity(row) && value !== undefined) {
+        if (status != null && status !== row.status) {
+          if (next == null) next = list.slice();
+          next[i] = Object.assign({}, row, { status: status });
+          changed = true;
+        }
+        break;
+      }
       if (next == null) next = list.slice();
       const updated = Object.assign({}, row);
       if (value !== undefined) {
@@ -99,7 +113,7 @@ function handleMessage(raw) {
     case "ping":
       return;
     case "telemetry": {
-      const onCam = state.section === "cameras" || state.section === "dvr";
+      const onCam = state.page === "cameras" || state.page === "dvr";
       const livePreview = onCam && !!state.cameraPreviewActive;
       const status = Object.assign({}, state.status || {});
       if (msg.telemetry) status.telemetry = msg.telemetry;

@@ -1,3 +1,6 @@
+import { loadCss } from "./load-css.js";
+loadCss("/static/js/ui/setup.css");
+
 import { html, render, nothing } from "../lit.js";
 import { api, $ } from "../api.js";
 import { state, patch } from "../store.js";

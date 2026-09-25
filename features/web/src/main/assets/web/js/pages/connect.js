@@ -28,7 +28,7 @@ function volumeLabel(v) {
 }
 
 /** Android / OS entities + helpers (not VHAL). Legacy `connect` deep-links here. */
-export function sectionAndroid() {
+export function pageAndroid() {
   const group = "android";
   const viewing = isShowingHidden(group);
   const items = viewing

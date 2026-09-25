@@ -70,7 +70,7 @@ function unitDimensionCards() {
   });
 }
 
-export function sectionSettings() {
+export function pageSettings() {
   const th = theme();
   const locale = (state.i18n && state.i18n.locale) || "pt-BR";
   const locales = (state.i18n && state.i18n.locales) || ["pt-BR", "en"];

@@ -9,12 +9,12 @@ var HOME_HERO_IDS = [
   "sensor_range",
   "sensor_speed",
   "sensor_gear",
-  "sensor_drive_mode",
+  "drive_mode",
   "sensor_fuel",
 ];
 
-export function sectionHome() {
-  // Dashboard sensors only (group=home). Writable drive_mode / regen live under Condução.
+export function pageHome() {
+  // Dashboard sensors (group=home) + drive_mode (single entity for that property).
   const viewing = isShowingHidden("home");
   const items = viewing
     ? hiddenEntitiesByGroup("home").filter(function (e) {
@@ -23,7 +23,14 @@ export function sectionHome() {
     : state.entities.filter(function (e) {
         return e.group === "home" && (e.entity === "sensor" || e.domain === "sensor") && e.status === "ok";
       });
-  const hero = pickEntities(items, HOME_HERO_IDS);
+  const heroPool = viewing
+    ? items
+    : (state.entities || []).filter(function (e) {
+        if (!(e.status === "ok" || e.status === "cached")) return false;
+        if (e.id === "drive_mode") return true;
+        return e.group === "home" && (e.entity === "sensor" || e.domain === "sensor");
+      });
+  const hero = pickEntities(heroPool, HOME_HERO_IDS);
   const heroIds = {};
   hero.forEach(function (e) {
     heroIds[e.id] = true;
@@ -44,7 +51,7 @@ export function sectionHome() {
           ${dashSummary(hero, { className: "dash-home" })}
           ${rest.length
             ? html`
-                <h2 class="section-label" style="margin:20px 0 10px">
+                <h2 class="page-label" style="margin:20px 0 10px">
                   ${t("dash.home.more", "More sensors")}
                 </h2>
                 ${entityGrid(rest)}

@@ -1,7 +1,7 @@
 import { api, $ } from "./api.js";
 import { state, patch, notify, subscribe } from "./store.js";
 import { render as litRender } from "./lit.js";
-import { sectionView } from "./sections/index.js";
+import { pageView } from "./pages/index.js";
 import {
   loadHistoryPoints,
   loadEnergyDash,
@@ -11,25 +11,25 @@ import {
   stopCameraLive,
   applyCameraPlayerSrc,
   ensureStoreLoaded,
-} from "./sections/index.js";
-import { loadShortcuts } from "./sections/shortcuts.js";
+} from "./pages/index.js";
+import { loadShortcuts } from "./pages/shortcuts.js";
 import { shouldShowSetup, renderSetupOverlay } from "./ui/setup.js";
 import { setTheme } from "./theme.js";
 import { loadI18n } from "./i18n.js";
 import { loadIcons, mountNavIcons } from "./icons.js";
-import { stashCurrentScroll, restoreSectionScroll, rememberScroll } from "./nav.js";
+import { stashCurrentScroll, restorePageScroll, rememberScroll } from "./nav.js";
 import { connectEvents } from "./events.js";
 import {
-  applyLegacySectionQuery,
+  applyLegacyPageQuery,
   setRouteEnterHandler,
   startRouter,
-  gotoSection,
+  gotoPage,
   router,
 } from "./router.js";
 
 function updateNavActive(sec) {
   document.querySelectorAll(".nav-item").forEach(function (n) {
-    n.classList.toggle("active", n.getAttribute("data-sec") === sec);
+    n.classList.toggle("active", n.getAttribute("data-page") === sec);
   });
 }
 
@@ -45,8 +45,8 @@ function applyCapabilityNav() {
       return c && has(c.trim());
     });
     el.style.display = ok ? "" : "none";
-    if (!ok && state.section === el.getAttribute("data-sec")) {
-      goSection("home", { replace: true });
+    if (!ok && state.page === el.getAttribute("data-page")) {
+      goPage("home", { replace: true });
     }
   });
 }
@@ -58,14 +58,14 @@ function paint() {
   const prevProbeScroll = probeScrollEl ? probeScrollEl.scrollTop : 0;
 
   var outlet = router.outlet();
-  litRender(outlet != null ? outlet : sectionView(state.section), main);
+  litRender(outlet != null ? outlet : pageView(state.page), main);
   renderSetupOverlay();
   mountNavIcons();
-  updateNavActive(state.section);
+  updateNavActive(state.page);
 
-  if (state.section === "store") ensureStoreLoaded();
+  if (state.page === "store") ensureStoreLoaded();
 
-  if (state.section === "cameras" || state.section === "dvr") {
+  if (state.page === "cameras" || state.page === "dvr") {
     if (state.cameraPlayerMode !== "dvr") {
       Promise.resolve(startCameraLive()).then(function () {
         return applyCameraPlayerSrc();
@@ -75,7 +75,7 @@ function paint() {
     stopCameraLive();
   }
 
-  restoreSectionScroll(state.section);
+  restorePageScroll(state.page);
   const probeAfter = document.getElementById("probeScroll");
   if (probeAfter) probeAfter.scrollTop = prevProbeScroll;
 }
@@ -192,7 +192,7 @@ export async function refresh() {
   Object.assign(state, updates);
   applyCapabilityNav();
 
-  if (state.section === "history") {
+  if (state.page === "history") {
     if (!state.historySelected && state.historyEntities && state.historyEntities.length) {
       patch({ historySelected: state.historyEntities[0] });
     }
@@ -200,51 +200,51 @@ export async function refresh() {
       await loadHistoryPoints();
     }
   }
-  if (state.section === "energy") {
+  if (state.page === "energy") {
     await loadEnergyDash();
   }
-  if (state.section === "sound" || !state._soundsLoaded) {
+  if (state.page === "sound" || !state._soundsLoaded) {
     state._soundsLoaded = true;
     await loadSounds();
   }
-  if (state.section === "cameras" || state.section === "dvr") {
+  if (state.page === "cameras" || state.page === "dvr") {
     await loadRecordings();
   }
-  if (state.section === "shortcuts" || state.section === "settings" || state.section === "system" || !state._shortcutsLoaded) {
+  if (state.page === "shortcuts" || state.page === "settings" || state.page === "system" || !state._shortcutsLoaded) {
     state._shortcutsLoaded = true;
     await loadShortcuts();
   }
   notify();
 }
 
-function onSectionEnter(sec, prev) {
-  if (prev && prev !== sec) {
+function onPageEnter(page, prev) {
+  if (prev && prev !== page) {
     stashCurrentScroll();
     if (
       (prev === "cameras" || prev === "dvr") &&
-      sec !== "cameras" &&
-      sec !== "dvr"
+      page !== "cameras" &&
+      page !== "dvr"
     ) {
       stopCameraLive();
     }
   }
 
-  updateNavActive(sec);
+  updateNavActive(page);
 
   const updates = {
-    section: sec,
+    page: page,
     openChoiceId: null,
     choiceSearchQuery: "",
     showHiddenGroup: null,
   };
-  if (sec === "store") updates._storeLoaded = false;
+  if (page === "store") updates._storeLoaded = false;
   patch(updates);
 
-  if (sec === "shortcuts" || sec === "settings" || sec === "system") {
+  if (page === "shortcuts" || page === "settings" || page === "system") {
     loadShortcuts().then(function () {
       notify();
     });
-  } else if (sec === "history") {
+  } else if (page === "history") {
     if (!state.historySelected && state.historyEntities && state.historyEntities.length) {
       patch({ historySelected: state.historyEntities[0], historyView: null });
     } else {
@@ -253,11 +253,11 @@ function onSectionEnter(sec, prev) {
     loadHistoryPoints().then(function () {
       notify();
     });
-  } else if (sec === "energy") {
+  } else if (page === "energy") {
     loadEnergyDash().then(function () {
       notify();
     });
-  } else if (sec === "cameras" || sec === "dvr") {
+  } else if (page === "cameras" || page === "dvr") {
     patch({
       cameraPreviewActive: false,
       cameraPreviewSrc: "",
@@ -270,11 +270,11 @@ function onSectionEnter(sec, prev) {
     loadRecordings().then(function () {
       notify();
     });
-  } else if (sec === "sound") {
+  } else if (page === "sound") {
     loadSounds().then(function () {
       notify();
     });
-  } else if (sec === "lab") {
+  } else if (page === "lab") {
     api("/api/lab")
       .then(function (lab) {
         state.lab = lab;
@@ -299,15 +299,15 @@ function onSectionEnter(sec, prev) {
   }
 }
 
-function goSection(sec, options) {
-  if (!sec) return;
-  return gotoSection(sec, options);
+function goPage(page, options) {
+  if (!page) return;
+  return gotoPage(page, options);
 }
 
-window.__ocaGoSection = goSection;
+window.__ocaGoPage = goPage;
 
-applyLegacySectionQuery();
-setRouteEnterHandler(onSectionEnter);
+applyLegacyPageQuery();
+setRouteEnterHandler(onPageEnter);
 startRouter(function () {
   notify();
 });
@@ -326,7 +326,7 @@ document.addEventListener(
   "scroll",
   function (ev) {
     if (ev.target && ev.target.id === "main") {
-      rememberScroll(state.section, ev.target.scrollTop);
+      rememberScroll(state.page, ev.target.scrollTop);
     }
   },
   true,

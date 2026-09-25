@@ -61,6 +61,8 @@ class SessionEventFanout(
     private fun emitEntityIfChanged(entityId: String, display: String?) {
         val prev = lastEntityDisplay.put(entityId, display)
         if (prev == null || prev == display) return
+        // Binding-key edges only. Composites never emit product id with attr-raw
+        // (catalog refresh is owned by RoutesEvents / WebEventHub).
         events.tryEmit(VehicleEvent.EntityValueChanged(entityId, display))
     }
 }

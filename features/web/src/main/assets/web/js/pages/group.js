@@ -8,14 +8,14 @@ import {
 import { entityGrid, entityLabel, pageHead } from "../ui/cards.js";
 
 var FAMILY_ORDER = [
+  "climate",
+  "seat",
   "drive_mode",
   "regen",
   "steering",
   "brake",
   "lock",
   "window",
-  "climate",
-  "seat",
   "energy",
   "charging",
   "adas",
@@ -45,13 +45,13 @@ export function familySections(items, opts) {
   });
   return keys.map(function (fam) {
     return html`
-      <h2 class="section-label" style="margin:20px 0 10px">${entityLabel(fam)}</h2>
+      <h2 class="page-label" style="margin:20px 0 10px">${entityLabel(fam)}</h2>
       ${entityGrid(buckets[fam], opts)}
     `;
   });
 }
 
-export function sectionGroup(title, sub, group) {
+export function pageGroup(title, sub, group) {
   const viewing = isShowingHidden(group);
   const items = viewing
     ? hiddenEntitiesByGroup(group)

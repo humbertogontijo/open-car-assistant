@@ -1,5 +1,6 @@
 package cc.opencar.assistant.feature.web
 
+import cc.opencar.assistant.api.EntityRegistry
 import cc.opencar.assistant.api.VehicleEvent
 import cc.opencar.assistant.support.I18nBundle
 import com.google.gson.Gson
@@ -15,6 +16,9 @@ import kotlinx.coroutines.launch
 /**
  * Event-driven UI channel: telemetry + entity deltas + catalog invalidate.
  * Client still bootstraps once via HTTP [refresh]; this replaces soft-poll.
+ *
+ * Composite binding-key edges never become WS `entity` deltas — catalog
+ * invalidation only ([EntityContract.UPDATE_CATALOG]).
  */
 internal fun Routing.registerEventRoutes(deps: OcaWebDeps) {
     val session = deps.session
@@ -40,17 +44,23 @@ internal fun Routing.registerEventRoutes(deps: OcaWebDeps) {
                 session.events().collect { ev ->
                     when (ev) {
                         is VehicleEvent.EntityValueChanged -> {
-                            send(
-                                Frame.Text(
-                                    gson.toJson(
-                                        mapOf(
-                                            "t" to "entity",
-                                            "id" to ev.entityId,
-                                            "value" to ev.value,
+                            val product = EntityRegistry.resolveBinding(ev.entityId)
+                            if (product != null && product.isComposite) {
+                                // Binding-key edge for a composite → catalog only.
+                                WebEventHub.emitCatalog("composite_attr")
+                            } else {
+                                send(
+                                    Frame.Text(
+                                        gson.toJson(
+                                            mapOf(
+                                                "t" to "entity",
+                                                "id" to ev.entityId,
+                                                "value" to ev.value,
+                                            ),
                                         ),
                                     ),
-                                ),
-                            )
+                                )
+                            }
                         }
                         else -> Unit
                     }

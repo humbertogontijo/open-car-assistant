@@ -56,20 +56,15 @@ class EntityHistoryRecorder(
                 record("sensor_range_ev", "home", "sensor", snap.rangeEvKm?.let { "%.0f".format(it) }, now)
                 record("sensor_range_fuel", "home", "sensor", snap.rangeFuelKm?.let { "%.0f".format(it) }, now)
                 record("sensor_odometer", "home", "sensor", snap.odometerKm?.let { "%.0f".format(it) }, now)
-                record("sensor_drive_mode", "home", "sensor", snap.driveMode, now)
+                record("drive_mode", "drive", "drive_mode", snap.driveMode, now)
                 record(
-                    "sensor_hvac_temp", "climate", "climate",
+                    "climate", "controls", "climate",
                     snap.hvacTempC?.let { "%.1f".format(it) },
                     now,
                 )
                 record(
-                    "sensor_temp_ambient", "climate", "climate",
+                    "sensor_temp_ambient", "controls", "climate",
                     snap.tempAmbientC?.let { "%.0f".format(it) },
-                    now,
-                )
-                record(
-                    "sensor_temp_indoor", "climate", "climate",
-                    snap.tempIndoorC?.let { "%.1f".format(it) },
                     now,
                 )
                 record(
@@ -78,7 +73,7 @@ class EntityHistoryRecorder(
                     now,
                 )
                 record(
-                    "sensor_charge_a", "energy", "charging",
+                    "charge_current", "energy", "charging",
                     snap.chargeCurrentA?.let { "%.1f".format(it) },
                     now,
                 )
@@ -102,9 +97,6 @@ class EntityHistoryRecorder(
                     snap.avgFuelL100km?.let { "%.1f".format(it) },
                     now,
                 )
-                record("hvac_temp", "climate", "climate", snap.hvacTempC?.let { "%.1f".format(it) }, now)
-                record("charge_current", "energy", "charging", snap.chargeCurrentA?.let { "%.1f".format(it) }, now)
-                record("drive_mode", "drive", "drive_mode", snap.driveMode, now)
             }
         }
     }

@@ -542,7 +542,7 @@ function ensureHistoryDefaults() {
   if (Object.keys(updates).length) patch(updates);
 }
 
-export function sectionHistory() {
+export function pageHistory() {
   ensureHistoryDefaults();
   const entities = state.historyEntities || [];
   const selected = state.historySelected || "";

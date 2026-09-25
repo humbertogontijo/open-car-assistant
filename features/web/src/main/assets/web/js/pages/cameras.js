@@ -146,7 +146,7 @@ export async function stopCameraLive() {
 
 export { applyCameraPlayerSrc };
 
-export function sectionCameras() {
+export function pageCameras() {
   const dvr = (state.status && state.status.dvr) || {};
   const dvrActive = dvr.mode === "dvr" || (!!dvr.recording && dvr.mode !== "off");
   const storages = dvr.storages || [];

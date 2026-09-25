@@ -43,8 +43,8 @@ export async function setLocale(locale) {
 }
 
 export function applyChrome() {
-  document.querySelectorAll(".nav-item[data-sec]").forEach(function (el) {
-    const sec = el.getAttribute("data-sec");
+  document.querySelectorAll(".nav-item[data-page]").forEach(function (el) {
+    const sec = el.getAttribute("data-page");
     const label = el.querySelector(".label");
     if (label) label.textContent = t("nav." + sec, label.textContent);
   });

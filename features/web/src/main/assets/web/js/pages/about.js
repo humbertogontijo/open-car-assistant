@@ -2,7 +2,7 @@ import { html } from "../lit.js";
 import { state } from "../store.js";
 import { t } from "../i18n.js";
 
-export function sectionAbout() {
+export function pageAbout() {
   const s = state.status || {};
   const setup = state.setup || {};
   const rows = [

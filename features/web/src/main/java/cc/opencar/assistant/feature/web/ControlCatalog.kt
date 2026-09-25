@@ -3,11 +3,12 @@ package cc.opencar.assistant.feature.web
 import android.content.Context
 import cc.opencar.assistant.api.DeviceClass
 import cc.opencar.assistant.api.EntityContract
+import cc.opencar.assistant.api.EntityDef
+import cc.opencar.assistant.api.EntityRegistry
 import cc.opencar.assistant.api.EntityType
 import cc.opencar.assistant.api.PropertyValue
 import cc.opencar.assistant.api.ReadOutcome
 import cc.opencar.assistant.api.UnitOfMeasurement
-import cc.opencar.assistant.api.VehicleProperty
 import cc.opencar.assistant.api.VehicleSession
 import cc.opencar.assistant.api.WellKnownProperties
 import cc.opencar.assistant.feature.memory.SettingsMemoryController
@@ -16,355 +17,11 @@ import cc.opencar.assistant.support.LastKnownStore
 import kotlinx.coroutines.flow.first
 
 /**
- * Curated product controls. [input] drives typed UI; [icon] maps to SVG sprite keys.
- * [group] is the OEM web nav section id (controls, drive, energy, …).
- * [deviceClass] / [unitOfMeasurement] mirror HA semantics; display uses localized [unitLabel].
+ * Product entity API facade over [EntityRegistry].
+ * Builds `/api/entities` maps and handles set/read (including composite climate).
  */
 object ControlCatalog {
-    data class ControlDef(
-        val id: String,
-        val group: String,
-        val entity: EntityType,
-        val property: VehicleProperty,
-        /** bool | choice | command | int | float | text | sensor */
-        val input: String,
-        val optionKeys: List<Pair<String, Int>>? = null,
-        val writable: Boolean = true,
-        val deviceClass: DeviceClass? = null,
-        val unitOfMeasurement: UnitOfMeasurement? = null,
-        val acronym: String? = null,
-        val lastKnown: Boolean = false,
-        val valueMapId: String? = null,
-        val labelKey: String? = null,
-        val hintKey: String? = null,
-        val icon: String? = null,
-        val min: Float? = null,
-        val max: Float? = null,
-        val step: Float? = null,
-        /** Opt-in for local HA-style entity history recording. */
-        val history: Boolean = false,
-    ) {
-        fun resolvedLabelKey(): String = labelKey ?: "control.$id"
-        fun resolvedHintKey(): String = hintKey ?: "control.$id.hint"
-        fun resolvedValueMapId(): String = valueMapId ?: id
-        fun resolvedIcon(): String = icon ?: id
-    }
-
-    val ALL: List<ControlDef> = listOf(
-        ControlDef("drive_mode", "drive", EntityType.DRIVE_MODE,
-            WellKnownProperties.DRIVE_MODE, "choice",
-            optionKeys = listOf(
-                "opt.drive_mode.1" to 5,
-                "opt.drive_mode.2" to 6,
-                "opt.drive_mode.3" to 7,
-            ),
-            lastKnown = true, icon = "drive_mode", history = true,
-        ),
-        ControlDef("regen", "drive", EntityType.REGEN,
-            WellKnownProperties.REGEN, "choice",
-            // VHAL ints: Weak=1, Medium=2, Strong=3, Auto=4 (options sorted by value).
-            optionKeys = listOf(
-                "opt.regen.1" to 1,
-                "opt.regen.2" to 2,
-                "opt.regen.3" to 3,
-                "opt.regen.4" to 4,
-            ),
-            lastKnown = true, icon = "regen",
-        ),
-        ControlDef("esc_sport", "drive", EntityType.EXTRA, WellKnownProperties.ESC_SPORT, "bool", acronym = "ESC", icon = "drive"),
-        ControlDef("auto_hold", "drive", EntityType.BRAKE, WellKnownProperties.AUTO_HOLD, "bool", icon = "brake"),
-        ControlDef("hdc", "drive", EntityType.BRAKE, WellKnownProperties.HDC, "bool", acronym = "HDC", icon = "brake"),
-        ControlDef("cst", "drive", EntityType.EXTRA, WellKnownProperties.CST, "bool", acronym = "CST", lastKnown = true, icon = "drive"),
-        ControlDef("steer_soft", "drive", EntityType.STEERING, WellKnownProperties.STEER_SOFT, "bool", lastKnown = true, icon = "steer"),
-        ControlDef("steer_medium", "drive", EntityType.STEERING, WellKnownProperties.STEER_MEDIUM, "bool", lastKnown = true, icon = "steer"),
-        ControlDef("steer_heavy", "drive", EntityType.STEERING, WellKnownProperties.STEER_HEAVY, "bool", lastKnown = true, icon = "steer"),
-        ControlDef("intelligent_steer", "drive", EntityType.STEERING, WellKnownProperties.INTELLIGENT_STEER, "bool", lastKnown = true, icon = "steer"),
-        ControlDef("brake_pedal", "drive", EntityType.BRAKE,
-            WellKnownProperties.BRAKE_PEDAL_MODE, "choice",
-            // SETTING_BRAKE_PEDAL_STATUS: Standard=0, Comfort=1, Sport=2 (EX5 UI shows Comfort/Sport).
-            optionKeys = listOf(
-                "opt.brake_pedal.0" to 0,
-                "opt.brake_pedal.1" to 1,
-                "opt.brake_pedal.2" to 2,
-            ),
-            icon = "brake",
-        ),
-        ControlDef("hvac_power", "controls", EntityType.CLIMATE, WellKnownProperties.HVAC_POWER, "bool", icon = "climate", history = true),
-        ControlDef("hvac_ac", "controls", EntityType.CLIMATE, WellKnownProperties.HVAC_AC, "bool", icon = "climate"),
-        ControlDef("hvac_auto", "controls", EntityType.CLIMATE, WellKnownProperties.HVAC_AUTO, "bool", icon = "climate"),
-        ControlDef("hvac_recirc", "controls", EntityType.CLIMATE, WellKnownProperties.HVAC_RECIRC, "bool", icon = "climate"),
-        ControlDef("hvac_max_defrost", "controls", EntityType.CLIMATE, WellKnownProperties.HVAC_MAX_DEFROST, "bool", icon = "climate"),
-        ControlDef("hvac_max_ac", "controls", EntityType.CLIMATE, WellKnownProperties.HVAC_MAX_AC, "bool", icon = "climate"),
-        ControlDef("hvac_eco", "controls", EntityType.CLIMATE, WellKnownProperties.HVAC_ECO, "bool", lastKnown = true, icon = "climate"),
-        ControlDef("hvac_auto_dry", "controls", EntityType.CLIMATE, WellKnownProperties.HVAC_AUTO_DRY, "bool", lastKnown = true, icon = "climate"),
-        ControlDef("hvac_rapid_cool", "controls", EntityType.CLIMATE, WellKnownProperties.HVAC_RAPID_COOL, "bool", icon = "climate"),
-        ControlDef("hvac_rapid_heat", "controls", EntityType.CLIMATE, WellKnownProperties.HVAC_RAPID_HEAT, "bool", icon = "climate"),
-        ControlDef("hvac_temp", "controls", EntityType.CLIMATE, WellKnownProperties.HVAC_TEMP_C, "float",
-            deviceClass = DeviceClass.TEMPERATURE,
-            unitOfMeasurement = UnitOfMeasurement.CELSIUS,
-            lastKnown = true, icon = "temp", min = 16f, max = 32f, step = 0.5f, history = true,
-        ),
-        ControlDef("hvac_fan", "controls", EntityType.CLIMATE, WellKnownProperties.HVAC_FAN, "choice",
-            optionKeys = (0..8).map { "opt.hvac_fan.$it" to it },
-            icon = "fan",
-        ),
-        ControlDef("hvac_fan_direction", "controls", EntityType.CLIMATE, WellKnownProperties.HVAC_FAN_DIRECTION, "choice",
-            optionKeys = listOf(
-                "opt.hvac_fan_direction.0" to 0,
-                "opt.hvac_fan_direction.1" to 1,
-                "opt.hvac_fan_direction.2" to 2,
-                "opt.hvac_fan_direction.3" to 3,
-                "opt.hvac_fan_direction.4" to 4,
-            ),
-            icon = "fan",
-        ),
-        ControlDef("hvac_seat_vent", "controls", EntityType.SEAT, WellKnownProperties.HVAC_SEAT_VENT, "choice",
-            optionKeys = listOf(
-                "opt.hvac_seat_vent.0" to 0,
-                "opt.hvac_seat_vent.1" to 1,
-                "opt.hvac_seat_vent.2" to 2,
-                "opt.hvac_seat_vent.3" to 3,
-            ),
-            icon = "seat",
-        ),
-        ControlDef("battery_hold", "energy", EntityType.ENERGY, WellKnownProperties.BATTERY_HOLD, "bool", lastKnown = true, icon = "battery"),
-        ControlDef("battery_save", "energy", EntityType.ENERGY, WellKnownProperties.BATTERY_SAVE, "bool", lastKnown = true, icon = "battery"),
-        ControlDef("battery_mode", "energy", EntityType.ENERGY, WellKnownProperties.BATTERY_MODE, "choice",
-            // BATTERY_MODE_*: Normal=1, HLD(forced)=2, CHARGE(smart)=3.
-            optionKeys = listOf(
-                "opt.battery_mode.1" to 1,
-                "opt.battery_mode.2" to 2,
-                "opt.battery_mode.3" to 3,
-            ),
-            icon = "battery",
-        ),
-        ControlDef("charge_current", "energy", EntityType.CHARGING, WellKnownProperties.CHARGE_CURRENT, "float",
-            deviceClass = DeviceClass.CURRENT,
-            unitOfMeasurement = UnitOfMeasurement.AMPERE,
-            icon = "charge", min = 0f, max = 32f, step = 1f, history = true,
-        ),
-        ControlDef("charge_limit", "energy", EntityType.CHARGING, WellKnownProperties.CHARGE_LIMIT, "int",
-            deviceClass = DeviceClass.CURRENT,
-            unitOfMeasurement = UnitOfMeasurement.AMPERE,
-            icon = "charge", min = 5f, max = 32f, step = 1f, lastKnown = true,
-        ),
-        // Write-only pulse commands (IHU629G); no lasting state to read back.
-        ControlDef("charge_switch", "energy", EntityType.CHARGING, WellKnownProperties.CHARGE_SWITCH, "command",
-            optionKeys = listOf(
-                "opt.charge_switch.609" to 609,
-                "opt.charge_switch.610" to 610,
-                "opt.charge_switch.611" to 611,
-            ),
-            icon = "charge",
-        ),
-        ControlDef("charge_pre_now", "energy", EntityType.CHARGING, WellKnownProperties.CHARGE_PRE_NOW, "bool", icon = "charge"),
-        ControlDef("charge_soc_max", "energy", EntityType.CHARGING, WellKnownProperties.CHARGE_SOC_MAX, "float",
-            deviceClass = DeviceClass.BATTERY,
-            unitOfMeasurement = UnitOfMeasurement.PERCENT,
-            icon = "charge", min = 50f, max = 100f, step = 1f, lastKnown = true,
-        ),
-        ControlDef("charge_soc_min", "energy", EntityType.CHARGING, WellKnownProperties.CHARGE_SOC_MIN, "float",
-            deviceClass = DeviceClass.BATTERY,
-            unitOfMeasurement = UnitOfMeasurement.PERCENT,
-            icon = "charge", min = 0f, max = 50f, step = 1f, lastKnown = true,
-        ),
-        ControlDef("charge_discharge_soc", "energy", EntityType.CHARGING, WellKnownProperties.CHARGE_DISCHARGE_SOC, "float",
-            deviceClass = DeviceClass.BATTERY,
-            unitOfMeasurement = UnitOfMeasurement.PERCENT,
-            icon = "charge", min = 0f, max = 100f, step = 1f, lastKnown = true,
-        ),
-        ControlDef("charge_v2l", "energy", EntityType.CHARGING, WellKnownProperties.CHARGE_V2L, "bool", acronym = "V2L", icon = "charge"),
-        ControlDef("charge_v2v", "energy", EntityType.CHARGING, WellKnownProperties.CHARGE_V2V, "bool", acronym = "V2V", icon = "charge"),
-        ControlDef("charge_parking", "energy", EntityType.CHARGING, WellKnownProperties.CHARGE_PARKING, "bool", icon = "charge"),
-        ControlDef("parking_comfort", "controls", EntityType.CLIMATE, WellKnownProperties.PARKING_COMFORT, "bool", lastKnown = true, icon = "climate"),
-        ControlDef("nap_mode", "controls", EntityType.CLIMATE, WellKnownProperties.NAP_MODE, "bool", lastKnown = true, icon = "climate"),
-        ControlDef("space_capsule", "controls", EntityType.CLIMATE, WellKnownProperties.SPACE_CAPSULE, "bool", lastKnown = true, icon = "climate"),
-        ControlDef("lka", "adas", EntityType.ADAS, WellKnownProperties.LANE_KEEPING, "bool", acronym = "LKA", lastKnown = true, icon = "adas"),
-        ControlDef("ldw", "adas", EntityType.ADAS, WellKnownProperties.LDW, "bool", acronym = "LDW", lastKnown = true, icon = "adas"),
-        ControlDef("elka", "adas", EntityType.ADAS, WellKnownProperties.ELKA, "bool", acronym = "ELKA", lastKnown = true, icon = "adas"),
-        ControlDef("aeb", "adas", EntityType.ADAS, WellKnownProperties.AEB, "bool", acronym = "AEB", lastKnown = true, icon = "adas"),
-        ControlDef("fcw", "adas", EntityType.ADAS, WellKnownProperties.FCW, "choice",
-            // FORWARD_COLLISION_WARN_SNVTY: Off / Later / Moderate / Earlier.
-            optionKeys = listOf(
-                "opt.fcw.0" to 0,
-                "opt.fcw.1" to 1,
-                "opt.fcw.2" to 2,
-                "opt.fcw.3" to 3,
-            ),
-            acronym = "FCW", icon = "adas",
-        ),
-        ControlDef("rcta", "adas", EntityType.ADAS, WellKnownProperties.RCTA, "bool", acronym = "RCTA", lastKnown = true, icon = "adas"),
-        ControlDef("rcw", "adas", EntityType.ADAS, WellKnownProperties.RCW, "bool", acronym = "RCW", lastKnown = true, icon = "adas"),
-        ControlDef("fcda", "adas", EntityType.ADAS, WellKnownProperties.FCDA, "bool", acronym = "FCDA", lastKnown = true, icon = "adas"),
-        ControlDef("dow", "adas", EntityType.ADAS, WellKnownProperties.DOW, "bool", acronym = "DOW", lastKnown = true, icon = "adas"),
-        ControlDef("idas_mode", "adas", EntityType.ADAS, WellKnownProperties.IDAS_MODE, "choice",
-            // SETTING_INTELLIGENT_DRIVING_ASSISTANCE_MODE — OEM tiles ACC / ICC.
-            optionKeys = listOf(
-                "opt.idas_mode.1" to 1,
-                "opt.idas_mode.2" to 2,
-            ),
-            acronym = "IDAS", icon = "adas", lastKnown = true,
-        ),
-        ControlDef("speed_limit_warn", "adas", EntityType.ADAS, WellKnownProperties.SPEED_LIMIT_WARN, "bool", lastKnown = true, icon = "adas"),
-        ControlDef("speed_limit_max", "adas", EntityType.ADAS, WellKnownProperties.SPEED_LIMIT_MAX, "sensor",
-            // AAOS access=READ; gRPC SetProperty ACKs but car_service value never moves.
-            writable = false,
-            deviceClass = DeviceClass.SPEED,
-            unitOfMeasurement = UnitOfMeasurement.KM_PER_HOUR,
-            icon = "adas", lastKnown = true,
-        ),
-        ControlDef("lane_change_warn", "adas", EntityType.ADAS, WellKnownProperties.LANE_CHANGE_WARN, "bool", lastKnown = true, icon = "adas"),
-        ControlDef("dms", "adas", EntityType.ADAS, WellKnownProperties.DMS, "bool", acronym = "DMS", lastKnown = true, icon = "adas"),
-        ControlDef("approach_unlock", "controls", EntityType.LOCK, WellKnownProperties.APPROACH_UNLOCK, "bool", lastKnown = true, icon = "lock"),
-        ControlDef("away_lock", "controls", EntityType.LOCK, WellKnownProperties.AWAY_LOCK, "bool", lastKnown = true, icon = "lock"),
-        ControlDef("central_lock", "controls", EntityType.LOCK, WellKnownProperties.CENTRAL_LOCK, "bool", icon = "lock"),
-        ControlDef("audible_lock", "controls", EntityType.LOCK, WellKnownProperties.AUDIBLE_LOCK, "bool", icon = "lock"),
-        ControlDef("keyless_unlock", "controls", EntityType.LOCK, WellKnownProperties.KEYLESS_UNLOCK, "bool", lastKnown = true, icon = "lock"),
-        ControlDef("twostep_unlock", "controls", EntityType.LOCK, WellKnownProperties.TWOSTEP_UNLOCK, "bool", lastKnown = true, icon = "lock"),
-        ControlDef("p_gear_unlock", "controls", EntityType.LOCK, WellKnownProperties.P_GEAR_UNLOCK, "bool", lastKnown = true, icon = "lock"),
-        ControlDef("mirror_auto_fold", "controls", EntityType.EXTRA, WellKnownProperties.MIRROR_AUTO_FOLD, "bool", lastKnown = true, icon = "cabin"),
-        ControlDef("auto_close_window", "controls", EntityType.WINDOW, WellKnownProperties.AUTO_CLOSE_WINDOW, "bool", icon = "window"),
-        ControlDef("easy_ingress", "controls", EntityType.SEAT, WellKnownProperties.EASY_INGRESS, "bool", lastKnown = true, icon = "seat"),
-        ControlDef("vehicle_locator_mode", "controls", EntityType.EXTRA, WellKnownProperties.VEHICLE_LOCATOR_MODE, "choice",
-            optionKeys = listOf(
-                "opt.vehicle_locator_mode.1" to 1,
-                "opt.vehicle_locator_mode.2" to 2,
-                "opt.vehicle_locator_mode.3" to 3,
-            ),
-            lastKnown = true, icon = "cabin",
-        ),
-        ControlDef("trunk_open_height", "controls", EntityType.EXTRA, WellKnownProperties.TRUNK_OPEN_HEIGHT, "choice",
-            optionKeys = listOf(
-                "opt.trunk_open_height.1" to 1,
-                "opt.trunk_open_height.2" to 2,
-                "opt.trunk_open_height.3" to 3,
-                "opt.trunk_open_height.4" to 4,
-                "opt.trunk_open_height.5" to 5,
-            ),
-            lastKnown = true, icon = "cabin",
-        ),
-        ControlDef("sunroof_tilt", "controls", EntityType.WINDOW, WellKnownProperties.SUNROOF_TILT, "bool", icon = "window"),
-        ControlDef("courtesy_light", "lights", EntityType.LIGHT, WellKnownProperties.COURTESY_LIGHT, "bool", icon = "light"),
-        ControlDef("approach_light", "lights", EntityType.LIGHT, WellKnownProperties.APPROACH_LIGHT, "bool", icon = "light"),
-        ControlDef("exterior_light", "lights", EntityType.LIGHT, WellKnownProperties.EXTERIOR_LIGHT, "choice",
-            optionKeys = listOf(
-                "opt.exterior_light.0" to 0,
-                "opt.exterior_light.1" to 1,
-                "opt.exterior_light.2" to 2,
-                "opt.exterior_light.3" to 3,
-            ),
-            lastKnown = true, icon = "light",
-        ),
-        ControlDef("rear_fog", "lights", EntityType.LIGHT, WellKnownProperties.REAR_FOG, "bool", icon = "light"),
-        ControlDef("headlight_height", "lights", EntityType.LIGHT, WellKnownProperties.HEADLIGHT_HEIGHT, "choice",
-            optionKeys = listOf(
-                "opt.headlight_height.0" to 0,
-                "opt.headlight_height.1" to 1,
-                "opt.headlight_height.2" to 2,
-                "opt.headlight_height.3" to 3,
-            ),
-            lastKnown = true, icon = "light",
-        ),
-        ControlDef("home_safe_light", "lights", EntityType.LIGHT, WellKnownProperties.HOME_SAFE_LIGHT, "choice",
-            // OEM light_attr_time: Off · 10s · 20s · 30s · 40s · 50s · 60s.
-            optionKeys = listOf(
-                "opt.home_safe_light.0" to 0,
-                "opt.home_safe_light.1" to 1,
-                "opt.home_safe_light.2" to 2,
-                "opt.home_safe_light.3" to 3,
-                "opt.home_safe_light.4" to 4,
-                "opt.home_safe_light.5" to 5,
-                "opt.home_safe_light.6" to 6,
-            ),
-            lastKnown = true, icon = "light",
-        ),
-        // OEM Tela "Modo de exibição": Modo de luz / Modo noturno / Automático.
-        // VHAL ints match Android UiModeManager (1=day, 2=night, 3=custom/auto schedule);
-        // AdaptAPI tokens are 0x20150101/02/04 and are remapped by Venus to these ints.
-        ControlDef("day_mode", "lights", EntityType.LIGHT, WellKnownProperties.DAY_MODE, "choice",
-            optionKeys = listOf(
-                "opt.day_mode.1" to 1,
-                "opt.day_mode.2" to 2,
-                "opt.day_mode.3" to 3,
-            ),
-            lastKnown = true, icon = "light",
-        ),
-        ControlDef("night_mode", "lights", EntityType.LIGHT, WellKnownProperties.NIGHT_MODE, "bool", lastKnown = true, icon = "light"),
-        // SETTING_FUNC_AMBIENCE_LIGHT_MAINCOLOR — mode, not a color index.
-        // AdaptAPI: DRIVERMODE=0x02, SETCOLOR=0x03, MUSIC=0x04.
-        ControlDef("ambience_main_color", "lights", EntityType.LIGHT, WellKnownProperties.AMBIENCE_MAIN_COLOR, "choice",
-            optionKeys = listOf(
-                "opt.ambience_main_color.2" to 2,
-                "opt.ambience_main_color.3" to 3,
-                "opt.ambience_main_color.4" to 4,
-            ),
-            lastKnown = true, icon = "light",
-        ),
-        ControlDef("ambience_intensity", "lights", EntityType.LIGHT, WellKnownProperties.AMBIENCE_INTENSITY, "int",
-            icon = "light", min = 0f, max = 100f, step = 1f, lastKnown = true,
-        ),
-        ControlDef("esm_volume", "sound", EntityType.EXTRA, WellKnownProperties.ESM_VOLUME, "choice",
-            // VALUE_ESM_VOLUME_LEVEL_*: Off / Low / Mid / High.
-            optionKeys = listOf(
-                "opt.esm_volume.0" to 0,
-                "opt.esm_volume.1" to 1,
-                "opt.esm_volume.2" to 2,
-                "opt.esm_volume.3" to 3,
-            ),
-            acronym = "AVAS", icon = "system", lastKnown = true,
-        ),
-        ControlDef("esm_sound", "sound", EntityType.EXTRA, WellKnownProperties.ESM_SOUND, "choice",
-            // ESM_SOUND_TYPE_1/2/3 — Classic / Galactic note / Space walk (1-based; 0 = unset).
-            optionKeys = listOf(
-                "opt.esm_sound.0" to 1,
-                "opt.esm_sound.1" to 2,
-                "opt.esm_sound.2" to 3,
-            ),
-            acronym = "AVAS", icon = "system", lastKnown = true,
-        ),
-        ControlDef("media_volume", "sound", EntityType.EXTRA, WellKnownProperties.MEDIA_VOLUME, "int",
-            icon = "sound", min = 0f, max = 39f, step = 1f, lastKnown = true,
-        ),
-        ControlDef("speed_volume", "sound", EntityType.EXTRA, WellKnownProperties.SPEED_VOLUME, "choice",
-            optionKeys = listOf(
-                "opt.speed_volume.0" to 0,
-                "opt.speed_volume.1" to 1,
-                "opt.speed_volume.2" to 2,
-                "opt.speed_volume.3" to 3,
-            ),
-            lastKnown = true, icon = "system",
-        ),
-        ControlDef("usb_mode", "vehicle", EntityType.EXTRA, WellKnownProperties.USB_MODE, "choice",
-            optionKeys = listOf(
-                "opt.usb_mode.0" to 0,
-                "opt.usb_mode.1" to 1,
-                "opt.usb_mode.2" to 2,
-            ),
-            icon = "usb",
-        ),
-        ControlDef("hud_active", "display", EntityType.HUD, WellKnownProperties.HUD_ACTIVE, "bool", icon = "hud"),
-        ControlDef("hud_snow", "display", EntityType.HUD, WellKnownProperties.HUD_SNOW, "bool", icon = "hud"),
-        ControlDef("hud_ar", "display", EntityType.HUD, WellKnownProperties.HUD_AR, "bool", icon = "hud"),
-        ControlDef("wheel_custom_key", "controls", EntityType.EXTRA, WellKnownProperties.WHEEL_CUSTOM_KEY, "choice",
-            // BCM_FUNC_CUSTOM_KEY stores small ints = CUSTOM_KEY_TYPE_* − NONE (1/4/5/7/8),
-            // plus firmware extras like driving settings (0x21111418 / AntoraVhalIds.CUSTOM_KEY_DRIVING_SETTINGS).
-            optionKeys = listOf(
-                "opt.wheel_custom_key.0" to 0,
-                "opt.wheel_custom_key.1" to 1,
-                "opt.wheel_custom_key.2" to 4,
-                "opt.wheel_custom_key.3" to 5,
-                "opt.wheel_custom_key.4" to 7,
-                "opt.wheel_custom_key.5" to 8,
-                "opt.wheel_custom_key.drive" to 0x21111418,
-            ),
-            lastKnown = true, icon = "drive",
-            deviceClass = DeviceClass.ENUM,
-        ),
-        ControlDef(
-            "vr_activated", "assistant", EntityType.EXTRA, WellKnownProperties.VR_ACTIVATED, "bool",
-            lastKnown = true, icon = "system",
-        ),
-    )
+    val ALL: List<EntityDef> get() = EntityRegistry.ALL
 
     fun i18n(context: Context, session: VehicleSession): I18nBundle =
         I18nBundle.load(context, session.integrationId)
@@ -377,10 +34,14 @@ object ControlCatalog {
         val store = context?.let { LastKnownStore(it) }
         val i18n = context?.let { i18n(it, session) }
         val persist = memory?.persistSnapshot().orEmpty()
-        return ALL.map { def ->
+        return ALL.mapNotNull { def ->
             val base = when {
+                def.id == "climate" -> climateMap(session, def, store, i18n) ?: return@mapNotNull null
                 def.id == "drive_mode" -> driveModeMap(session, def, store, i18n)
-                else -> defToMap(def, session.diagnose(def.property), store, i18n, session)
+                else -> {
+                    val prop = def.property() ?: return@mapNotNull null
+                    defToMap(def, session.diagnose(prop), store, i18n, session)
+                }
             }
             enrichPersist(base, def, persist[def.id], i18n)
         }
@@ -397,12 +58,6 @@ object ControlCatalog {
         val t = session.telemetry().first()
         val i18n = context?.let { i18n(it, session) }
         fun s(key: String, fallback: String) = i18n?.t(key, fallback) ?: fallback
-        val driveDisplay = i18n?.resolveMaybe(t.driveMode)
-            ?: i18n?.valueLabel("drive_mode", t.driveMode)
-            ?: t.driveMode
-        val regenDisplay = t.regenLevel?.let { lvl ->
-            i18n?.valueLabel("regen", lvl) ?: lvl.toString()
-        }
         val persist = memory?.persistSnapshot().orEmpty()
         val vinValue = when (val out = session.diagnose(WellKnownProperties.INFO_VIN)) {
             is ReadOutcome.Ok -> out.value?.display()
@@ -475,30 +130,8 @@ object ControlCatalog {
                 icon = "brake", i18n = i18n, binary = true, valueMapId = "parking_brake",
             ),
             sensor(
-                "sensor_drive_mode", "home", s("sensor.drive_mode", "Modo"),
-                driveDisplay, icon = "drive_mode", history = true, i18n = i18n,
-            ),
-            sensor(
-                "sensor_regen", "home", s("sensor.regen", "Regen"),
-                regenDisplay, icon = "regen", i18n = i18n,
-            ),
-            sensor(
-                "sensor_hvac_temp", "controls", s("sensor.hvac_temp", "Temp"),
-                t.hvacTempC?.let { "%.1f".format(it) },
-                deviceClass = DeviceClass.TEMPERATURE,
-                unitOfMeasurement = UnitOfMeasurement.CELSIUS,
-                icon = "temp", history = true, i18n = i18n,
-            ),
-            sensor(
                 "sensor_temp_ambient", "controls", s("sensor.temp_ambient", "Temp. externa"),
                 t.tempAmbientC?.let { "%.0f".format(it) },
-                deviceClass = DeviceClass.TEMPERATURE,
-                unitOfMeasurement = UnitOfMeasurement.CELSIUS,
-                icon = "temp", history = true, i18n = i18n,
-            ),
-            sensor(
-                "sensor_temp_indoor", "controls", s("sensor.temp_indoor", "Temp. interna"),
-                t.tempIndoorC?.let { "%.1f".format(it) },
                 deviceClass = DeviceClass.TEMPERATURE,
                 unitOfMeasurement = UnitOfMeasurement.CELSIUS,
                 icon = "temp", history = true, i18n = i18n,
@@ -509,13 +142,6 @@ object ControlCatalog {
                 deviceClass = DeviceClass.TEMPERATURE,
                 unitOfMeasurement = UnitOfMeasurement.CELSIUS,
                 icon = "battery", history = true, i18n = i18n,
-            ),
-            sensor(
-                "sensor_charge_a", "energy", s("sensor.charge_a", "Corrente"),
-                t.chargeCurrentA?.let { "%.1f".format(it) },
-                deviceClass = DeviceClass.CURRENT,
-                unitOfMeasurement = UnitOfMeasurement.AMPERE,
-                icon = "charge", history = true, i18n = i18n,
             ),
             sensor(
                 "sensor_charge_plug", "energy", s("sensor.charge_plug", "Plug"),
@@ -614,8 +240,20 @@ object ControlCatalog {
 
     /** Current display value for shortcut conditions / entity_state watching. */
     suspend fun currentValue(session: VehicleSession, id: String): String? {
-        val def = ALL.firstOrNull { it.id == id } ?: return null
-        return when (val out = session.diagnose(def.property)) {
+        val def = EntityRegistry.resolve(id) ?: return null
+        if (def.id == "climate") {
+            val map = climateMap(session, def, null, null) ?: return null
+            val attr = EntityRegistry.aliasAttribute(id)
+            return when (attr) {
+                null, "power" -> map["value"] as? String
+                "temperature" -> (map["attributes"] as? Map<*, *>)?.get("temperature")?.toString()
+                "fan_mode" -> (map["attributes"] as? Map<*, *>)?.get("fan_mode")?.toString()
+                else -> (map["attributes"] as? Map<*, *>)?.get(attr)?.toString()
+                    ?: map["value"] as? String
+            }
+        }
+        val prop = def.property() ?: return null
+        return when (val out = session.diagnose(prop)) {
             is ReadOutcome.Ok -> out.value?.display()
             else -> null
         }
@@ -623,19 +261,27 @@ object ControlCatalog {
 
     suspend fun set(session: VehicleSession, id: String, raw: String, context: Context? = null): Result<Unit> {
         val store = context?.let { LastKnownStore(it) }
-        if (id == "drive_mode") {
+        val resolved = EntityRegistry.resolve(id)
+            ?: return Result.failure(IllegalArgumentException("unknown control"))
+
+        if (resolved.id == "climate") {
+            val attr = if (id == "climate") null else EntityRegistry.aliasAttribute(id)
+            return setClimate(session, resolved, raw, attr, store)
+        }
+
+        if (resolved.id == "drive_mode" || id == "drive_mode") {
             val mode = raw.toIntOrNull() ?: return Result.failure(IllegalArgumentException("bad mode"))
-            // Antora EX5: DM_FUNC_DRIVE_MODE_SELECT accepts 5/6/7 (Comfort/Normal/Sport).
-            // DRIVE_MODE_SELECTION_{PURE,HYBRID,POWER} are VHAL READ-only — do not write them.
             val result = session.set(WellKnownProperties.DRIVE_MODE, PropertyValue.IntVal(mode))
-            if (result.isSuccess) store?.put(id, mode.toString())
+            if (result.isSuccess) store?.put("drive_mode", mode.toString())
             return result
         }
-        val def = ALL.firstOrNull { it.id == id }
-            ?: return Result.failure(IllegalArgumentException("unknown control"))
+
+        val def = resolved
         if (!def.writable) {
             return Result.failure(IllegalArgumentException("control is read-only"))
         }
+        val prop = def.property()
+            ?: return Result.failure(IllegalArgumentException("control has no binding"))
         val pv: PropertyValue = when (def.input) {
             "bool" -> {
                 val on = raw == "1" || raw.equals("true", true) || raw == "on"
@@ -644,26 +290,245 @@ object ControlCatalog {
             "float" -> PropertyValue.FloatVal(raw.toFloat())
             else -> PropertyValue.IntVal(raw.toInt())
         }
-        val result = session.set(def.property, pv)
+        val result = session.set(prop, pv)
         if (result.isSuccess && def.lastKnown) store?.put(def.id, raw)
         return result
     }
 
+    private suspend fun setClimate(
+        session: VehicleSession,
+        def: EntityDef,
+        raw: String,
+        aliasAttr: String?,
+        store: LastKnownStore?,
+    ): Result<Unit> {
+        val v = raw.trim()
+        // Alias writes: treat as attribute set (hvac_power=1 → power)
+        if (aliasAttr != null) {
+            return writeClimateAttr(session, def, aliasAttr, v, store)
+        }
+        val lower = v.lowercase().replace('-', '_')
+        when {
+            lower == "off" || lower == "0" -> return writeClimateAttr(session, def, "power", "0", store)
+            lower == "on" || lower == "1" -> return writeClimateAttr(session, def, "power", "1", store)
+            lower.startsWith("hvac_mode:") || lower.startsWith("hvac_mode_") -> {
+                val mode = lower.removePrefix("hvac_mode").trimStart(':', '_')
+                return setClimateMode(session, def, mode, store)
+            }
+            lower.startsWith("temperature:") || lower.startsWith("temperature_") -> {
+                val t = lower.removePrefix("temperature").trimStart(':', '_')
+                return writeClimateAttr(session, def, "temperature", t, store)
+            }
+            lower.startsWith("fan_mode:") || lower.startsWith("fan_mode_") -> {
+                val f = lower.removePrefix("fan_mode").trimStart(':', '_')
+                return writeClimateAttr(session, def, "fan_mode", f, store)
+            }
+            lower.startsWith("recirc:") || lower.startsWith("recirc_") -> {
+                val r = lower.removePrefix("recirc").trimStart(':', '_')
+                return writeClimateAttr(session, def, "recirc", r, store)
+            }
+            lower.startsWith("ac:") || lower.startsWith("ac_") -> {
+                val a = lower.removePrefix("ac").trimStart(':', '_')
+                return writeClimateAttr(session, def, "ac", a, store)
+            }
+            lower.toFloatOrNull() != null ->
+                return writeClimateAttr(session, def, "temperature", lower, store)
+            lower in setOf("auto", "cool", "heat", "fan_only", "defrost") ->
+                return setClimateMode(session, def, lower, store)
+        }
+        return Result.failure(IllegalArgumentException("unknown climate value: $raw"))
+    }
+
+    private suspend fun setClimateMode(
+        session: VehicleSession,
+        def: EntityDef,
+        mode: String,
+        store: LastKnownStore?,
+    ): Result<Unit> {
+        when (mode) {
+            "off" -> return writeClimateAttr(session, def, "power", "0", store)
+            "on" -> return writeClimateAttr(session, def, "power", "1", store)
+            "auto" -> {
+                writeClimateAttr(session, def, "power", "1", store)
+                writeClimateAttr(session, def, "auto", "1", store)
+                return writeClimateAttr(session, def, "ac", "0", store)
+            }
+            "cool" -> {
+                writeClimateAttr(session, def, "power", "1", store)
+                writeClimateAttr(session, def, "auto", "0", store)
+                return writeClimateAttr(session, def, "ac", "1", store)
+            }
+            "heat", "defrost" -> {
+                writeClimateAttr(session, def, "power", "1", store)
+                writeClimateAttr(session, def, "auto", "0", store)
+                writeClimateAttr(session, def, "ac", "0", store)
+                return writeClimateAttr(session, def, "max_defrost", if (mode == "defrost") "1" else "0", store)
+            }
+            "fan_only" -> {
+                writeClimateAttr(session, def, "power", "1", store)
+                writeClimateAttr(session, def, "auto", "0", store)
+                writeClimateAttr(session, def, "ac", "0", store)
+                return writeClimateAttr(session, def, "max_defrost", "0", store)
+            }
+        }
+        return Result.failure(IllegalArgumentException("unknown hvac_mode: $mode"))
+    }
+
+    private suspend fun writeClimateAttr(
+        session: VehicleSession,
+        def: EntityDef,
+        attr: String,
+        raw: String,
+        store: LastKnownStore?,
+    ): Result<Unit> {
+        val prop = def.attributeProperty(attr)
+            ?: return Result.failure(IllegalArgumentException("unknown climate attr: $attr"))
+        val pv = when (attr) {
+            "temperature" -> PropertyValue.FloatVal(raw.toFloat())
+            "fan_mode", "fan_direction" -> PropertyValue.IntVal(raw.toInt())
+            else -> {
+                val on = raw == "1" || raw.equals("true", true) || raw.equals("on", true)
+                PropertyValue.IntVal(if (on) 1 else 0)
+            }
+        }
+        val result = session.set(prop, pv)
+        if (result.isSuccess && def.lastKnown) {
+            store?.put("climate:$attr", raw)
+        }
+        return result
+    }
+
+    private suspend fun climateMap(
+        session: VehicleSession,
+        def: EntityDef,
+        store: LastKnownStore?,
+        i18n: I18nBundle?,
+    ): Map<String, Any?>? {
+        val powerProp = def.attributeProperty("power")
+        val tempProp = def.attributeProperty("temperature")
+        val coreBound = listOfNotNull(powerProp, tempProp).any { session.hasBinding(it) }
+        if (!coreBound) {
+            // Still show if any climate attr is bound
+            val any = def.attributes.values.any { session.hasBinding(EntityRegistry.property(it)) }
+            if (!any) return null
+        }
+
+        suspend fun readInt(attr: String): Int? {
+            val p = def.attributeProperty(attr) ?: return null
+            if (!session.hasBinding(p)) return null
+            return when (val out = session.diagnose(p)) {
+                is ReadOutcome.Ok -> out.value?.asInt()
+                else -> null
+            }
+        }
+        suspend fun readFloat(attr: String): Float? {
+            val p = def.attributeProperty(attr) ?: return null
+            if (!session.hasBinding(p)) return null
+            return when (val out = session.diagnose(p)) {
+                is ReadOutcome.Ok -> out.value?.asFloat()
+                else -> null
+            }
+        }
+
+        val power = readInt("power")
+        val auto = readInt("auto")
+        val ac = readInt("ac")
+        val maxDefrost = readInt("max_defrost")
+        val maxAc = readInt("max_ac")
+        val temperature = readFloat("temperature")
+        val currentTemp = readFloat("current_temperature")
+            ?: session.telemetry().first().tempIndoorC
+        val fanMode = readInt("fan_mode")
+        val fanDirection = readInt("fan_direction")
+        val recirc = readInt("recirc")
+        val eco = readInt("eco")
+
+        fun on(v: Int?) = v != null && v != 0 && v != 2
+
+        val hvacMode = when {
+            power != null && !on(power) -> "off"
+            on(auto) -> "auto"
+            on(maxDefrost) -> "heat"
+            on(ac) || on(maxAc) -> "cool"
+            on(power) -> "fan_only"
+            else -> "off"
+        }
+
+        if (def.lastKnown) {
+            store?.put(def.id, hvacMode)
+            temperature?.let { store?.put("climate:temperature", it.toString()) }
+        }
+
+        val label = i18n?.t(def.resolvedLabelKey(), "Climate") ?: "Climate"
+        val hint = if (i18n != null && i18n.has(def.resolvedHintKey())) {
+            i18n.t(def.resolvedHintKey()).takeIf { it.isNotBlank() }
+        } else null
+
+        val attrs = linkedMapOf<String, Any?>(
+            "hvac_modes" to listOf("off", "auto", "cool", "heat", "fan_only"),
+            "hvac_mode" to hvacMode,
+            "fan_modes" to (0..8).toList(),
+        )
+        temperature?.let { attrs["temperature"] = it }
+        currentTemp?.let { attrs["current_temperature"] = it }
+        fanMode?.let { attrs["fan_mode"] = it }
+        fanDirection?.let { attrs["fan_direction"] = it }
+        attrs["recirc"] = if (on(recirc)) 1 else 0
+        attrs["ac"] = if (on(ac)) 1 else 0
+        attrs["auto"] = if (on(auto)) 1 else 0
+        attrs["eco"] = if (on(eco)) 1 else 0
+        attrs["power"] = if (on(power)) 1 else 0
+        def.min?.let { attrs["min_temp"] = it }
+        def.max?.let { attrs["max_temp"] = it }
+        def.step?.let { attrs["target_temp_step"] = it }
+
+        val status = when {
+            power != null || temperature != null -> "ok"
+            else -> "unavailable"
+        }
+
+        return EntityContract.enrich(
+            mapOf(
+                "id" to def.id,
+                "group" to def.group,
+                "entity" to def.domain.id,
+                "label" to label,
+                "labelKey" to def.resolvedLabelKey(),
+                "hint" to hint,
+                "description" to hint,
+                "input" to "climate",
+                "icon" to def.resolvedIcon(),
+                "deviceClass" to def.deviceClass?.id,
+                "unitOfMeasurement" to def.unitOfMeasurement?.id,
+                "unitLabel" to resolveUnitLabel(def.unitOfMeasurement, i18n),
+                "min" to def.min,
+                "max" to def.max,
+                "step" to def.step,
+                "history" to def.history,
+                "writable" to (status == "ok"),
+                "value" to hvacMode,
+                "valueLabel" to hvacMode,
+                "state" to hvacMode,
+                "status" to status,
+                "permission" to null,
+                "needsPrivilege" to false,
+                "stale" to false,
+                "attributes" to attrs,
+                EntityContract.FIELD_COMPOSITE to true,
+                EntityContract.FIELD_UPDATE to EntityContract.UPDATE_CATALOG,
+            ),
+        )
+    }
+
     private fun enrichPersist(
         base: Map<String, Any?>,
-        def: ControlDef,
+        def: EntityDef,
         pin: Map<String, Any?>?,
         i18n: I18nBundle?,
     ): Map<String, Any?> {
         val enabled = pin?.get("enabled") == true
         val pVal = pin?.get("value") as? String
         return base + mapOf(
-            "input" to def.input,
-            "icon" to def.resolvedIcon(),
-            "min" to def.min,
-            "max" to def.max,
-            "step" to def.step,
-            "history" to def.history,
             "persistEnabled" to enabled,
             "persistValue" to pVal,
             "persistLabel" to pVal?.let { i18n?.valueLabel(def.resolvedValueMapId(), it) ?: it },
@@ -672,7 +537,7 @@ object ControlCatalog {
 
     private suspend fun driveModeMap(
         session: VehicleSession,
-        def: ControlDef,
+        def: EntityDef,
         store: LastKnownStore?,
         i18n: I18nBundle?,
     ): Map<String, Any?> {
@@ -702,7 +567,7 @@ object ControlCatalog {
     }
 
     private fun defToMap(
-        def: ControlDef,
+        def: EntityDef,
         outcome: ReadOutcome,
         store: LastKnownStore?,
         i18n: I18nBundle?,
@@ -712,7 +577,7 @@ object ControlCatalog {
         if (def.input == "command") {
             val permission = (outcome as? ReadOutcome.Denied)?.permission
             val denied = outcome is ReadOutcome.Denied
-            val bound = session?.hasBinding(def.property) == true
+            val bound = def.property()?.let { session?.hasBinding(it) } == true
             val ready = def.writable && bound && !denied
             return baseMap(
                 def,
@@ -753,7 +618,7 @@ object ControlCatalog {
         return baseMap(def, value, status, permission, stale = false, i18n = i18n)
     }
 
-    private fun optionMaps(def: ControlDef, i18n: I18nBundle?): List<Map<String, Any?>> {
+    private fun optionMaps(def: EntityDef, i18n: I18nBundle?): List<Map<String, Any?>> {
         // Always emit options sorted by ascending numeric value (Auto=3/4 last, etc.).
         val keys = def.optionKeys
         if (keys != null) {
@@ -776,7 +641,7 @@ object ControlCatalog {
     }
 
     private fun baseMap(
-        def: ControlDef,
+        def: EntityDef,
         value: String?,
         status: String,
         permission: String?,
@@ -799,7 +664,7 @@ object ControlCatalog {
             mapOf(
                 "id" to def.id,
                 "group" to def.group,
-                "entity" to def.entity.id,
+                "entity" to def.domain.id,
                 "label" to label,
                 "labelKey" to def.resolvedLabelKey(),
                 "hint" to hint,
@@ -823,11 +688,13 @@ object ControlCatalog {
                 "needsPrivilege" to (status == "denied"),
                 "stale" to stale,
                 "writeOnly" to (def.input == "command"),
+                EntityContract.FIELD_COMPOSITE to def.isComposite,
+                EntityContract.FIELD_UPDATE to EntityContract.updatePolicy(def.isComposite),
             ),
         )
     }
 
-    private fun valueLabel(def: ControlDef, value: String?, i18n: I18nBundle?): String? {
+    private fun valueLabel(def: EntityDef, value: String?, i18n: I18nBundle?): String? {
         if (value == null) return null
         if (def.input == "bool") {
             val on = value == "1" || value.equals("true", true) || value == "on"
@@ -836,8 +703,9 @@ object ControlCatalog {
         }
         i18n?.valueLabel(def.resolvedValueMapId(), value)?.let { return it }
         val asInt = value.toIntOrNull()
-        if (asInt != null && def.optionKeys != null) {
-            def.optionKeys.firstOrNull { it.second == asInt }?.let { (key, _) ->
+        val optionKeys = def.optionKeys
+        if (asInt != null && optionKeys != null) {
+            optionKeys.firstOrNull { it.second == asInt }?.let { (key, _) ->
                 return i18n?.t(key, key) ?: key
             }
             if (asInt > 0xff) return "0x" + asInt.toString(16)
