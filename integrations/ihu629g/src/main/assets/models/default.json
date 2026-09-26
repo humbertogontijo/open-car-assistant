@@ -1,0 +1,9 @@
+{
+  "id": "default",
+  "label": "IHU629G default",
+  "matchDevice": [
+    "ihu629",
+    "ihu629g",
+    "geometry"
+  ]
+}

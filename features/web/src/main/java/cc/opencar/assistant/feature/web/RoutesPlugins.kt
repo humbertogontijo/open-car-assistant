@@ -9,7 +9,7 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import org.json.JSONObject
 
-internal fun Routing.registerPluginRoutes(deps: OcaWebDeps) {
+internal fun Routing.registerPluginRoutes(deps: OaaWebDeps) {
     get("/api/plugins") {
         call.respond(mapOf("plugins" to deps.pluginDetailMaps()))
     }

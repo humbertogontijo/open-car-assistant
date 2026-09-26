@@ -8,45 +8,48 @@ Collaborator work stays under `integrations/<platform-id>/`. Gradle auto-include
 
 ```
 integrations/<platform-id>/
-  host.sh                      # oca-setup defaults (ADB host/port/user)
+  host.sh                      # oaa-setup defaults (ADB host/port/user)
   build.gradle.kts
   src/main/assets/
-    platform.json              # extends, properties, android overlays, variants, …
+    platform.json              # extends, properties, android overlays, models + profiles lists
+    models/<sku>.json          # build/market SKU (matchDevice, optional property allowlist)
+    profiles/<id>.json         # energy/capability profile (detect, extraCapabilities)
+
     i18n/<platform-id>/        # optional overrides + valueMaps (en.json, pt-BR.json)
   src/main/java/...            # thin Integration + bridge only when needed
   src/main/resources/META-INF/services/
     cc.opencar.assistant.api.VehicleIntegration   # FQCN of your implementation
 ```
 
-Product install is **user-space `/data`**. Prefer a transport that works without priv-app (Antora: gRPC). If your HU only exposes VHAL via `CarPropertyManager`, use shared `CarPropertyBackend` from `:integrations:platform:common`. Formal `signature|privileged` grants (priv-app whitelist, OEM platform key) stay inside the platform folder if you need them — core `oca-setup` does not elevate.
+Product install is **user-space `/data`**. Prefer a transport that works without priv-app (Antora: gRPC). If your HU only exposes VHAL via `CarPropertyManager`, use shared `CarPropertyBackend` from `:integrations:platform:aaos`. Formal `signature|privileged` grants (priv-app whitelist, OEM platform key) stay inside the platform folder if you need them — core `oaa-setup` does not elevate.
 
 Shared layers (not auto-registered as integrations):
 
 ```
-integrations/platform/common/   # AAOS plumbing: PlatformConfig, CarPropertyBridge, …
-  src/main/assets/platform/     # Shared parents: aosp.json, android.json (via "extends")
+integrations/platform/aaos/     # AAOS plumbing: PlatformConfig, CarPropertyBridge, …
+  src/main/assets/platform/aaos/platform.json   # Shared parent via "extends": ["aaos"]
 integrations/platform/flyme/    # Flyme Auto family helpers
-libs/support/                   # :oca-support — I18nBundle, LastKnownStore (product helpers)
+libs/oaa-support/                   # :oaa-support — I18nBundle, LastKnownStore (product helpers)
 libs/api/                       # :integration-api — SPI
 ```
 
 ## Steps
 
 1. Create `integrations/<platform-id>/` as above.
-2. Fill `platform.json` (`backend`: `vhal`, `"extends": ["aosp", "android"]`). Prefer config over Kotlin for properties / match. Put the full HU property catalog under `properties` (`id`, `key`, `access`, `areas`, optional `entity`). Use `access: "rw"` (or `"w"`) for product-writable props. Copy structure from **`ihu629g`** (simple) rather than Antora when starting out; regenerate Antora-scale catalogs with `tools/gen-platform-properties`. The `android` fragment is the **AAOS HU settings transport** (`settings` + `volumeGroups`) — product domains are `switch` / `number` / `media_player` (see [domains.md](domains.md)). For surround cameras, add `cameras: [{ "role": "front", "cameraId": "0" }, …]` (roles: front/right/rear/left) — mosaic size/fps come from the cameras, not a `dvr` quality block.
+2. Fill `platform.json` (`backend`: `vhal`, `"extends": ["aaos"]`, `"models": ["default"]`, `"profiles": ["default"]`). Prefer config over Kotlin for properties / match. Put the full HU property catalog under `properties` (`id`, `key`, `access`, `areas`) — **do not** set `entity` here. SKU / market allowlists in `models/<sku>.json` drive identity product bindings (VHAL key = entity id); profiles hold detect / capabilities only (`matchDevice` from `ro.product.device`). See [ADR-0002](adr/0002-model-variant-bindings.md). Copy structure from **`ihu629g`** (simple) or **`demo`** (in-memory CI fake) rather than Antora when starting out; regenerate Antora-scale catalogs with `tools/gen-platform-properties`. The aaos parent's `android` block is the **AAOS HU settings transport** (`settings` + `volumeGroups`) — product domains are `switch` / `number` / `media_player` (see [domains.md](domains.md)). For surround cameras, add `cameras: [{ "role": "front", "cameraId": "0" }, …]` (roles: front/right/rear/left) — mosaic size/fps come from the cameras, not a `dvr` quality block.
 3. Implement `VehicleIntegration` (+ optional `warm`, `createQuickEntry`, `wakeSignals`) on `VehiclePropertyBackend` / `CarPropertyBackend`. Prefer implementing `observe()` when the transport can push property changes; leave it null so the session polls (~1s). The product UI is event-driven (`session.telemetry()` / `events()` → `/api/events` WebSocket) either way.
-4. Product writes are gated by `access` `w`/`rw` (derived allowlist). OEM-specific Android bits (e.g. `VOLUME_GROUP/*`) go under `android.volumeGroups` in the integration file — shared wifi/bt/brightness live in `platform/android.json`.
+4. Product writes are gated by `access` `w`/`rw` (derived allowlist). OEM-specific Android bits (e.g. `VOLUME_GROUP/*`) go under `android.volumeGroups` in the integration file — shared wifi/bt/brightness live in `platform/aaos/platform.json`.
 5. Register the class in `META-INF/services/cc.opencar.assistant.api.VehicleIntegration` (one FQCN per line).
-6. Host setup: `./tools/oca-setup -i <platform-id> -H <ip> setup` (loads `integrations/<id>/host.sh`).
-7. i18n: reuse common keys from `:oca-support`; add platform packs only for overrides / valueMaps (see below).
+6. Host setup: `./tools/oaa-setup -i <platform-id> -H <ip> setup` (loads `integrations/<id>/host.sh`).
+7. i18n: reuse common keys from `:oaa-support`; add platform packs only for overrides / valueMaps (see below).
 
 ## Internationalization
 
-Common strings live in `:oca-support` assets (`libs/support/`):
+Common strings live in `:oaa-support` assets (`libs/oaa-support/`):
 
 ```
-libs/support/src/main/assets/i18n/common/en.json
-libs/support/src/main/assets/i18n/common/pt-BR.json
+libs/oaa-support/src/main/assets/i18n/common/en.json
+libs/oaa-support/src/main/assets/i18n/common/pt-BR.json
 ```
 
 Per-integration packs (path includes the id so APK asset merge does not collide):
@@ -81,16 +84,19 @@ JSON shape:
 - Locale: `GET /api/i18n`, `POST /api/locale`, Sistema → Idioma (pt-BR / en). Locale switch reloads the dictionary; cards re-render from keys without a catalog rebuild.
 - New OEM enum literals belong in `platform.json` / valueMaps, not in `EntityRegistry`.
 
-## Variants vs new modules
+## Models vs profiles vs new modules
 
 | Situation | Action |
 |-----------|--------|
-| Same chip, PHEV vs BEV props | `variants` in `platform.json` |
-| Same chip, one market missing a setting | binding override / variant |
+| Same chip, new market flash (`p145_eu`) | `models/<sku>.json` + Lab probe allowlist |
+| Same chip, PHEV vs BEV | `profiles/phev.json` / `profiles/bev.json` |
+| Same chip, one market missing a setting | Omit binding on that profile (or key on that SKU allowlist) |
 | New SoC / different VHAL family | New `integrations/<id>/` |
 | BR/CN EX2 (IHU629G) | `integrations/ihu629g` (VHAL / CarProperty) |
 | AU EX2 (Antora) | Same `antora1000` module |
 
+See [ADR-0002](adr/0002-model-variant-bindings.md).
+
 ## Lab override
 
-Lab tab → **Integration override** (or `POST /api/lab/integration-override` with `id=<platform>`). Forces a specific integration id (e.g. `ihu629g` on an Antora HU to test registry/UI without that hardware). **Force-stop or reboot** after applying so runtime rematches. See [contributor-debug.md](contributor-debug.md).
+Lab tab → **Integration override** (or `POST /api/lab/integration-override` with `id=<platform>`). Forces a specific integration id — e.g. `demo` with no HU, or `ihu629g` on an Antora unit to test UI without that SoC. **Force-stop or reboot** after applying so runtime rematches. See [contributor-debug.md](contributor-debug.md).

@@ -1,54 +1,64 @@
 import { html } from "../lit.js";
 import {
   entitiesByGroup,
-  groupByEntity,
+  groupBySection,
   hiddenEntitiesByGroup,
   isShowingHidden,
 } from "../store.js";
-import { entityGrid, entityLabel, pageHead } from "../ui/cards.js";
+import { t } from "../i18n.js";
+import { entityGrid, pageHead } from "../ui/cards.js";
 
-var FAMILY_ORDER = [
+/** Preferred section order within a page (unknown sections sort last, A–Z). */
+var SECTION_ORDER = [
   "climate",
-  "fan",
-  "drivetrain",
-  "chassis",
-  "steering",
-  "cover",
-  "lock",
-  "camera",
-  "charger",
-  "ev_battery",
-  "light",
-  "hud",
-  "media_player",
-  "switch",
-  "select",
-  "number",
-  "sensor",
-  "device_tracker",
+  "hvac",
   "seat",
-  "extra",
+  "window",
+  "mirror",
+  "lock",
+  "exterior",
+  "scene",
+  "drive",
+  "adas",
+  "charge",
+  "hybrid",
+  "light",
+  "ambience",
+  "hud",
+  "brightness",
+  "telemetry",
+  "setting",
+  "obd2",
+  "other",
 ];
 
+function sectionTitle(sectionId) {
+  return t("section." + sectionId + ".title", sectionId);
+}
+
+/** Group entities into page subsections by `section` (not HA domain). */
 export function familySections(items, opts) {
   opts = opts || {};
   if (!items || !items.length) {
     return entityGrid(items, opts);
   }
-  var buckets = groupByEntity(items);
+  var buckets = groupBySection(items);
   var keys = Object.keys(buckets);
   keys.sort(function (a, b) {
-    var ia = FAMILY_ORDER.indexOf(a);
-    var ib = FAMILY_ORDER.indexOf(b);
-    if (ia < 0) ia = FAMILY_ORDER.length;
-    if (ib < 0) ib = FAMILY_ORDER.length;
+    var ia = SECTION_ORDER.indexOf(a);
+    var ib = SECTION_ORDER.indexOf(b);
+    if (ia < 0) ia = SECTION_ORDER.length;
+    if (ib < 0) ib = SECTION_ORDER.length;
     if (ia !== ib) return ia - ib;
     return a < b ? -1 : a > b ? 1 : 0;
   });
-  return keys.map(function (fam) {
+  if (keys.length === 1) {
+    return entityGrid(buckets[keys[0]], opts);
+  }
+  return keys.map(function (sec) {
     return html`
-      <h2 class="page-label" style="margin:20px 0 10px">${entityLabel(fam)}</h2>
-      ${entityGrid(buckets[fam], opts)}
+      <h2 class="page-label" style="margin:20px 0 10px">${sectionTitle(sec)}</h2>
+      ${entityGrid(buckets[sec], opts)}
     `;
   });
 }

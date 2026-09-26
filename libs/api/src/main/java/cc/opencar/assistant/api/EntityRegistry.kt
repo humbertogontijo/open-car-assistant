@@ -3,22 +3,27 @@ package cc.opencar.assistant.api
 /**
  * Single product entity registry.
  *
- * Entity ids are Home Assistant–shaped: `domain.object_id`
- * (e.g. `cover.window_driver`, `switch.mirror_fold`, `climate.cabin`).
+ * - **Atomic (single property):** [id] and [bindingKey] are the VHAL property key
+ *   (e.g. `MIRROR_FOLD`, `PERF_VEHICLE_SPEED`) so provenance is obvious.
+ * - **Composite / multi-area:** HA-shaped ids (`climate.cabin`, `cover.window_driver`);
+ *   [attributes] map semantic names → VHAL property keys.
+ * - Legacy ids live in [aliases] and resolve via [resolve].
  *
- * - Atomic entities: [bindingKey] is the platform.json `entity` key (often the object_id).
- * - Composite entities: [bindingKey] is null; [attributes] map semantic names → binding keys.
- * - Legacy bare / pre-cover ids live in [aliases] and resolve via [resolve].
- *
- * Integrations never hardcode VHAL hex — they bind keys in `platform.json`.
+ * [group] = nav page; [section] = subsection within that page (not HA domain).
  */
 data class EntityDef(
     val id: String,
     val domain: EntityType,
+    /** Nav page id (`home`, `controls`, `drive`, …). */
     val group: String,
-    /** Single-binding entities: platform.json `entity` key. Composite: null. */
+    /**
+     * Subsection within [group] (e.g. `climate`, `lock`, `adas`).
+     * UI sections by this field — not by [domain].
+     */
+    val section: String? = null,
+    /** Single-binding entities: VHAL property key. Composite: null. */
     val bindingKey: String? = null,
-    /** Composite only: attribute name → binding key. */
+    /** Composite only: attribute name → VHAL property key. */
     val attributes: Map<String, String> = emptyMap(),
     /**
      * Soft UI hint: bool | choice | command | int | float | text | sensor | climate | cover | …
@@ -52,12 +57,14 @@ data class EntityDef(
 ) {
     val isComposite: Boolean get() = bindingKey == null && attributes.isNotEmpty()
 
-    /** Object id segment after `domain.` (HA-shaped). */
+    /** Object id segment after `domain.` when HA-shaped; otherwise the full [id]. */
     val objectId: String
         get() {
             val prefix = domain.id + "."
             return if (id.startsWith(prefix)) id.removePrefix(prefix) else id
         }
+
+    fun resolvedSection(): String = section ?: domain.id
 
     fun resolvedLabelKey(): String = labelKey ?: "control.$id"
     fun resolvedHintKey(): String = hintKey ?: "control.$id.hint"
@@ -79,7 +86,7 @@ data class EntityDef(
 }
 
 object EntityRegistry {
-    const val NS = "oca"
+    const val NS = "oaa"
 
     /** Attributes that are always area 0 even on instanced covers. */
     val GLOBAL_AREA_ATTRS: Set<String> = setOf("auto_close", "status", "open_height")
@@ -106,57 +113,26 @@ object EntityRegistry {
     const val AREA_DOOR_REAR = 0x20000000
 
     // ----- Composites -----
+    // climate.cabin (+ pilot sensors) load from entities/standard-pilot.json via [EntityPackLoader].
 
-    val CLIMATE = EntityDef(
-        id = entityId(EntityType.CLIMATE, "cabin"),
-        domain = EntityType.CLIMATE,
-        group = "controls",
-        bindingKey = null,
-        // Car HVAC is power+auto+setpoint (not HA heat/cool/fan_only).
-        // Cabin fan + vent direction stay here; seat fans / boosts are atomics.
-        // Zones: Antora HVAC_TEMPERATURE_SET is a single area (driver). Multi-zone
-        // cabin climate would be extra climate.* entities (like covers) when a
-        // platform lists multiple temp areas — not invented heat/cool modes.
-        // AAOS/Ultra attrs: power, temperature, current_temperature, fan_mode,
-        // fan_direction, ac, auto, recirc; dual/SYNC when HVAC_DUAL_ON is bound.
-        attributes = mapOf(
-            "power" to "hvac_power",
-            "temperature" to "hvac_temp_c",
-            "fan_mode" to "hvac_fan",
-            "fan_direction" to "hvac_fan_direction",
-            "ac" to "hvac_ac",
-            "auto" to "hvac_auto",
-            "recirc" to "hvac_recirc",
-            "current_temperature" to "temp_indoor_c",
-        ),
-        input = "climate",
-        aliases = setOf(
-            "climate",
-            "hvac_power", "hvac_ac", "hvac_auto", "hvac_recirc",
-            "hvac_temp", "hvac_fan", "hvac_fan_direction",
-        ),
-        min = 16f,
-        max = 32f,
-        step = 0.5f,
-        deviceClass = DeviceClass.TEMPERATURE,
-        unitOfMeasurement = UnitOfMeasurement.CELSIUS,
-        icon = "climate",
-        history = true,
-        lastKnown = true,
-    )
+    /** Cabin climate — definition lives in the declarative standard-pilot pack. */
+    val CLIMATE: EntityDef
+        get() = byId("climate.cabin")
+            ?: error("climate.cabin missing from entities/standard-pilot.json")
 
     val DRIVETRAIN = EntityDef(
         id = entityId(EntityType.DRIVETRAIN, "vehicle"),
         domain = EntityType.DRIVETRAIN,
         group = "drive",
+        section = "drive",
         bindingKey = null,
         attributes = mapOf(
-            "gear" to "gear",
-            "mode" to "drive_mode",
-            "regen" to "regen",
-            "battery_hold" to "battery_hold",
-            "battery_save" to "battery_save",
-            "battery_mode" to "battery_mode",
+            "gear" to "GEAR_SELECTION",
+            "mode" to "DM_FUNC_DRIVE_MODE_SELECT",
+            "regen" to "SETTING_FUNC_ENERGY_REGENERATION",
+            "battery_hold" to "HYBRID_FUNC_BATTERY_CHARGE_MODE",
+            "battery_save" to "HYBRID_FUNC_BATTERY_SAVE_MODE",
+            "battery_mode" to "HYBRID_FUNC_BATTERY_MODE",
         ),
         input = "choice",
         valueMapId = "drive_mode",
@@ -174,14 +150,15 @@ object EntityRegistry {
         id = entityId(EntityType.CHASSIS, "vehicle"),
         domain = EntityType.CHASSIS,
         group = "drive",
+        section = "drive",
         bindingKey = null,
         attributes = mapOf(
-            "brake_pedal" to "brake_pedal_mode",
-            "esc" to "esc_sport",
-            "hdc" to "hdc",
-            "auto_hold" to "auto_hold",
-            "epb" to "epb",
-            "parking_brake" to "parking_brake",
+            "brake_pedal" to "SETTING_BRAKE_PEDAL_STATUS",
+            "esc" to "SETTING_FUNC_ESC_SPORT_MODE",
+            "hdc" to "SETTING_FUNC_HDC_SWITCH",
+            "auto_hold" to "SETTING_FUNC_AUTO_HOLD",
+            "epb" to "SETTING_FUNC_PBC_DOUBLE_EPB_SWITCH",
+            "parking_brake" to "PARKING_BRAKE_ON",
         ),
         input = "bool",
         aliases = setOf(
@@ -197,12 +174,13 @@ object EntityRegistry {
         id = entityId(EntityType.STEERING, "vehicle"),
         domain = EntityType.STEERING,
         group = "drive",
+        section = "drive",
         bindingKey = null,
         attributes = mapOf(
-            "assist_level" to "steer_assist_level",
-            "sync_drive_mode" to "steer_sync_drive_mode",
-            "intelligent" to "intelligent_steer",
-            "custom_key" to "wheel_custom_key",
+            "assist_level" to "SETTING_FUNC_STEERING_ASSISTANCE_LEVEL",
+            "sync_drive_mode" to "DM_FUNC_STEERING_WHEEL_FEEL_SYNC_DRIVEMODE",
+            "intelligent" to "SETTING_FUNC_INTELLIGENT_STEERING_SWITCH",
+            "custom_key" to "BCM_FUNC_CUSTOM_KEY",
         ),
         input = "choice",
         optionKeys = listOf(
@@ -224,24 +202,25 @@ object EntityRegistry {
         id = entityId(EntityType.CHARGER, "vehicle"),
         domain = EntityType.CHARGER,
         group = "energy",
+        section = "charge",
         bindingKey = null,
         attributes = mapOf(
-            "plug" to "charge_plug",
-            "current" to "charge_current",
-            "limit" to "charge_limit",
-            "switch" to "charge_switch",
-            "pre_now" to "charge_pre_now",
-            "soc_max" to "charge_soc_max",
-            "soc_min" to "charge_soc_min",
-            "discharge_soc" to "charge_discharge_soc",
-            "v2l" to "charge_v2l",
-            "v2v" to "charge_v2v",
-            "parking" to "charge_parking",
-            "estimated_time" to "charge_estimated_time",
-            "energy" to "charge_energy",
-            "work_current" to "charge_work_current",
-            "work_voltage" to "charge_work_voltage",
-            "external_light" to "charge_external_light",
+            "plug" to "CHARGE_FUNC_CHARGING_PLUG_STATE",
+            "current" to "CHARGE_FUNC_CHARGING_CURRENT",
+            "limit" to "CHARGE_FUNC_CHARGING_CURRENT_MAX",
+            "switch" to "CHARGE_FUNC_AC_CHARGING",
+            "pre_now" to "CHARGE_FUNC_PRE_CHARGING_IMMEDIATELY",
+            "soc_max" to "CHARGE_FUNC_CHARGING_SOC_MAX",
+            "soc_min" to "CHARGE_FUNC_CHARGING_SOC_MIN",
+            "discharge_soc" to "CHARGE_FUNC_DISCHARGING_SOC",
+            "v2l" to "CHARGE_FUNC_DISCHARGING_SWITCH_V2L",
+            "v2v" to "CHARGE_FUNC_DISCHARGING_SWITCH_V2V",
+            "parking" to "CHARGE_FUNC_PARKING",
+            "estimated_time" to "CHARGE_FUNC_CHARGING_ESTIMATED_TIME",
+            "energy" to "CHARGE_FUNC_CHARGING_ENERGY",
+            "work_current" to "CHARGE_FUNC_CHARGING_WORK_CURRENT",
+            "work_voltage" to "CHARGE_FUNC_CHARGING_WORK_VOLTAGE",
+            "external_light" to "CHARGE_FUNC_EXTERNAL_CHARGING_LIGHT",
         ),
         input = "bool",
         aliases = setOf(
@@ -261,12 +240,13 @@ object EntityRegistry {
         id = entityId(EntityType.EV_BATTERY, "main"),
         domain = EntityType.EV_BATTERY,
         group = "energy",
+        section = "hybrid",
         bindingKey = null,
         attributes = mapOf(
-            "percent" to "ev_battery_percent",
-            "level_raw" to "ev_battery_level_raw",
-            "temp_c" to "battery_temp_c",
-            "hybrid_soc" to "hybrid_soc",
+            "percent" to "TYPE_EV_BATTERY_PERCENTAGE",
+            "level_raw" to "EV_BATTERY_LEVEL",
+            "temp_c" to "SENSOR_TYPE_EV_BATTERY_TEMP",
+            "hybrid_soc" to "HYBRID_FUNC_BATTERY_SOC",
         ),
         input = "sensor",
         aliases = setOf(
@@ -284,11 +264,11 @@ object EntityRegistry {
         group = "display",
         bindingKey = null,
         attributes = mapOf(
-            "active" to "hud_active",
-            "snow" to "hud_snow",
-            "ar" to "hud_ar",
-            "display_mode" to "hud_display_mode",
-            "angle" to "hud_angle",
+            "active" to "SETTING_FUNC_HUD_ACTIVE",
+            "snow" to "SETTING_FUNC_HUD_SNOW_MODE",
+            "ar" to "SETTING_FUNC_HUD_AR_ENGINE",
+            "display_mode" to "SETTING_FUNC_HUD_DISPLAY_MODE",
+            "angle" to "SETTING_FUNC_HUD_ANGLE_ADJUST",
         ),
         input = "bool",
         aliases = setOf(
@@ -305,8 +285,8 @@ object EntityRegistry {
         group = "lights",
         bindingKey = null,
         attributes = mapOf(
-            "color" to "ambience_main_color",
-            "brightness" to "ambience_intensity",
+            "color" to "SETTING_FUNC_AMBIENCE_LIGHT_MAINCOLOR",
+            "brightness" to "SETTING_FUNC_AMBIENCE_LIGHT_INTENSITY_SET",
         ),
         input = "light",
         optionKeys = listOf(
@@ -330,7 +310,7 @@ object EntityRegistry {
 
     val COVER_WINDOW_DRIVER = cover(
         objectId = "window_driver",
-        bindingKey = "window_pos",
+        bindingKey = "WINDOW_POS",
         areaId = AREA_WINDOW_ROW_1_LEFT,
         deviceClass = DeviceClass.WINDOW,
         aliases = setOf("window.driver", "window_driver"),
@@ -338,7 +318,7 @@ object EntityRegistry {
     )
     val COVER_WINDOW_PASSENGER = cover(
         objectId = "window_passenger",
-        bindingKey = "window_pos",
+        bindingKey = "WINDOW_POS",
         areaId = AREA_WINDOW_ROW_1_RIGHT,
         deviceClass = DeviceClass.WINDOW,
         aliases = setOf("window.passenger", "window_passenger"),
@@ -346,7 +326,7 @@ object EntityRegistry {
     )
     val COVER_WINDOW_REAR_LEFT = cover(
         objectId = "window_rear_left",
-        bindingKey = "window_pos",
+        bindingKey = "WINDOW_POS",
         areaId = AREA_WINDOW_ROW_2_LEFT,
         deviceClass = DeviceClass.WINDOW,
         aliases = setOf("window.rear_left", "window_rear_left"),
@@ -354,7 +334,7 @@ object EntityRegistry {
     )
     val COVER_WINDOW_REAR_RIGHT = cover(
         objectId = "window_rear_right",
-        bindingKey = "window_pos",
+        bindingKey = "WINDOW_POS",
         areaId = AREA_WINDOW_ROW_2_RIGHT,
         deviceClass = DeviceClass.WINDOW,
         aliases = setOf("window.rear_right", "window_rear_right"),
@@ -362,7 +342,7 @@ object EntityRegistry {
     )
     val COVER_SUNROOF = cover(
         objectId = "sunroof",
-        bindingKey = "window_pos",
+        bindingKey = "WINDOW_POS",
         areaId = AREA_WINDOW_ROOF_TOP,
         deviceClass = DeviceClass.WINDOW,
         aliases = setOf("sunroof"),
@@ -370,7 +350,7 @@ object EntityRegistry {
     )
     val COVER_SUNSHADE = cover(
         objectId = "sunshade",
-        bindingKey = "window_pos",
+        bindingKey = "WINDOW_POS",
         areaId = AREA_WINDOW_ROOF_TOP_2,
         deviceClass = DeviceClass.SHADE,
         aliases = setOf("sunshade"),
@@ -384,8 +364,8 @@ object EntityRegistry {
         group = "controls",
         bindingKey = null,
         attributes = mapOf(
-            "status" to "trunk_status",
-            "move" to "trunk_move",
+            "status" to "BCM_FUNC_TRUNK_DOOR_STATUS",
+            "move" to "DOOR_MOVE",
         ),
         input = "cover",
         aliases = setOf("trunk", "trunk_status", "trunk_move"),
@@ -405,8 +385,7 @@ object EntityRegistry {
         CAMERA_FRONT, CAMERA_RIGHT, CAMERA_REAR, CAMERA_LEFT,
     )
 
-    val ALL: List<EntityDef> = listOf(
-        CLIMATE,
+    private val kotlinBuiltin: List<EntityDef> = listOf(
         DRIVETRAIN,
         CHASSIS,
         STEERING,
@@ -427,72 +406,72 @@ object EntityRegistry {
         CAMERA_LEFT,
 
         // Cover siblings
-        e("auto_close_window", "controls", EntityType.SWITCH, "bool",
+        e("SETTING_FUNC_AUTO_CLOSE_WINDOW", "controls", EntityType.SWITCH, "bool",
             lastKnown = true, icon = "window",
         ),
-        e("sunroof_tilt", "controls", EntityType.SWITCH, "bool",
+        e("BCM_FUNC_SUNROOF_TILT", "controls", EntityType.SWITCH, "bool",
             lastKnown = true, icon = "window",
         ),
-        e("trunk_open_height", "controls", EntityType.NUMBER, "int",
+        e("SETTING_FUNC_TRUNK_OPENING_POSITION", "controls", EntityType.NUMBER, "int",
             icon = "cabin", min = 0f, max = 100f, step = 1f, lastKnown = true,
         ),
 
         // Drive extras
-        e("cst", "drive", EntityType.SWITCH, "bool", acronym = "CST", lastKnown = true, icon = "drive"),
+        e("SETTING_FUNC_CST_SWITCH", "drive", EntityType.SWITCH, "bool", acronym = "CST", lastKnown = true, icon = "drive"),
 
         // HVAC extras — boosts / presets, not climate modes.
-        e("hvac_max_defrost", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "climate"),
-        e("hvac_max_ac", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "climate"),
-        e("hvac_eco", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "climate"),
-        e("hvac_auto_dry", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "climate"),
-        e("hvac_rapid_cool", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "climate"),
-        e("hvac_rapid_heat", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "climate"),
-        e("hvac_electric_defrost", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "climate"),
-        e("hvac_auto_recirc", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "climate"),
-        e("hvac_auto_seat_vent", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "seat"),
+        e("HVAC_MAX_DEFROST_ON", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "climate"),
+        e("HVAC_MAX_AC_ON", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "climate"),
+        e("HVAC_FUNC_ECO_SWITCH", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "climate"),
+        e("HVAC_FUNC_AUTO_DRY", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "climate"),
+        e("HVAC_RAPID_COOLING", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "climate"),
+        e("HVAC_RAPID_HEATING", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "climate"),
+        e("HVAC_ELECTRIC_DEFROSTER_ON", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "climate"),
+        e("HVAC_AUTO_RECIRC_ON", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "climate"),
+        e("HVAC_FUNC_AUTO_SEAT_VENTILATION", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "seat"),
 
         // Seat ventilation — fan domain (separate from climate cabin fan).
         fan(
             objectId = "seat_driver",
-            bindingKey = "hvac_seat_vent",
+            bindingKey = "HVAC_SEAT_VENTILATION",
             areaId = AREA_SEAT_ROW_1_LEFT,
             aliases = setOf("hvac_seat_vent", "hvac_seat_vent_driver"),
             icon = "seat",
         ),
         fan(
             objectId = "seat_passenger",
-            bindingKey = "hvac_seat_vent",
+            bindingKey = "HVAC_SEAT_VENTILATION",
             areaId = AREA_SEAT_ROW_1_RIGHT,
             aliases = setOf("hvac_seat_vent_passenger"),
             icon = "seat",
         ),
 
-        e("parking_comfort", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "climate"),
-        e("nap_mode", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "climate"),
-        e("space_capsule", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "climate"),
+        e("SCENE_FUNC_PARKING_COMFORT_SWITCH", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "climate"),
+        e("SCENE_FUNC_NAP_MODE", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "climate"),
+        e("SETTING_SPACE_CAPSULE_SWITCH", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "climate"),
 
-        e("mirror_fold", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "cabin"),
-        e("mirror_auto_fold", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "cabin"),
+        e("MIRROR_FOLD", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "cabin"),
+        e("SETTING_FUNC_MIRROR_AUTO_FOLDING", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "cabin"),
 
         // Real locks (actuators). Policy helpers stay switch.* (approach_unlock, …).
         lock(
             objectId = "central",
-            bindingKey = "central_lock",
+            bindingKey = "SETTING_FUNC_CENTRAL_LOCK",
             aliases = setOf("central_lock"),
             icon = "lock",
         ),
         lock(
             objectId = "windows",
-            bindingKey = "window_lock",
+            bindingKey = "WINDOW_LOCK",
             aliases = setOf("window_lock"),
             icon = "lock",
         ),
 
-        e("lka", "adas", EntityType.SWITCH, "bool", bindingKey = "lane_keeping", acronym = "LKA", lastKnown = true, icon = "adas"),
-        e("ldw", "adas", EntityType.SWITCH, "bool", acronym = "LDW", lastKnown = true, icon = "adas"),
-        e("elka", "adas", EntityType.SWITCH, "bool", acronym = "ELKA", lastKnown = true, icon = "adas"),
-        e("aeb", "adas", EntityType.SWITCH, "bool", acronym = "AEB", lastKnown = true, icon = "adas"),
-        e("fcw", "adas", EntityType.SELECT, "choice",
+        e("lka", "adas", EntityType.SWITCH, "bool", bindingKey = "SETTING_FUNC_LANE_KEEPING_AID", acronym = "LKA", lastKnown = true, icon = "adas"),
+        e("SETTING_FUNC_LANE_KEEPING_AID_WARNING", "adas", EntityType.SWITCH, "bool", acronym = "LDW", lastKnown = true, icon = "adas"),
+        e("SETTING_FUNC_EMGY_LANE_KEEP_AID", "adas", EntityType.SWITCH, "bool", acronym = "ELKA", lastKnown = true, icon = "adas"),
+        e("SETTING_FUNC_AUTONOMOUS_EMERGENCY_BRAKING", "adas", EntityType.SWITCH, "bool", acronym = "AEB", lastKnown = true, icon = "adas"),
+        e("SETTING_FUNC_FORWARD_COLLISION_WARN_SNVTY", "adas", EntityType.SELECT, "choice",
             optionKeys = listOf(
                 "opt.fcw.0" to 0,
                 "opt.fcw.1" to 1,
@@ -501,40 +480,40 @@ object EntityRegistry {
             ),
             acronym = "FCW", icon = "adas",
         ),
-        e("rcta", "adas", EntityType.SWITCH, "bool", acronym = "RCTA", lastKnown = true, icon = "adas"),
+        e("SETTING_FUNC_REAR_CROSS_TRAFFIC_ALERT", "adas", EntityType.SWITCH, "bool", acronym = "RCTA", lastKnown = true, icon = "adas"),
         e("rcta_volume", "adas", EntityType.NUMBER, "int",
             icon = "adas", min = 0f, max = 3f, step = 1f, lastKnown = true,
         ),
-        e("rcw", "adas", EntityType.SWITCH, "bool", acronym = "RCW", lastKnown = true, icon = "adas"),
-        e("fcda", "adas", EntityType.SWITCH, "bool", acronym = "FCDA", lastKnown = true, icon = "adas"),
-        e("dow", "adas", EntityType.SWITCH, "bool", acronym = "DOW", lastKnown = true, icon = "adas"),
-        e("idas_mode", "adas", EntityType.SELECT, "choice",
+        e("SETTING_FUNC_REAR_COLLISION_WARNING", "adas", EntityType.SWITCH, "bool", acronym = "RCW", lastKnown = true, icon = "adas"),
+        e("SETTING_FUNC_FCDA_STATUS", "adas", EntityType.SWITCH, "bool", acronym = "FCDA", lastKnown = true, icon = "adas"),
+        e("SETTING_FUNC_DOOR_OPEN_WARN_ACTIVE", "adas", EntityType.SWITCH, "bool", acronym = "DOW", lastKnown = true, icon = "adas"),
+        e("SETTING_INTELLIGENT_DRIVING_ASSISTANCE_MODE", "adas", EntityType.SELECT, "choice",
             optionKeys = listOf(
                 "opt.idas_mode.1" to 1,
                 "opt.idas_mode.2" to 2,
             ),
             acronym = "IDAS", icon = "adas", lastKnown = true,
         ),
-        e("speed_limit_warn", "adas", EntityType.SWITCH, "bool", lastKnown = true, icon = "adas"),
-        e("speed_limit_max", "adas", EntityType.SENSOR, "sensor",
+        e("SETTING_FUNC_SPEED_LIMIT_WARNING_MODE", "adas", EntityType.SWITCH, "bool", lastKnown = true, icon = "adas"),
+        e("SETTING_FUNC_SPEED_WARNING_MAX", "adas", EntityType.SENSOR, "sensor",
             writable = false,
             deviceClass = DeviceClass.SPEED,
             unitOfMeasurement = UnitOfMeasurement.KM_PER_HOUR,
             icon = "adas", lastKnown = true,
         ),
         e("speed_limit_update", "adas", EntityType.SWITCH, "bool", lastKnown = true, icon = "adas"),
-        e("lane_change_warn", "adas", EntityType.SWITCH, "bool", lastKnown = true, icon = "adas"),
-        e("dms", "adas", EntityType.SWITCH, "bool", acronym = "DMS", lastKnown = true, icon = "adas"),
+        e("SETTING_FUNC_LANE_CHANGE_WARNING_MODE", "adas", EntityType.SWITCH, "bool", lastKnown = true, icon = "adas"),
+        e("DMS_DPS_SWITCH", "adas", EntityType.SWITCH, "bool", acronym = "DMS", lastKnown = true, icon = "adas"),
 
         // Access *policy* — not lock domain.
-        e("approach_unlock", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "lock"),
-        e("away_lock", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "lock"),
-        e("audible_lock", "controls", EntityType.SWITCH, "bool", icon = "lock"),
-        e("keyless_unlock", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "lock"),
-        e("twostep_unlock", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "lock"),
-        e("p_gear_unlock", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "lock"),
-        e("easy_ingress", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "seat"),
-        e("vehicle_locator_mode", "controls", EntityType.SELECT, "choice",
+        e("SETTING_FUNC_APPROACH_UNLOCK", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "lock"),
+        e("SETTING_FUNC_AWAY_LOCK", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "lock"),
+        e("SETTING_FUNC_AUDIBLE_LOCKING_FEEDBACK", "controls", EntityType.SWITCH, "bool", icon = "lock"),
+        e("SETTING_FUNC_KEYLESS_UNLOCKING", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "lock"),
+        e("SETTING_FUNC_TWOSTEP_UNLOCKING", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "lock"),
+        e("SETTING_FUNC_P_GEAR_UNLOCK", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "lock"),
+        e("SETTING_FUNC_EASY_INGRESS_EGRESS", "controls", EntityType.SWITCH, "bool", lastKnown = true, icon = "seat"),
+        e("SETTING_FUNC_CAR_LOCATOR_REMINDER_MODE", "controls", EntityType.SELECT, "choice",
             optionKeys = listOf(
                 "opt.vehicle_locator_mode.1" to 1,
                 "opt.vehicle_locator_mode.2" to 2,
@@ -543,9 +522,9 @@ object EntityRegistry {
             lastKnown = true, icon = "cabin",
         ),
 
-        e("courtesy_light", "lights", EntityType.SWITCH, "bool", icon = "light"),
-        e("approach_light", "lights", EntityType.SWITCH, "bool", icon = "light"),
-        e("exterior_light", "lights", EntityType.SELECT, "choice",
+        e("SETTING_FUNC_LAMP_AUTOMATIC_COURTESY_LIGHT", "lights", EntityType.SWITCH, "bool", icon = "light"),
+        e("SETTING_FUNC_LAMP_APPROACH_LIGHT", "lights", EntityType.SWITCH, "bool", icon = "light"),
+        e("SETTING_FUNC_LAMP_EXTERIOR_LIGHT_CONTROL", "lights", EntityType.SELECT, "choice",
             optionKeys = listOf(
                 "opt.exterior_light.0" to 0,
                 "opt.exterior_light.1" to 1,
@@ -554,10 +533,10 @@ object EntityRegistry {
             ),
             lastKnown = true, icon = "light",
         ),
-        e("rear_fog", "lights", EntityType.SWITCH, "bool", icon = "light"),
+        e("FOG_LIGHTS_SWITCH", "lights", EntityType.SWITCH, "bool", icon = "light"),
         e("hazard_lights", "lights", EntityType.SWITCH, "bool", icon = "light"),
         e("high_beam", "lights", EntityType.SWITCH, "bool", icon = "light"),
-        e("headlight_height", "lights", EntityType.SELECT, "choice",
+        e("SETTING_FUNC_LAMP_LOW_BEAM_VERTICAL_LEVEL", "lights", EntityType.SELECT, "choice",
             optionKeys = listOf(
                 "opt.headlight_height.0" to 0,
                 "opt.headlight_height.1" to 1,
@@ -566,7 +545,7 @@ object EntityRegistry {
             ),
             lastKnown = true, icon = "light",
         ),
-        e("home_safe_light", "lights", EntityType.SELECT, "choice",
+        e("SETTING_FUNC_LAMP_HOME_SAFE_LIGHT", "lights", EntityType.SELECT, "choice",
             optionKeys = listOf(
                 "opt.home_safe_light.0" to 0,
                 "opt.home_safe_light.1" to 1,
@@ -578,7 +557,7 @@ object EntityRegistry {
             ),
             lastKnown = true, icon = "light",
         ),
-        e("day_mode", "lights", EntityType.SELECT, "choice",
+        e("SETTING_FUNC_DAYMODE_SETTING", "lights", EntityType.SELECT, "choice",
             optionKeys = listOf(
                 "opt.day_mode.1" to 1,
                 "opt.day_mode.2" to 2,
@@ -586,7 +565,7 @@ object EntityRegistry {
             ),
             lastKnown = true, icon = "light",
         ),
-        e("night_mode", "lights", EntityType.SWITCH, "bool", lastKnown = true, icon = "light"),
+        e("SETTING_FUNC_NIGHTMODE", "lights", EntityType.SWITCH, "bool", lastKnown = true, icon = "light"),
 
         e("display_brightness", "display", EntityType.NUMBER, "int",
             icon = "light", min = 0f, max = 100f, step = 1f, lastKnown = true,
@@ -606,7 +585,7 @@ object EntityRegistry {
         e("tire_warning", "vehicle", EntityType.SENSOR, "sensor",
             writable = false, icon = "sensor",
         ),
-        e("esm_volume", "sound", EntityType.SELECT, "choice",
+        e("SETTING_FUNC_ESM_VOLUME", "sound", EntityType.SELECT, "choice",
             optionKeys = listOf(
                 "opt.esm_volume.0" to 0,
                 "opt.esm_volume.1" to 1,
@@ -615,7 +594,7 @@ object EntityRegistry {
             ),
             acronym = "AVAS", icon = "system", lastKnown = true,
         ),
-        e("esm_sound", "sound", EntityType.SELECT, "choice",
+        e("SETTING_FUNC_ESM_SOUND_TYPE", "sound", EntityType.SELECT, "choice",
             optionKeys = listOf(
                 "opt.esm_sound.0" to 1,
                 "opt.esm_sound.1" to 2,
@@ -623,10 +602,10 @@ object EntityRegistry {
             ),
             acronym = "AVAS", icon = "system", lastKnown = true,
         ),
-        e("media_volume", "sound", EntityType.NUMBER, "int",
+        e("SETTING_FUNC_AUDIO_MEDIA_VOLUME", "sound", EntityType.NUMBER, "int",
             icon = "sound", min = 0f, max = 39f, step = 1f, lastKnown = true,
         ),
-        e("speed_volume", "sound", EntityType.SELECT, "choice",
+        e("SETTING_FUNC_AUDIO_COMPENSATION_LEVEL", "sound", EntityType.SELECT, "choice",
             optionKeys = listOf(
                 "opt.speed_volume.0" to 0,
                 "opt.speed_volume.1" to 1,
@@ -641,7 +620,7 @@ object EntityRegistry {
         e("voice_broadcast", "assistant", EntityType.SELECT, "choice",
             lastKnown = true, icon = "system",
         ),
-        e("usb_mode", "vehicle", EntityType.SELECT, "choice",
+        e("SETTING_FUNC_USB_SWITCH", "vehicle", EntityType.SELECT, "choice",
             optionKeys = listOf(
                 "opt.usb_mode.0" to 0,
                 "opt.usb_mode.1" to 1,
@@ -649,8 +628,15 @@ object EntityRegistry {
             ),
             icon = "usb",
         ),
-        e("vr_activated", "assistant", EntityType.SWITCH, "bool", lastKnown = true, icon = "system"),
+        e("VR_ACTIVATED", "assistant", EntityType.SWITCH, "bool", lastKnown = true, icon = "system"),
     )
+
+    private val declarativePilot: List<EntityDef> = runCatching {
+        EntityPackLoader.loadClasspath("entities/standard-pilot.json")
+    }.getOrElse { emptyList() }
+
+    /** Product catalog: declarative packs win on id, then Kotlin builtins. */
+    val ALL: List<EntityDef> = EntityPackLoader.merge(declarativePilot, kotlinBuiltin)
 
     private val byId: Map<String, EntityDef> = ALL.associateBy { it.id }
 
@@ -727,6 +713,7 @@ object EntityRegistry {
             id = id,
             domain = EntityType.COVER,
             group = "controls",
+            section = "window",
             bindingKey = bindingKey,
             input = "cover",
             aliases = aliases + objectId,
@@ -754,6 +741,7 @@ object EntityRegistry {
             id = id,
             domain = EntityType.FAN,
             group = "controls",
+            section = "seat",
             bindingKey = bindingKey,
             input = "choice",
             optionKeys = listOf(
@@ -785,6 +773,7 @@ object EntityRegistry {
             id = id,
             domain = EntityType.LOCK,
             group = "controls",
+            section = "lock",
             bindingKey = bindingKey,
             input = "choice",
             optionKeys = listOf(
@@ -799,16 +788,18 @@ object EntityRegistry {
     }
 
     /**
-     * Atomic widget: [objectId] is the HA object_id; [id] = `domain.objectId`.
-     * [bindingKey] defaults to [objectId] (platform.json entity key).
-     * Bare [objectId] is always aliased for legacy resolve.
+     * Atomic widget bound to one VHAL property.
+     *
+     * [propertyKey] is both the entity [EntityDef.id] and [EntityDef.bindingKey].
+     * Optional [legacyObjectId] seeds HA-shaped aliases (`switch.mirror_fold`).
      */
     private fun e(
-        objectId: String,
+        propertyKey: String,
         group: String,
         domain: EntityType,
         input: String,
-        bindingKey: String? = objectId,
+        bindingKey: String? = propertyKey,
+        section: String? = null,
         optionKeys: List<Pair<String, Int>>? = null,
         writable: Boolean = true,
         deviceClass: DeviceClass? = null,
@@ -822,13 +813,17 @@ object EntityRegistry {
         history: Boolean = false,
         aliases: Set<String> = emptySet(),
         areaId: Int? = null,
+        legacyObjectId: String? = null,
     ): EntityDef {
-        val id = entityId(domain, objectId)
+        val key = bindingKey ?: propertyKey
+        val legacy = legacyObjectId ?: propertyKey.lowercase()
+        val resolvedSection = section ?: CatalogEntityFactory.familyOf(key)
         return EntityDef(
-            id = id,
+            id = key,
             domain = domain,
             group = group,
-            bindingKey = bindingKey,
+            section = resolvedSection,
+            bindingKey = key,
             input = input,
             optionKeys = optionKeys,
             writable = writable,
@@ -841,8 +836,10 @@ object EntityRegistry {
             max = max,
             step = step,
             history = history,
-            aliases = aliases + objectId,
+            aliases = aliases + legacy + entityId(domain, legacy) + key,
             areaId = areaId,
+            labelKey = "control.$key",
+            hintKey = "control.$key.hint",
         )
     }
 }

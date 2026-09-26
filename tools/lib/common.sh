@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shared helpers for oca-setup (sourced).
+# Shared helpers for oaa-setup (sourced).
 
 log()  { printf '➜ %s\n' "$*"; }
 ok()   { printf '✓ %s\n' "$*"; }
@@ -29,27 +29,36 @@ load_integration() {
   fi
   # shellcheck source=/dev/null
   source "$file"
-  : "${OCA_ADB_PORT:?integration must set OCA_ADB_PORT}"
-  : "${OCA_ANDROID_USER:?}"
-  : "${OCA_PACKAGE:?}"
-  : "${OCA_ACTIVITY:?}"
-  local host_disp="${OCA_HOST:-<set -H or OCA_HOST>}"
-  ok "Integration: $id  host=$host_disp:$OCA_ADB_PORT  user=$OCA_ANDROID_USER  pkg=$OCA_PACKAGE"
+  # Legacy OCA_* env → OAA_* (one transition period).
+  : "${OAA_HOST:=${OCA_HOST:-}}"
+  : "${OAA_ADB_PORT:=${OCA_ADB_PORT:-}}"
+  : "${OAA_ANDROID_USER:=${OCA_ANDROID_USER:-}}"
+  : "${OAA_PACKAGE:=${OCA_PACKAGE:-}}"
+  : "${OAA_ACTIVITY:=${OCA_ACTIVITY:-}}"
+  : "${OAA_APK_DEBUG:=${OCA_APK_DEBUG:-}}"
+  : "${OAA_APK_SIGNED:=${OCA_APK_SIGNED:-}}"
+  : "${OAA_INTEGRATION_ID:=${OCA_INTEGRATION_ID:-}}"
+  : "${OAA_ADB_PORT:?integration must set OAA_ADB_PORT}"
+  : "${OAA_ANDROID_USER:?}"
+  : "${OAA_PACKAGE:?}"
+  : "${OAA_ACTIVITY:?}"
+  local host_disp="${OAA_HOST:-<set -H or OAA_HOST>}"
+  ok "Integration: $id  host=$host_disp:$OAA_ADB_PORT  user=$OAA_ANDROID_USER  pkg=$OAA_PACKAGE"
 }
 
 require_host() {
-  [[ -n "${OCA_HOST:-}" ]] || die "Set the HU address: --host / -H CAR_IP  (or export OCA_HOST)"
+  [[ -n "${OAA_HOST:-}" ]] || die "Set the HU address: --host / -H CAR_IP  (or export OAA_HOST)"
 }
 
 adb_s() {
   require_host
-  adb -s "${OCA_HOST}:${OCA_ADB_PORT}" "$@"
+  adb -s "${OAA_HOST}:${OAA_ADB_PORT}" "$@"
 }
 
-oca_connect() {
+oaa_connect() {
   require_cmd adb
   require_host
-  local serial="${OCA_HOST}:${OCA_ADB_PORT}"
+  local serial="${OAA_HOST}:${OAA_ADB_PORT}"
   if ! adb devices | grep -q "^${serial}[[:space:]]"; then
     log "adb connect $serial"
     adb connect "$serial" >/dev/null
@@ -59,19 +68,19 @@ oca_connect() {
   ok "Connected $serial"
 }
 
-oca_build() {
+oaa_build() {
   log "Building :app:assembleDebug"
   (
     cd "$ROOT"
     export JAVA_HOME="${JAVA_HOME:-$(/usr/libexec/java_home -v 17 2>/dev/null || true)}"
     gradlew :app:assembleDebug --quiet
   )
-  ok "Built $OCA_APK_DEBUG"
+  ok "Built $OAA_APK_DEBUG"
 }
 
-oca_sign() {
-  local debug_apk="${OCA_APK_DEBUG:?}"
-  local signed_apk="${OCA_APK_SIGNED:?}"
+oaa_sign() {
+  local debug_apk="${OAA_APK_DEBUG:?}"
+  local signed_apk="${OAA_APK_SIGNED:?}"
   [[ -f "$debug_apk" ]] || die "APK missing — run build first: $debug_apk"
   log "Signing with :signing:signApk (community testkey)"
   (
@@ -87,19 +96,19 @@ oca_sign() {
   ok "Signed $signed_apk"
 }
 
-oca_ensure_apk() {
-  if [[ ! -f "$OCA_APK_SIGNED" ]]; then
-    if [[ -f "$OCA_APK_DEBUG" ]]; then
-      oca_sign
+oaa_ensure_apk() {
+  if [[ ! -f "$OAA_APK_SIGNED" ]]; then
+    if [[ -f "$OAA_APK_DEBUG" ]]; then
+      oaa_sign
     else
-      oca_build
-      oca_sign
+      oaa_build
+      oaa_sign
     fi
   fi
 }
 
-oca_start() {
-  log "Starting $OCA_PACKAGE/$OCA_ACTIVITY (user $OCA_ANDROID_USER)"
-  adb_s shell am force-stop --user "$OCA_ANDROID_USER" "$OCA_PACKAGE" 2>/dev/null || true
-  adb_s shell am start --user "$OCA_ANDROID_USER" -n "${OCA_PACKAGE}/${OCA_ACTIVITY}"
+oaa_start() {
+  log "Starting $OAA_PACKAGE/$OAA_ACTIVITY (user $OAA_ANDROID_USER)"
+  adb_s shell am force-stop --user "$OAA_ANDROID_USER" "$OAA_PACKAGE" 2>/dev/null || true
+  adb_s shell am start --user "$OAA_ANDROID_USER" -n "${OAA_PACKAGE}/${OAA_ACTIVITY}"
 }

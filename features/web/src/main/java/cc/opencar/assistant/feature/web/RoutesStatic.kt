@@ -38,7 +38,7 @@ private val SPA_PAGES = setOf(
     "about",
 )
 
-internal fun Routing.registerStaticRoutes(deps: OcaWebDeps) {
+internal fun Routing.registerStaticRoutes(deps: OaaWebDeps) {
     get("/") {
         call.response.headers.append(HttpHeaders.CacheControl, "no-store")
         call.respondText(deps.assetText("web/index.html"), ContentType.Text.Html)
@@ -73,7 +73,7 @@ internal fun Routing.registerStaticRoutes(deps: OcaWebDeps) {
  * SPA shell for known section paths. Register **after** API/debug routes so
  * `/{section}` cannot shadow `/api`, `/debug`, etc.
  */
-internal fun Routing.registerSpaFallbackRoutes(deps: OcaWebDeps) {
+internal fun Routing.registerSpaFallbackRoutes(deps: OaaWebDeps) {
     get("/{section}") {
         val section = call.parameters["section"] ?: return@get
         if (section !in SPA_PAGES) {
@@ -85,8 +85,8 @@ internal fun Routing.registerSpaFallbackRoutes(deps: OcaWebDeps) {
     }
 }
 
-internal fun OcaWebDeps.assetText(path: String): String =
+internal fun OaaWebDeps.assetText(path: String): String =
     context.assets.open(path).bufferedReader().use { it.readText() }
 
-internal fun OcaWebDeps.assetBytes(path: String): ByteArray =
+internal fun OaaWebDeps.assetBytes(path: String): ByteArray =
     context.assets.open(path).use { it.readBytes() }

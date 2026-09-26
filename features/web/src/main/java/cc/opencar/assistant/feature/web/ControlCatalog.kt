@@ -1,6 +1,7 @@
 package cc.opencar.assistant.feature.web
 
 import android.content.Context
+import cc.opencar.assistant.api.CatalogEntityFactory
 import cc.opencar.assistant.api.DeviceClass
 import cc.opencar.assistant.api.EntityContract
 import cc.opencar.assistant.api.EntityDef
@@ -10,7 +11,6 @@ import cc.opencar.assistant.api.PropertyValue
 import cc.opencar.assistant.api.ReadOutcome
 import cc.opencar.assistant.api.UnitOfMeasurement
 import cc.opencar.assistant.api.VehicleSession
-import cc.opencar.assistant.api.WellKnownProperties
 import cc.opencar.assistant.feature.dvr.DvrController
 import cc.opencar.assistant.feature.memory.SettingsMemoryController
 import cc.opencar.assistant.support.I18nBundle
@@ -24,6 +24,10 @@ import kotlinx.coroutines.flow.first
 object ControlCatalog {
     val ALL: List<EntityDef> get() = EntityRegistry.ALL
 
+    /** Curated registry + auto entities for unbound catalog property keys. */
+    fun defsFor(session: VehicleSession): List<EntityDef> =
+        ALL + CatalogEntityFactory.fromCatalog(session.catalog())
+
     fun i18n(context: Context, session: VehicleSession): I18nBundle =
         I18nBundle.load(context, session.integrationId)
 
@@ -35,7 +39,7 @@ object ControlCatalog {
         val store = context?.let { LastKnownStore(it) }
         val i18n = context?.let { i18n(it, session) }
         val persist = memory?.persistSnapshot().orEmpty()
-        return ALL.mapNotNull { def ->
+        return defsFor(session).mapNotNull { def ->
             val base = when {
                 def.domain == EntityType.CAMERA -> return@mapNotNull null
                 def.domain == EntityType.CLIMATE && def.isComposite ->
@@ -65,7 +69,7 @@ object ControlCatalog {
         val t = session.telemetry().first()
         val i18n = context?.let { i18n(it, session) }
         val persist = memory?.persistSnapshot().orEmpty()
-        val vinValue = when (val out = session.diagnose(WellKnownProperties.INFO_VIN)) {
+        val vinValue = when (val out = session.diagnose(EntityRegistry.property("INFO_VIN"))) {
             is ReadOutcome.Ok -> out.value?.display()
             else -> null
         }
@@ -240,7 +244,10 @@ object ControlCatalog {
         val androidEntities = android?.entityMaps(persist).orEmpty()
         val locationEntities = location?.entityMaps().orEmpty()
         val cameraEntities = cameraEntityMaps(dvr)
-        return sensors + controls + androidEntities + locationEntities + cameraEntities
+        // Prefer registry-bound sensors (declarative pack) over telemetry-only duplicates.
+        val controlIds = controls.mapNotNull { it["id"] as? String }.toSet()
+        val telemetrySensors = sensors.filter { (it["id"] as? String) !in controlIds }
+        return telemetrySensors + controls + androidEntities + locationEntities + cameraEntities
     }
 
     private fun cameraEntityMaps(dvr: DvrController?): List<Map<String, Any?>> {
@@ -261,6 +268,7 @@ object ControlCatalog {
                 mapOf(
                     "id" to def.id,
                     "group" to def.group,
+                EntityContract.FIELD_SECTION to def.resolvedSection(),
                     "entity" to EntityType.CAMERA.id,
                     "domain" to EntityType.CAMERA.id,
                     "labelKey" to def.resolvedLabelKey(),
@@ -280,9 +288,19 @@ object ControlCatalog {
         }
     }
 
+    private fun resolveDef(session: VehicleSession, id: String): EntityDef? {
+        EntityRegistry.resolve(id)?.let { return it }
+        val claimed = CatalogEntityFactory.claimedBindingKeys()
+        if (id in claimed) return null
+        val entry = session.catalog().firstOrNull { e ->
+            e.property.key == id || e.name == id
+        } ?: return null
+        return CatalogEntityFactory.fromCatalog(listOf(entry), claimed).firstOrNull()
+    }
+
     /** Current display value for shortcut conditions / entity_state watching. */
     suspend fun currentValue(session: VehicleSession, id: String): String? {
-        val def = EntityRegistry.resolve(id) ?: return null
+        val def = resolveDef(session, id) ?: return null
         if (def.domain == EntityType.CAMERA) {
             // Live state is owned by DVR; callers with a DvrController should use entity maps.
             return null
@@ -312,7 +330,7 @@ object ControlCatalog {
 
     suspend fun set(session: VehicleSession, id: String, raw: String, context: Context? = null): Result<Unit> {
         val store = context?.let { LastKnownStore(it) }
-        val resolved = EntityRegistry.resolve(id)
+        val resolved = resolveDef(session, id)
             ?: return Result.failure(IllegalArgumentException("unknown control"))
 
         if (resolved.isComposite) {
@@ -505,6 +523,7 @@ object ControlCatalog {
             mapOf(
                 "id" to def.id,
                 "group" to def.group,
+                EntityContract.FIELD_SECTION to def.resolvedSection(),
                 "entity" to def.domain.id,
                 "domain" to def.domain.id,
                 "labelKey" to def.resolvedLabelKey(),
@@ -760,6 +779,7 @@ object ControlCatalog {
             mapOf(
                 "id" to def.id,
                 "group" to def.group,
+                EntityContract.FIELD_SECTION to def.resolvedSection(),
                 "entity" to def.domain.id,
                 "labelKey" to def.resolvedLabelKey(),
                 "hintKey" to def.resolvedHintKey(),
@@ -874,6 +894,7 @@ object ControlCatalog {
             mapOf(
                 "id" to def.id,
                 "group" to def.group,
+                EntityContract.FIELD_SECTION to def.resolvedSection(),
                 "entity" to def.domain.id,
                 "labelKey" to def.resolvedLabelKey(),
                 "hintKey" to def.resolvedHintKey(),
@@ -1007,6 +1028,7 @@ object ControlCatalog {
             mapOf(
                 "id" to def.id,
                 "group" to def.group,
+                EntityContract.FIELD_SECTION to def.resolvedSection(),
                 "entity" to def.domain.id,
                 "labelKey" to def.resolvedLabelKey(),
                 "hintKey" to def.resolvedHintKey(),
@@ -1047,6 +1069,7 @@ object ControlCatalog {
         valueMapId: String? = null,
         /** Treat 0/1/on/off/true/false as localized On/Off. */
         binary: Boolean = false,
+        section: String = "telemetry",
     ): Map<String, Any?> {
         val id = "sensor.$objectId"
         val ok = value != null && value.isNotBlank()
@@ -1055,6 +1078,7 @@ object ControlCatalog {
             mapOf(
                 "id" to id,
                 "group" to group,
+                EntityContract.FIELD_SECTION to section,
                 "entity" to EntityType.SENSOR.id,
                 "domain" to EntityType.SENSOR.id,
                 "labelKey" to stringKey,

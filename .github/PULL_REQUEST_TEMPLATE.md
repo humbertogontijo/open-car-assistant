@@ -15,8 +15,8 @@
 - [ ] `./gradlew :app:assembleDebug` passes locally
 - [ ] No OEM platform keys, `local.properties`, APKs, or personal LAN IPs
 - [ ] Integration/plugin PRs stay under their folder tree when possible
-- [ ] New controls: `WellKnownProperties` + `ControlCatalog` + common i18n (+ `platform.json` bindings)
-- [ ] Hardware-related: tested with `./tools/oca-setup -i <id> -H <ip> …` (or noted why not)
+- [ ] New controls: `EntityRegistry` + common i18n (+ SKU allowlist / `platform.json` catalog)
+- [ ] Hardware-related: tested with `./tools/oaa-setup -i <id> -H <ip> …` (or noted why not)
 
 ## Test plan
 

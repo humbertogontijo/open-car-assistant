@@ -10,17 +10,11 @@ import android.net.wifi.WifiManager
 import android.provider.Settings
 import android.util.Log
 import android.view.KeyEvent
-import androidx.core.app.NotificationManagerCompat
 import cc.opencar.assistant.api.AndroidVolumeGroup
 import cc.opencar.assistant.api.EntityContract
 import cc.opencar.assistant.api.EntityType
 import cc.opencar.assistant.feature.memory.ExternalSettingsApplier
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 
 /**
  * HU radios, brightness, and HA-style media_player for automations.
@@ -70,27 +64,21 @@ class AndroidSettingsController(
         }
     }
 
-    private var mediaWatchJob: Job? = null
-
     val cabinVolIds: Set<String> = volumeGroups.map { it.entityId }.toSet()
     val allIds: Set<String> = BASE_IDS + cabinVolIds
     val writableIds: Set<String> =
         BASE_IDS + volumeGroups.filter { it.keyWritable }.map { it.entityId }
 
     /**
-     * Poll MediaSession when the notification listener is missing or silent —
-     * OEM pause/play otherwise only shows up after an unrelated catalog reload.
-     * Listener callbacks still push immediately via [OcaNotificationListener.publish].
+     * One-shot MediaSession seed. Live playback/metadata come only from
+     * [OaaNotificationListener] callbacks — no backup poll (hides silent listener).
      */
-    fun start(scope: CoroutineScope) {
-        mediaWatchJob?.cancel()
-        mediaWatchJob = scope.launch(Dispatchers.Default) {
-            while (isActive) {
-                val hasListener = OcaNotificationListener.instance != null
-                delay(if (hasListener) 2_500L else 1_000L)
-                runCatching { mediaSnapshot() }
-            }
-        }
+    fun start(@Suppress("UNUSED_PARAMETER") scope: CoroutineScope) {
+        val snap = runCatching { mediaSnapshot() }.getOrNull()
+        Log.i(
+            TAG,
+            "media seed playback=${snap?.playback} listener=${OaaNotificationListener.instance != null}",
+        )
     }
 
     fun status(): Map<String, Any?> {
@@ -262,21 +250,44 @@ class AndroidSettingsController(
     }
 
     /**
-     * Best-effort enable of [OcaNotificationListener] via Secure settings
+     * Best-effort enable of [OaaNotificationListener] via Secure settings
      * (works from shell / privileged; no-op for normal apps).
+     *
+     * Always rewrites legacy `OcaNotificationListener` → `OaaNotificationListener`
+     * so a rename cannot leave a dead component that still counts as "enabled"
+     * for the package (which hid the missing bind after we removed media polling).
      */
     fun tryEnableMediaListener(): Boolean {
-        if (isMediaListenerEnabled()) return true
-        val component = ComponentName(context, OcaNotificationListener::class.java).flattenToString()
+        val target = ComponentName(context, OaaNotificationListener::class.java).flattenToString()
+        val legacy = ComponentName(
+            context.packageName,
+            "cc.opencar.assistant.feature.web.OcaNotificationListener",
+        ).flattenToString()
         return try {
             val cr = context.contentResolver
             val key = "enabled_notification_listeners"
-            val cur = Settings.Secure.getString(cr, key).orEmpty()
-            val parts = cur.split(':').map { it.trim() }.filter { it.isNotEmpty() }.toMutableSet()
-            if (parts.add(component)) {
+            val parts = Settings.Secure.getString(cr, key).orEmpty()
+                .split(':')
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .toMutableSet()
+            var changed = false
+            if (parts.remove(legacy)) {
+                Log.i(TAG, "migrating notification listener Oca → Oaa")
+                changed = true
+            }
+            val stale = parts.filter {
+                it.startsWith("${context.packageName}/") && it != target
+            }
+            if (stale.isNotEmpty()) {
+                parts.removeAll(stale.toSet())
+                changed = true
+            }
+            if (parts.add(target)) changed = true
+            if (changed) {
                 Settings.Secure.putString(cr, key, parts.joinToString(":"))
             }
-            isMediaListenerEnabled()
+            isMediaListenerComponentEnabled()
         } catch (t: Throwable) {
             Log.d(TAG, "tryEnableMediaListener: ${t.message}")
             false
@@ -503,7 +514,7 @@ class AndroidSettingsController(
     }
 
     private fun mediaSnapshot(): MediaSnapshot =
-        OcaNotificationListener.refreshFromManager(context)
+        OaaNotificationListener.refreshFromManager(context)
 
     private fun brightnessOrNull(): Int? = try {
         Settings.System.getInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS)
@@ -512,8 +523,18 @@ class AndroidSettingsController(
     }
 
     private fun isMediaListenerEnabled(): Boolean {
-        return NotificationManagerCompat.getEnabledListenerPackages(context)
-            .contains(context.packageName)
+        if (OaaNotificationListener.instance != null) return true
+        return isMediaListenerComponentEnabled()
+    }
+
+    /** True when Secure settings list the current [OaaNotificationListener] component. */
+    private fun isMediaListenerComponentEnabled(): Boolean {
+        val target = ComponentName(context, OaaNotificationListener::class.java).flattenToString()
+        val cur = Settings.Secure.getString(
+            context.contentResolver,
+            "enabled_notification_listeners",
+        ).orEmpty()
+        return cur.split(':').any { it.trim() == target }
     }
 
     companion object {

@@ -7,7 +7,7 @@ import cc.opencar.assistant.api.WakeSignals
  * Flyme Auto family helpers shared by Geely EX2 (IHU629G) and EX5 (Antora / SE1000).
  *
  * VenusVehicleServer gRPC stays in `:integrations:antora1000` — it is not a Flyme-wide transport.
- * True AOSP property IDs live in [cc.opencar.assistant.integrations.common.AospVehicleIds].
+ * True AOSP property IDs live in [cc.opencar.assistant.integrations.aaos.AospVehicleIds].
  */
 object FlymePlatform {
     const val FAMILY = "flyme"
@@ -15,7 +15,7 @@ object FlymePlatform {
     /** Status-bar icon entry for Flyme Auto HUs. */
     fun createStatusBarQuickEntry(
         iconRes: Int = R.drawable.ic_status_bar_entry,
-        describe: String = "OCA",
+        describe: String = "OAA",
     ): QuickEntry = FlymeStatusBarQuickEntry(iconRes = iconRes, describe = describe)
 
     /**

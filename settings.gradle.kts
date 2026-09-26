@@ -14,7 +14,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "open-car-assistant"
+rootProject.name = "open-automotive-assistant"
 
 include(":app")
 
@@ -22,8 +22,8 @@ include(":app")
 include(":integration-api")
 project(":integration-api").projectDir = file("libs/api")
 
-include(":oca-support")
-project(":oca-support").projectDir = file("libs/support")
+include(":oaa-support")
+project(":oaa-support").projectDir = file("libs/oaa-support")
 
 include(":car-stubs")
 project(":car-stubs").projectDir = file("libs/car-stubs")
@@ -31,9 +31,9 @@ project(":car-stubs").projectDir = file("libs/car-stubs")
 include(":signing")
 project(":signing").projectDir = file("libs/signing")
 
-include(":integrations:platform:common")
+include(":integrations:platform:aaos")
 include(":integrations:platform:flyme")
-project(":integrations:platform:common").projectDir = file("integrations/platform/common")
+project(":integrations:platform:aaos").projectDir = file("integrations/platform/aaos")
 project(":integrations:platform:flyme").projectDir = file("integrations/platform/flyme")
 
 // Vehicle integrations: every integrations/<id>/ with a build.gradle.kts (except platform/)

@@ -1,0 +1,111 @@
+openapi: 3.0.3
+info:
+  title: Open Automotive Assistant Protocol
+  version: 0.1.0
+  description: |
+    Versioned HTTP + WebSocket contract for Open Automotive Assistant on the head unit (default port 8787).
+    Entity field names follow EntityContract (HA-shaped domain.object_id).
+servers:
+  - url: http://127.0.0.1:8787
+    description: HU WebView / localhost
+  - url: http://{carHost}:8787
+    description: Same-LAN browser
+    variables:
+      carHost:
+        default: 192.168.1.1
+paths:
+  /api/entities:
+    get:
+      summary: List product entities
+      operationId: listEntities
+      parameters:
+        - name: includeHidden
+          in: query
+          schema:
+            type: string
+            enum: ["1"]
+          description: When `1`, include entities marked hidden by the user
+      responses:
+        "200":
+          description: Entity catalog snapshot (JSON array of Entity maps)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Entity"
+  /api/events:
+    get:
+      summary: WebSocket event stream (upgrade)
+      description: |
+        Clients connect with `Upgrade: websocket`. Frames are JSON objects with a `type` field.
+      operationId: eventsWebSocket
+      responses:
+        "101":
+          description: Switching Protocols (WebSocket)
+        "200":
+          description: Documentation stub — live clients must use WebSocket
+components:
+  schemas:
+    Entity:
+      type: object
+      required: [id, domain]
+      properties:
+        id:
+          type: string
+          description: Stable catalog id (`climate.cabin`, `sensor.soc`, …)
+          example: climate.cabin
+        domain:
+          type: string
+          description: EntityType id (climate, sensor, switch, …)
+          example: climate
+        entity:
+          type: string
+          description: Legacy alias of domain
+        state:
+          type: string
+          nullable: true
+        value:
+          type: string
+          nullable: true
+          description: Current value (product field; often same as state)
+        friendlyName:
+          type: string
+        label:
+          type: string
+        available:
+          type: boolean
+        status:
+          type: string
+          enum: [ok, cached, denied, unavailable, failed]
+        deviceClass:
+          type: string
+          nullable: true
+        unitOfMeasurement:
+          type: string
+          nullable: true
+        attributes:
+          type: object
+          additionalProperties: true
+        group:
+          type: string
+          description: Nav section id (home, energy, controls, …)
+        composite:
+          type: boolean
+        update:
+          type: string
+          enum: [entity, catalog]
+          description: Live-update policy for WebSocket clients
+    EventEnvelope:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [telemetry, entity, catalog]
+          description: |
+            `entity` — atomic value patch; `catalog` — reload /api/entities;
+            `telemetry` — session telemetry snapshot
+        payload:
+          type: object
+          additionalProperties: true

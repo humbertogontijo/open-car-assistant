@@ -14,7 +14,7 @@ import io.ktor.utils.io.core.readBytes
 import io.ktor.utils.io.readRemaining
 import java.io.ByteArrayOutputStream
 
-internal fun Routing.registerSoundRoutes(deps: OcaWebDeps) {
+internal fun Routing.registerSoundRoutes(deps: OaaWebDeps) {
     val sounds = deps.sounds ?: return
 
     get("/api/sounds") {

@@ -332,7 +332,7 @@ class MosaicGlComposer(
     }
 
     companion object {
-        private const val TAG = "OcaMosaicGl"
+        private const val TAG = "OaaMosaicGl"
         private const val VERT = """
             attribute vec4 aPosition;
             attribute vec4 aTexCoord;

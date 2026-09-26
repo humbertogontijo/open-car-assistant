@@ -13,7 +13,7 @@ import java.nio.ByteBuffer
  * [fromMs]/[toMs] are media-relative within each source file.
  */
 object Mp4ClipRemuxer {
-    private const val TAG = "OcaMp4Cut"
+    private const val TAG = "OaaMp4Cut"
 
     data class Range(
         val src: File,

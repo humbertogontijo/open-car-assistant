@@ -91,7 +91,7 @@ class MosaicPreviewSession(
     }
 
     companion object {
-        private const val TAG = "OcaMosaic"
+        private const val TAG = "OaaMosaic"
         const val DEFAULT_FPS = 15
         const val MIN_FPS = 1
         const val MAX_FPS = 30

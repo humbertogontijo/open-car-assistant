@@ -1,6 +1,6 @@
 # Contributor remote debug
 
-Anyone on the car LAN can inspect OCA state, pull logs, and attach Android Studio without reverse-engineering the HU alone.
+Anyone on the car LAN can inspect app state, pull logs, and attach Android Studio without reverse-engineering the HU alone.
 
 ## 1. Wireless ADB
 
@@ -16,7 +16,7 @@ adb devices
 
 Debug and contributor build types ship with `android:debuggable=true`. Release stays non-debuggable.
 
-OCA debug is app-level and works with package-install rights only.
+App debug is app-level and works with package-install rights only.
 
 ## 2. Contributor mode (Lab)
 
@@ -69,15 +69,15 @@ Token is required when Contributor mode is on. Without Contributor mode, write/d
 
 ### VHAL catalog vs product entities
 
-Lab → **VHAL catalog** lists every property from `platform.json` → `properties` (after `extends` merge). Each row may show an **Entity** id when that native id has an `entity` field.
+Lab → **VHAL catalog** lists every property from `platform.json` → `properties` (after `extends` merge). Each row may show an **Entity** id when that VHAL key is product-bound (identity: entity id = property key) or claimed by a composite attribute.
 
 | Filter | Meaning |
 |--------|---------|
 | **All** | Full HU / platform catalog |
-| **Bound (cards)** | Props already mapped to a product control (`entity`) |
-| **Missing** | On the car / in `properties`, but not yet a card |
+| **Bound (cards)** | Props with a product entity (curated or auto) |
+| **Missing** | On the car / in `properties`, but not yet claimed as a card |
 
-**Product entities** (cards) stay curated: add a human description in i18n (`control.<id>` / hint), an `EntityDef` in [EntityRegistry.kt](../libs/api/src/main/java/cc/opencar/assistant/api/EntityRegistry.kt), optional binding-key constant on `WellKnownProperties`, and a `platform.json` property with `entity` (+ `access: "rw"` if writable). See [adding-a-feature.md](adding-a-feature.md) “New product controls”.
+**Product entities** (cards): curated composites stay HA-shaped (`climate.cabin`); atomics use the **property key** as entity id. Titles/hints live in i18n (`control.<PROPERTY_KEY>`). Pages use `group`; subsections use `section` (not HA domain). See [ADR-0002](adr/0002-model-variant-bindings.md).
 
 Probe summary includes `boundEntities` / `unbound` counts. Re-probe after updating `platform.json` (`force=1`).
 

@@ -18,18 +18,26 @@ import {
 } from "../ui/dashboard.js";
 
 var ENERGY_HERO_IDS = [
+  "TYPE_EV_BATTERY_PERCENTAGE",
   "sensor.soc",
   "sensor.hybrid_soc",
+  "RANGE_REMAINING",
   "sensor.range",
   "sensor.range_ev",
   "sensor.fuel",
   "sensor.charge_plug",
+  "CHARGE_FUNC_CHARGING_PLUG_STATE",
   "charger.vehicle",
   "sensor.charge_energy",
   "sensor.charge_eta",
 ];
 
-var ENERGY_SPARK_IDS = ["sensor.soc", "sensor.charge_energy", "sensor.avg_energy"];
+var ENERGY_SPARK_IDS = [
+  "TYPE_EV_BATTERY_PERCENTAGE",
+  "sensor.soc",
+  "sensor.charge_energy",
+  "sensor.avg_energy",
+];
 
 export async function loadEnergyDash() {
   if (state._energyDashLoading) return;

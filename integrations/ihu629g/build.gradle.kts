@@ -16,7 +16,7 @@ android {
 
 dependencies {
     api(project(":integration-api"))
-    api(project(":integrations:platform:common"))
+    api(project(":integrations:platform:aaos"))
     api(project(":integrations:platform:flyme"))
     compileOnly(project(":car-stubs"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")

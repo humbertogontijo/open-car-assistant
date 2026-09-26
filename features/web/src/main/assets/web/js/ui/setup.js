@@ -16,7 +16,7 @@ function hostCmd() {
   const s = state.setup;
   return (
     (s && s.adbHints && s.adbHints[0]) ||
-    "./tools/oca-setup -i " +
+    "./tools/oaa-setup -i " +
       ((state.status && state.status.integration) || "PLATFORM_ID") +
       " -H <ip> setup"
   );

@@ -2,15 +2,15 @@ package cc.opencar.assistant.integrations.antora1000
 
 import android.content.Context
 import android.util.Log
-import cc.opencar.assistant.integrations.common.CarPropertyBackend
-import cc.opencar.assistant.integrations.common.VehiclePropertyBackend
+import cc.opencar.assistant.integrations.aaos.CarPropertyBackend
+import cc.opencar.assistant.integrations.aaos.VehiclePropertyBackend
 
 /**
  * Antora VHAL transport: VenusVehicleServer gRPC (user-space `/data` install).
  * Falls back to CarPropertyManager only if gRPC is unreachable (reads may be denied).
  */
 object AntoraBackendFactory {
-    private const val TAG = "OcaAntoraBackend"
+    private const val TAG = "OaaAntoraBackend"
 
     fun create(context: Context): VehiclePropertyBackend {
         val grpc = GrpcVhalBackend()

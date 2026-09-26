@@ -266,7 +266,7 @@ def main() -> int:
         "id": legacy["id"],
         "displayName": legacy.get("displayName", legacy["id"]),
         "backend": legacy.get("backend", "vhal"),
-        "extends": legacy.get("extends") or ["aosp", "android"],
+        "extends": legacy.get("extends") or ["aaos"],
         "match": legacy.get("match", []),
         "capabilities": legacy.get("capabilities", []),
         "dvr": legacy.get("dvr"),

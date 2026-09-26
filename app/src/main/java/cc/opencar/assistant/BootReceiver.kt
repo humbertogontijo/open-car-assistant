@@ -8,7 +8,7 @@ import android.util.Log
 import cc.opencar.assistant.api.PendingWake
 
 /**
- * Starts OCA on boot / package replace, and catches AOSP screen edges when the
+ * Starts Open Automotive Assistant on boot / package replace, and catches AOSP screen edges when the
  * process was not running. Vendor Flyme / ECARX intents live in
  * [cc.opencar.assistant.integrations.platform.flyme.FlymeWakeReceiver].
  *
@@ -35,7 +35,7 @@ class BootReceiver : BroadcastReceiver() {
                 val source = "manifest_$action"
                 PendingWake.persist(context, "on", source)
                 startServiceAndRuntime(context)
-                (context.applicationContext as? OcaApp)?.runtime?.notifyScreenOn(source)
+                (context.applicationContext as? OaaApp)?.runtime?.notifyScreenOn(source)
             }
             Intent.ACTION_SCREEN_ON,
             Intent.ACTION_USER_PRESENT,
@@ -44,13 +44,13 @@ class BootReceiver : BroadcastReceiver() {
                 val source = "manifest_$action"
                 PendingWake.persist(context, "on", source)
                 startServiceAndRuntime(context)
-                (context.applicationContext as? OcaApp)?.runtime?.notifyScreenOn(source)
+                (context.applicationContext as? OaaApp)?.runtime?.notifyScreenOn(source)
             }
             Intent.ACTION_SCREEN_OFF -> {
                 val source = "manifest_$action"
                 PendingWake.persist(context, "off", source)
                 startServiceAndRuntime(context)
-                (context.applicationContext as? OcaApp)?.runtime?.notifyScreenOff(source)
+                (context.applicationContext as? OaaApp)?.runtime?.notifyScreenOff(source)
             }
         }
     }
@@ -68,7 +68,7 @@ class BootReceiver : BroadcastReceiver() {
             Log.i(TAG, "user locked — FGS queued; deferring runtime until unlock")
             return
         }
-        (context.applicationContext as? OcaApp)?.runtime?.startAsync()
+        (context.applicationContext as? OaaApp)?.runtime?.startAsync()
     }
 
     companion object {

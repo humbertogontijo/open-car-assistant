@@ -9,7 +9,7 @@ import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 
-internal fun Routing.registerShortcutRoutes(deps: OcaWebDeps) {
+internal fun Routing.registerShortcutRoutes(deps: OaaWebDeps) {
     val shortcuts = deps.shortcuts
 
     get("/api/shortcuts") {

@@ -184,7 +184,7 @@ class FloatChipQuickEntry : QuickEntry {
             val cx = size / 2f
             val cy = size / 2f - size * 0.08f
             canvas.drawCircle(cx, cy, size * 0.20f, ring)
-            canvas.drawText("OCA", cx, size * 0.78f, label)
+            canvas.drawText("OAA", cx, size * 0.78f, label)
         }
     }
 

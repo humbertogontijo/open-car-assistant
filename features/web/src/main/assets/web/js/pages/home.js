@@ -5,10 +5,14 @@ import { entityGrid, pageHead } from "../ui/cards.js";
 import { dashSummary, pickEntities } from "../ui/dashboard.js";
 
 var HOME_HERO_IDS = [
+  "TYPE_EV_BATTERY_PERCENTAGE",
   "sensor.soc",
+  "RANGE_REMAINING",
   "sensor.range",
+  "PERF_VEHICLE_SPEED",
   "sensor.speed",
   "sensor.gear",
+  "GEAR_SELECTION",
   "drivetrain.vehicle",
   "sensor.fuel",
 ];

@@ -246,6 +246,6 @@ class Camera2ConcurrentProbe(private val context: Context) {
     }
 
     companion object {
-        private const val TAG = "OcaCam2Probe"
+        private const val TAG = "OaaCam2Probe"
     }
 }

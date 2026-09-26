@@ -106,7 +106,7 @@ object SetupStatus {
                 "refreshKey" to "setup.action.refresh",
             ),
             "adbHints" to listOf(
-                "./tools/oca-setup -i ${session.integrationId} -H <ip> setup",
+                "./tools/oaa-setup -i ${session.integrationId} -H <ip> setup",
                 "adb shell pm grant --user 11 ${context.packageName} android.car.permission.CAR_SPEED",
                 "adb shell pm grant --user 11 ${context.packageName} android.car.permission.CAR_ENERGY",
             ),

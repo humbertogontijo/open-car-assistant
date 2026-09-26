@@ -15,7 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
-internal fun Routing.registerStoreRoutes(deps: OcaWebDeps) {
+internal fun Routing.registerStoreRoutes(deps: OaaWebDeps) {
     post("/api/install/binary") {
         val expected = call.request.headers["X-Sha256"]
         val channel = call.receiveChannel()

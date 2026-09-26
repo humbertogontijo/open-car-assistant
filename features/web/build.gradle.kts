@@ -20,7 +20,7 @@ android {
 }
 dependencies {
     api(project(":integration-api"))
-    api(project(":oca-support"))
+    api(project(":oaa-support"))
     api(project(":feature-debug"))
     api(project(":feature-install"))
     api(project(":feature-telemetry"))

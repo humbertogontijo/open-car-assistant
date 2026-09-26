@@ -1,10 +1,13 @@
 package cc.opencar.assistant.api
 
 data class PlatformVariant(
+    /** Energy / capability profile id (`phev`, `bev`, `default`). */
     val id: String,
     val label: String,
     val extraCapabilities: Set<Capability> = emptySet(),
     val propertyOverrides: Map<String, VehicleProperty> = emptyMap(),
+    /** Build / market SKU id (`p145_eu`), from `ro.product.device` when known. */
+    val skuId: String? = null,
 )
 
 data class TelemetrySnapshot(
@@ -81,7 +84,7 @@ data class CameraRoleConfig(
 
 /**
  * Cabin [CarVolumeGroup] declared in `platform.json` → `android.volumeGroups`
- * (AAOS transport fragment). Shared HU settings stay in `platform/android.json`;
+ * (AAOS transport fragment). Shared HU settings stay in `platform/aaos/platform.json`;
  * OEM group maps overlay per integration. Product entity ids are HA-shaped
  * (`number.vol_media`, …) — see `docs/domains.md`.
  */

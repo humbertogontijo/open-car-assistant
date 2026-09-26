@@ -1,7 +1,7 @@
 package cc.opencar.assistant.integrations.ihu629g
 
 /**
- * EX2-specific VHAL value codecs.
+ * EX2-specific VHAL value codecs (not property IDs — those live in platform.json).
  */
 object Ihu629gCodecs {
     /** Zoned temp: °C = 17 + raw / 2 (1 °C steps). */
@@ -20,9 +20,12 @@ object Ihu629gCodecs {
         else -> raw != 0
     }
 
+    /** Parking-comfort write encoding (firmware-specific bit pattern). */
+    private const val PARK_ON_BASE = 0x201B0100
+    private const val PARK_DURATION_UNLIMITED = 0x13
+
     fun parkModeOn(unlimited: Boolean = true): Int =
-        if (unlimited) Ihu629gVhalIds.PARK_ON_BASE or Ihu629gVhalIds.PARK_DURATION_UNLIMITED
-        else 0
+        if (unlimited) PARK_ON_BASE or PARK_DURATION_UNLIMITED else 0
 
     fun parkModeIsOn(raw: Int?): Boolean = raw != null && raw != 0
 }

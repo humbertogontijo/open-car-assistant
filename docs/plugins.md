@@ -1,6 +1,6 @@
 # Plugins
 
-OCA distinguishes **vehicle integrations** (HU / SoC platforms) from **plugins** (external bridges such as Home Assistant).
+Open Automotive Assistant distinguishes **vehicle integrations** (HU / SoC platforms) from **plugins** (external bridges such as Home Assistant).
 
 Plugins are **compile-time** Gradle modules under `plugins/<id>/`. Folders are auto-included as `:plugin-<id>` and wired into `:app`. Runtime discovery uses Java ServiceLoader (`META-INF/services`). There is no dynamic ClassLoader / store-loaded plugin APK path.
 
@@ -9,7 +9,7 @@ Collaborator work stays under `plugins/<id>/` — no edits to `AssistantRuntime`
 ## SPI (`:integration-api`)
 
 ```kotlin
-interface OcaPlugin {
+interface OaaPlugin {
   val id: String
   val displayName: String
   val actionHandler: ShortcutActionHandler?   // optional
@@ -53,7 +53,7 @@ Uses **REST + WebSocket** only (not MQTT). Works with:
 ### Setup
 
 1. In Home Assistant: create a **Long-Lived Access Token** (Profile → Security).
-2. In OCA **Plugins → Home Assistant → Add / Set up**: paste URL + token, save (enables by default).
+2. In Open Automotive Assistant **Plugins → Home Assistant → Add / Set up**: paste URL + token, save (enables by default).
 3. Status shows **Connected** when the WebSocket auth succeeds.
 
 ### Shortcut contributions
@@ -68,14 +68,14 @@ Uses **REST + WebSocket** only (not MQTT). Works with:
 ```
 plugins/<id>/
   build.gradle.kts                 # depend on :integration-api
-  src/main/java/.../YourPlugin.kt  # implements OcaPlugin
+  src/main/java/.../YourPlugin.kt  # implements OaaPlugin
   src/main/resources/META-INF/services/
-    cc.opencar.assistant.api.plugin.OcaPlugin
+    cc.opencar.assistant.api.plugin.OaaPlugin
 ```
 
 1. Create `plugins/<id>/` as above.
-2. Implement `OcaPlugin` (+ optional shortcut handler/source + config schema).
-3. Register the FQCN in `META-INF/services/cc.opencar.assistant.api.plugin.OcaPlugin`.
+2. Implement `OaaPlugin` (+ optional shortcut handler/source + config schema).
+3. Register the FQCN in `META-INF/services/cc.opencar.assistant.api.plugin.OaaPlugin`.
 4. Never return secrets in `status()` / `configSnapshot()`.
 
 Gradle discovers the folder automatically as `:plugin-<id>`. Shortcuts and the Plugins UI pick up contributions from the SPI.

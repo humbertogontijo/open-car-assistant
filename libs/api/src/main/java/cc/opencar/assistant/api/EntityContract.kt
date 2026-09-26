@@ -18,14 +18,15 @@ package cc.opencar.assistant.api
  * | `id` | Stable catalog id (`climate.cabin`, `sensor.soc`, …) — HA-shaped `domain.object_id` |
  * | `domain` | Same as [EntityType.id] (`sensor`, `climate`, `cover`, `switch`, …) |
  * | `entity` | Alias of `domain` (legacy UI field) |
- * | `state` / `value` | Current state string (HA `state` / OCA `value`) |
+ * | `state` / `value` | Current state string (HA `state` / product `value`) |
  * | `friendlyName` / `label` | Localized display name |
  * | `available` | `true` when `status` is `ok` or `cached` |
  * | `status` | `ok` \| `cached` \| `denied` \| `unavailable` \| `failed` |
  * | `deviceClass` | HA-aligned [DeviceClass.id] |
  * | `unitOfMeasurement` | HA-aligned [UnitOfMeasurement.id] |
  * | `attributes` | Nested map of semantic extras (device_class, unit, …) |
- * | `group` | OEM nav section id (`home`, `energy`, `controls`, …) |
+ * | `group` | Nav page id (`home`, `energy`, `controls`, …) |
+ * | `section` | Subsection within the page (`climate`, `lock`, …) — not HA domain |
  * | `input` | Soft widget hint (`bool`, `choice`, `sensor`, `climate`, …); **domain** selects card family |
  * | `composite` | `true` when one product id spans many binding keys |
  * | `update` | Live-update policy: [UPDATE_ENTITY] (default) or [UPDATE_CATALOG] |
@@ -64,6 +65,7 @@ object EntityContract {
     const val FIELD_DEVICE_CLASS = "deviceClass"
     const val FIELD_UNIT = "unitOfMeasurement"
     const val FIELD_GROUP = "group"
+    const val FIELD_SECTION = "section"
     const val FIELD_COMPOSITE = "composite"
     /** How the web shell should apply live updates for this row. */
     const val FIELD_UPDATE = "update"

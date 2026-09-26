@@ -18,7 +18,7 @@
   background: var(--surface);
   backdrop-filter: var(--glass);
   -webkit-backdrop-filter: var(--glass);
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
@@ -70,7 +70,7 @@
 .dash-spark {
   padding: 0.85rem 1rem;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   color: var(--accent);

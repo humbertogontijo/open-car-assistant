@@ -63,7 +63,7 @@ class ApkInstaller(private val context: Context) {
 
     companion object {
         const val ACTION_INSTALL_COMPLETE = "cc.opencar.assistant.INSTALL_COMPLETE"
-        private const val TAG = "OcaInstall"
+        private const val TAG = "OaaInstall"
     }
 }
 
@@ -71,7 +71,7 @@ class InstallResultReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
         val msg = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
-        Log.i("OcaInstall", "status=$status msg=$msg")
+        Log.i("OaaInstall", "status=$status msg=$msg")
         if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
             val confirm = if (Build.VERSION.SDK_INT >= 33) {
                 intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)

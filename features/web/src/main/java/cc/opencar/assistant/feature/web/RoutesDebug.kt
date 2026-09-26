@@ -25,7 +25,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
-internal fun Routing.registerDebugRoutes(deps: OcaWebDeps) {
+internal fun Routing.registerDebugRoutes(deps: OaaWebDeps) {
     val session = deps.session
     val debug = deps.debug
     val probe = deps.probe
@@ -129,6 +129,8 @@ internal fun Routing.registerDebugRoutes(deps: OcaWebDeps) {
             mapOf(
                 "id" to session.integrationId,
                 "variant" to variantId,
+                "skuId" to session.variant.value.skuId,
+                "profileId" to session.variant.value.id,
                 "capabilities" to capabilities,
                 "catalogSize" to session.catalog().size,
                 "cameras" to session.cameras().map {
@@ -290,7 +292,7 @@ internal fun Routing.registerDebugRoutes(deps: OcaWebDeps) {
             labSnapshot(deps) + mapOf(
                 "ok" to true,
                 "restartRequired" to true,
-                "hint" to "Force-stop the app or reboot the HU, then reopen OCA to apply the override.",
+                "hint" to "Force-stop the app or reboot the HU, then reopen Open Automotive Assistant to apply the override.",
             ),
         )
     }
@@ -313,7 +315,7 @@ internal fun Routing.registerDebugRoutes(deps: OcaWebDeps) {
     }
 }
 
-internal fun labSnapshot(deps: OcaWebDeps): Map<String, Any?> {
+internal fun labSnapshot(deps: OaaWebDeps): Map<String, Any?> {
     val debug = deps.debug
     val override = deps.getIntegrationOverride()
     return mapOf(
@@ -329,7 +331,7 @@ internal fun labSnapshot(deps: OcaWebDeps): Map<String, Any?> {
 }
 
 internal fun htmlDebug(debug: ContributorDebugState): String = """
-    <!doctype html><html data-theme="dark"><head><meta charset=utf-8><title>OCA Debug</title>
+    <!doctype html><html data-theme="dark"><head><meta charset=utf-8><title>Open Automotive Assistant Debug</title>
     <link rel="stylesheet" href="/static/app.css"></head><body style="padding:24px">
     <h1>Contributor debug</h1>
     <p>Token: <code>${if (debug.contributorMode) debug.token else "(disabled)"}</code></p>

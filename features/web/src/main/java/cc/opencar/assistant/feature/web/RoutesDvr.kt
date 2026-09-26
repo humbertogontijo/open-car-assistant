@@ -23,7 +23,7 @@ import kotlinx.coroutines.withContext
  * DVR HTTP surface: mode / timeline / play / cut / clear / storage / policy / live HLS.
  * Legacy start/stop map to setMode; list/lock/mjpeg stream routes are gone.
  */
-internal fun Routing.registerDvrRoutes(deps: OcaWebDeps) {
+internal fun Routing.registerDvrRoutes(deps: OaaWebDeps) {
     val dvr = deps.dvr
 
     // Aliases → setMode (prefer POST /api/dvr/mode).

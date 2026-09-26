@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
  * Composite binding-key edges never become WS `entity` deltas — catalog
  * invalidation only ([EntityContract.UPDATE_CATALOG]).
  */
-internal fun Routing.registerEventRoutes(deps: OcaWebDeps) {
+internal fun Routing.registerEventRoutes(deps: OaaWebDeps) {
     val session = deps.session
     val gson = Gson()
 

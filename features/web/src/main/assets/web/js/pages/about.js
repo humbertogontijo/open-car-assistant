@@ -18,7 +18,7 @@ export function pageAbout() {
     <h1>${t("nav.about", "Sobre")}</h1>
     <div class="card">
       <p style="margin:0 0 12px">
-        ${t("about.blurb", "Open Car Assistant — shell unificado HU + web.")}
+        ${t("about.blurb", "Open Automotive Assistant — unified HU + web shell.")}
       </p>
       ${rows.map(
         function (r) {

@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.OpenCarAssistant" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.OpenAutomotiveAssistant" parent="android:Theme.Material.Light.NoActionBar" />
 </resources>

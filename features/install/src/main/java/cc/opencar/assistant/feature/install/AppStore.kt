@@ -183,7 +183,7 @@ class AppStore(
             connectTimeout = 20_000
             readTimeout = 180_000
             requestMethod = "GET"
-            setRequestProperty("User-Agent", "OpenCarAssistant/0.1")
+            setRequestProperty("User-Agent", "OpenAutomotiveAssistant/0.1")
             instanceFollowRedirects = true
         }
         try {

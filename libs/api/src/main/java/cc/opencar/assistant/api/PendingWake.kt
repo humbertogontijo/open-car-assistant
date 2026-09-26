@@ -5,7 +5,7 @@ import android.content.Intent
 import android.os.Build
 
 /**
- * Cross-process wake/sleep handoff when the HU resumes before OCA's runtime
+ * Cross-process wake/sleep handoff when the HU resumes before the app runtime
  * (and shortcuts) are ready — e.g. process was dead during STR and a
  * manifest-registered platform receiver brought us back up.
  *

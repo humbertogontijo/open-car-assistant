@@ -77,7 +77,7 @@ class MainActivity : ComponentActivity() {
         )
         lifecycleScope.launch {
             val ready = withTimeoutOrNull(30_000) {
-                OcaApp.instance.runtime.ready.first { it }
+                OaaApp.instance.runtime.ready.first { it }
                 true
             } == true
             if (!ready) {

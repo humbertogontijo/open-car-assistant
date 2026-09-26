@@ -37,7 +37,7 @@ body:
     id: status
     attributes:
       label: What you already have
-      description: platform.json draft, catalog dump, oca-setup host.sh, etc.
+      description: platform.json draft, catalog dump, oaa-setup host.sh, etc.
   - type: checkboxes
     id: ownership
     attributes:

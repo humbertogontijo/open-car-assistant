@@ -1,11 +1,11 @@
-# Car-native composites & covers (Antora)
+# Antora composites & covers
 
-Canonical domain field inventories (AAOS + CarPlay Ultra) live in **[domains.md](domains.md)**.
-This page keeps **platform-specific** Antora binding notes, HVAC zones, and Wave tables.
+Canonical domain inventories: **[domains.md](domains.md)**.  
+This page is **Antora-only** binding notes (HVAC zones, Wave tables) — not the portable taxonomy.
 
 Product controls are **composites** (multi-property systems), **covers** (open/close + optional position), or thin **widget** atomics (`switch` / `select` / `number` / `sensor`). Entity ids are Home Assistant–shaped: `domain.object_id`.
 
-HU radios / brightness / cabin volumes are **not** an `android` product domain — they use `switch.wifi`, `switch.bluetooth`, `number.brightness`, `number.vol_*` (transport still comes from `platform/android.json`). See [domains.md](domains.md) § HU settings.
+HU radios / brightness / cabin volumes are **not** an `android` product domain — they use `switch.wifi`, `switch.bluetooth`, `number.brightness`, `number.vol_*` (transport still comes from `platform/aaos/platform.json`). See [domains.md](domains.md) § HU settings.
 
 ## Composites
 

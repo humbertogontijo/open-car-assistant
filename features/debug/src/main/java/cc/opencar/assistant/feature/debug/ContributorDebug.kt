@@ -106,7 +106,7 @@ class ContributorDebugState(context: Context) {
     }
 }
 
-class OcaLog {
+class OaaLog {
     fun d(tag: String, msg: String) {
         android.util.Log.d(tag, msg)
         LogRingBuffer.append("D/$tag: $msg")

@@ -11,12 +11,16 @@
   --text-muted: #8b949e;
   --accent: #7eb6ff;
   --accent-soft: rgba(126, 182, 255, 0.16);
+  --accent-fill: rgba(126, 182, 255, 0.55);
+  --accent-fill-soft: rgba(126, 182, 255, 0.35);
   --accent-hover: #a8ceff;
   --accent-contrast: #0a0c10;
   --danger: #ff6b6b;
   --warn: #e6c35c;
   --border: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.14);
+  --scrim: rgba(0, 0, 0, 0.55);
+  --scrim-soft: rgba(0, 0, 0, 0.35);
   --status-ok: #5ddea0;
   --glass: blur(1.125rem);
   --radius: 1.125rem;
@@ -34,7 +38,8 @@
   --icon-btn: 2.5rem;
   --ctrl-touch: 3.5rem;
   --card-min: 19rem;
-  --card-h: 14rem;
+  /* Fallback only — live grids size rows as 2/3 of column width. */
+  --card-h: calc(var(--card-min) * 2 / 3);
   --space: 1rem;
   --space-lg: 1.5rem;
   /* Pin / reboot-snapshot accent (distinct from live --accent) */
@@ -54,12 +59,16 @@
   --text-muted: #5c6673;
   --accent: #3b7ddd;
   --accent-soft: rgba(59, 125, 221, 0.12);
+  --accent-fill: rgba(59, 125, 221, 0.55);
+  --accent-fill-soft: rgba(59, 125, 221, 0.35);
   --accent-hover: #2a6acc;
   --accent-contrast: #ffffff;
   --danger: #d64545;
   --warn: #b8860b;
   --border: rgba(18, 21, 26, 0.08);
   --border-strong: rgba(18, 21, 26, 0.14);
+  --scrim: rgba(255, 255, 255, 0.55);
+  --scrim-soft: rgba(255, 255, 255, 0.35);
   --status-ok: #1f9d63;
   --shadow: 0 0.5rem 1.75rem rgba(20, 30, 50, 0.08);
 }
@@ -75,12 +84,16 @@
   --text-muted: #ddd;
   --accent: #4da3ff;
   --accent-soft: rgba(77, 163, 255, 0.2);
+  --accent-fill: rgba(77, 163, 255, 0.55);
+  --accent-fill-soft: rgba(77, 163, 255, 0.35);
   --accent-hover: #7bbcff;
   --accent-contrast: #000;
   --danger: #ff5252;
   --warn: #ffd600;
   --border: #fff;
   --border-strong: #fff;
+  --scrim: rgba(0, 0, 0, 0.55);
+  --scrim-soft: rgba(0, 0, 0, 0.35);
   --status-ok: #00e676;
   --shadow: none;
 }

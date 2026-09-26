@@ -1,6 +1,6 @@
 # Disclaimer
 
-Open Car Assistant (OCA) is an independent community project. It is **not**
+Open Automotive Assistant is an independent community project. It is **not**
 affiliated with, endorsed by, or supported by Geely, ECARX, Flyme Auto, Antora,
 or any other vehicle / head-unit OEM.
 
@@ -8,7 +8,7 @@ or any other vehicle / head-unit OEM.
 
 Install, VHAL writes, and debug tooling are intended only
 for **head units you own** (typically unlocked / userdebug AAOS
-devices). Do not use OCA to modify vehicles or systems you do not control, or
+devices). Do not use Open Automotive Assistant to modify vehicles or systems you do not control, or
 to bypass manufacturer security on production locked devices.
 
 ## Reverse-engineered platform artifacts

@@ -270,6 +270,6 @@ class MosaicH264Encoder(
     }
 
     companion object {
-        private const val TAG = "OcaH264Enc"
+        private const val TAG = "OaaH264Enc"
     }
 }

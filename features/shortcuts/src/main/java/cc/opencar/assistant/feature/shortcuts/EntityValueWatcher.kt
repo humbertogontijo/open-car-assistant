@@ -15,9 +15,9 @@ import kotlin.coroutines.coroutineContext
 /**
  * Watches bound entity values for [ShortcutTrigger.EntityState] / conditions.
  *
- * Prefers [VehicleEvent.EntityValueChanged] from the session when available;
- * always keeps a poll loop so android / location / media entities (no session
- * push) keep updating after the first VHAL edge arrives.
+ * When [events] is available (reactive session), seeds once then relies on
+ * [VehicleEvent.EntityValueChanged] only — no backup poll that would hide
+ * missing stream edges. Without a session event flow, falls back to polling.
  */
 class EntityValueWatcher(
     private val store: ShortcutStore,
@@ -40,17 +40,20 @@ class EntityValueWatcher(
                 }
             }
             val eventsFlow = events
+            // Baseline so the first edge is a real change, not a boot false-positive.
+            pollOnce()
             if (eventsFlow != null) {
-                launch {
-                    eventsFlow.collect { ev ->
-                        if (ev !is VehicleEvent.EntityValueChanged) return@collect
-                        onSessionEntity(ev.entityId, ev.value)
-                    }
+                Log.i(TAG, "entity watch: observe (push) — no continuous poll")
+                eventsFlow.collect { ev ->
+                    if (ev !is VehicleEvent.EntityValueChanged) return@collect
+                    onSessionEntity(ev.entityId, ev.value)
                 }
-            }
-            while (coroutineContext.isActive) {
-                pollOnce()
-                delay(POLL_MS)
+            } else {
+                Log.i(TAG, "entity watch: poll mode (${POLL_MS}ms) — no session events")
+                while (coroutineContext.isActive) {
+                    pollOnce()
+                    delay(POLL_MS)
+                }
             }
         }
     }

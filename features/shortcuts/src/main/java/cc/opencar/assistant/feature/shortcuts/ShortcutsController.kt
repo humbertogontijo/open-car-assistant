@@ -162,9 +162,9 @@ class ShortcutsController(
             context = hostContext,
             store = store,
             onRunShortcut = { id -> engine.runById(id) },
-            onOpenOca = { section -> sendActivity(hostContext, QuickEntryMenu.ACTION_OPEN_SECTION, section) },
-            onExitOca = { sendActivity(hostContext, QuickEntryMenu.ACTION_EXIT, null) },
-            onBackgroundOca = { sendActivity(hostContext, QuickEntryMenu.ACTION_BACKGROUND, null) },
+            onOpenOaa = { section -> sendActivity(hostContext, QuickEntryMenu.ACTION_OPEN_SECTION, section) },
+            onExitOaa = { sendActivity(hostContext, QuickEntryMenu.ACTION_EXIT, null) },
+            onBackgroundOaa = { sendActivity(hostContext, QuickEntryMenu.ACTION_BACKGROUND, null) },
         )
         menu = m
         m.start()

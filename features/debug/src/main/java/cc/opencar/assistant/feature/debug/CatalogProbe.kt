@@ -209,7 +209,7 @@ class CatalogProbe(
     }
 
     companion object {
-        private const val TAG = "OcaProbe"
+        private const val TAG = "OaaProbe"
 
         fun familyOf(name: String): String {
             val n = name.uppercase()

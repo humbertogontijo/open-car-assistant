@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+# Open Automotive Assistant — host-side setup (build / sign / install / permissions).
+#
+# Usage:
+#   ./tools/oaa-setup [--integration antora1000] [--host IP] [--user N] <command>
+#
+# Commands:
+#   connect              adb connect to the HU
+#   build                gradle :app:assembleDebug
+#   sign                 sign APK with community testkey (:signing:signApk)
+#   install              /data install + runtime grants
+#   grant                grant runtime car/camera permissions for the Android user
+#   check                print permission / package status
+#   setup                connect → build → sign → install → grant → check
+#   uninstall            remove the package (best-effort legacy priv-app cleanup)
+#   start                launch MainActivity for the target user
+#
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/common.sh
+source "$ROOT/tools/lib/common.sh"
+# shellcheck source=lib/permissions.sh
+source "$ROOT/tools/lib/permissions.sh"
+# shellcheck source=lib/install.sh
+source "$ROOT/tools/lib/install.sh"
+
+INTEGRATION="${OAA_INTEGRATION:-antora1000}"
+HOST="${OAA_HOST:-}"
+ANDROID_USER="${OAA_USER:-}"
+CMD=""
+
+usage() {
+  sed -n '2,20p' "$0" | sed 's/^# \?//'
+  echo
+  echo "Integrations:"
+  for f in "$ROOT/integrations"/*/host.sh; do
+    [[ -f "$f" ]] && basename "$(dirname "$f")"
+  done | sed 's/^/  /'
+  echo
+  echo "Device commands require --host / -H CAR_IP (or OAA_HOST)."
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --integration|-i) INTEGRATION="$2"; shift 2 ;;
+    --host|-H) HOST="$2"; shift 2 ;;
+    --user|-u) ANDROID_USER="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    -*) die "Unknown flag: $1" ;;
+    *) CMD="$1"; shift; break ;;
+  esac
+done
+
+EXTRA=()
+while [[ $# -gt 0 ]]; do
+  EXTRA+=("$1"); shift
+done
+load_integration "$INTEGRATION"
+
+# CLI overrides
+[[ -n "$HOST" ]] && OAA_HOST="$HOST"
+[[ -n "$ANDROID_USER" ]] && OAA_ANDROID_USER="$ANDROID_USER"
+
+case "${CMD:-}" in
+  connect)
+    oaa_connect
+    ;;
+  build)
+    oaa_build
+    ;;
+  sign)
+    oaa_sign
+    ;;
+  install)
+    oaa_connect
+    oaa_ensure_apk
+    oaa_install_data
+    oaa_grant_runtime
+    oaa_check
+    ;;
+  grant)
+    oaa_connect
+    oaa_grant_runtime
+    oaa_check
+    ;;
+  check)
+    oaa_connect
+    oaa_check
+    ;;
+  setup)
+    oaa_connect
+    oaa_build
+    oaa_sign
+    oaa_install_data
+    oaa_grant_runtime
+    oaa_check
+    log "Telemetry-ready (user-space /data install)."
+    ;;
+  uninstall)
+    oaa_connect
+    oaa_uninstall
+    ;;
+  start)
+    oaa_connect
+    oaa_start
+    ;;
+  "" )
+    usage
+    exit 1
+    ;;
+  *)
+    die "Unknown command: $CMD"
+    ;;
+esac

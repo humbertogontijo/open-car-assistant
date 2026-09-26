@@ -2,7 +2,7 @@ package cc.opencar.assistant.plugin.homeassistant
 
 import android.content.Context
 import android.util.Log
-import cc.opencar.assistant.api.plugin.OcaPlugin
+import cc.opencar.assistant.api.plugin.OaaPlugin
 import cc.opencar.assistant.api.plugin.PluginConfigField
 import cc.opencar.assistant.api.plugin.PluginConfigFieldTypes
 import cc.opencar.assistant.api.plugin.PluginConfigSchema
@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicReference
  * Home Assistant bridge via REST + WebSocket (Nabu Casa / local / reverse proxy).
  * Shortcut action: `call_service`. Trigger: `entity_state`.
  */
-class HomeAssistantPlugin : OcaPlugin {
+class HomeAssistantPlugin : OaaPlugin {
     override val id: String = ID
     override val displayName: String = "Home Assistant"
 

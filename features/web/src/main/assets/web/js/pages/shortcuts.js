@@ -1462,8 +1462,8 @@ export function quickEntryCard() {
       : nothing;
   const hint =
     style === "status_bar"
-      ? t("shortcuts.topbar.hint_flyme", "Status-bar icon that opens the OCA menu")
-      : t("shortcuts.topbar.hint", "Status-bar or overlay chip that opens the OCA menu");
+      ? t("shortcuts.topbar.hint_flyme", "Status-bar icon that opens the app menu")
+      : t("shortcuts.topbar.hint", "Status-bar or overlay chip that opens the app menu");
   return prefCard({
     icon: "pin",
     title: t("shortcuts.topbar.title", "Floating menu"),

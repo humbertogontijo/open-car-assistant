@@ -1,5 +1,5 @@
 name: Bug report
-description: Something broken in OCA on a head unit or in the build
+description: Something broken in Open Automotive Assistant on a head unit or in the build
 title: "[bug] "
 labels: ["bug"]
 body:

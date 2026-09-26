@@ -1,6 +1,6 @@
 import { html, svg, nothing } from "../lit.js";
 import { state, patch } from "../store.js";
-import { t, entityLabel, entityValueLabel, optionLabel } from "../i18n.js";
+import { t, entityLabel, entityValueLabel, optionLabel, hasKey } from "../i18n.js";
 import { api, fmt } from "../api.js";
 import { prefSegment, choiceSelect } from "../ui/cards.js";
 import { formatDisplayNumber, unitLabelFor } from "../units.js";
@@ -77,18 +77,20 @@ function historyEntityLabel(id) {
 
 function historyFormatValue(value, meta) {
   if (value == null || value === "") return "—";
+  const raw = String(value);
+  // Samples may be raw ints, or legacy i18n keys from telemetry labels.
+  if (hasKey(raw)) return t(raw);
+
   if (meta) {
     const mapped = entityValueLabel(
       Object.assign({}, meta, { value: value }),
       value,
     );
-    if (meta.valueMapId || meta.binary || (meta.options && meta.options.length) || meta.input === "bool") {
-      if (mapped && mapped !== String(value)) return mapped;
-    }
+    if (mapped && mapped !== raw) return mapped;
   }
   if (meta && meta.options && meta.options.length) {
     const hit = meta.options.find(function (o) {
-      return String(o.value) === String(value);
+      return String(o.value) === raw;
     });
     if (hit) return optionLabel(hit);
   }

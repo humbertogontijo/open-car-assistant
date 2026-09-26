@@ -5,7 +5,7 @@ import android.content.Context
 import android.graphics.Rect
 
 /**
- * Platform-specific persistent entry into OCA (status-bar icon, float chip, …).
+ * Platform-specific persistent entry into the app (status-bar icon, float chip, …).
  * Feature code owns the dropdown / actions; platforms only present the affordance
  * and report activation via [Listener].
  */

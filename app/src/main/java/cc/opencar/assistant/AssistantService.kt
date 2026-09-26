@@ -153,7 +153,7 @@ class AssistantService : Service() {
         overlayCollectJob?.cancel()
         overlayCollectJob = null
         val app = applicationContext
-        if (app is OcaApp) {
+        if (app is OaaApp) {
             app.runtime.shortcuts?.detachOverlay()
         }
         runCatching { if (wakeReceiverRegistered) unregisterReceiver(wakeReceiver) }
@@ -176,7 +176,7 @@ class AssistantService : Service() {
                 "off" -> notifyScreenOff(source)
             }
             // Ensure runtime is spinning (process may have been dead during STR).
-            (applicationContext as? OcaApp)?.runtime?.startAsync()
+            (applicationContext as? OaaApp)?.runtime?.startAsync()
         }
         return START_STICKY
     }
@@ -190,7 +190,7 @@ class AssistantService : Service() {
     private fun bindShortcutsOverlay() {
         if (overlayCollectJob?.isActive == true) return
         overlayCollectJob = scope.launch {
-            val app = applicationContext as? OcaApp ?: return@launch
+            val app = applicationContext as? OaaApp ?: return@launch
             val shortcuts = withTimeoutOrNull(60_000L) {
                 while (app.runtime.shortcuts == null) {
                     if (app.runtime.ready.value) return@withTimeoutOrNull null
@@ -215,7 +215,7 @@ class AssistantService : Service() {
 
     private fun currentWakeSignals(): WakeSignals {
         val app = applicationContext
-        return if (app is OcaApp) app.runtime.wakeSignals() else WakeSignals()
+        return if (app is OaaApp) app.runtime.wakeSignals() else WakeSignals()
     }
 
     private fun installWakeReceiver(signals: WakeSignals) {
@@ -254,12 +254,12 @@ class AssistantService : Service() {
         if (Build.VERSION.SDK_INT < 26) return
         val mgr = getSystemService(NotificationManager::class.java)
         mgr.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "Open Car Assistant", NotificationManager.IMPORTANCE_LOW),
+            NotificationChannel(CHANNEL_ID, "Open Automotive Assistant", NotificationManager.IMPORTANCE_LOW),
         )
     }
 
     private fun buildNotification(entryVisible: Boolean): Notification {
-        val app = applicationContext as? OcaApp
+        val app = applicationContext as? OaaApp
         val shortcuts = app?.runtime?.shortcuts
         val openPi = PendingIntent.getActivity(
             this,
@@ -297,10 +297,10 @@ class AssistantService : Service() {
     private fun notifyWake(source: String) {
         Log.d(TAG, "wake signal: $source")
         val app = applicationContext
-        if (app is OcaApp) {
+        if (app is OaaApp) {
             app.runtime.notifyScreenOn(source)
         } else {
-            Log.w(TAG, "wake signal dropped — app not OcaApp")
+            Log.w(TAG, "wake signal dropped — app not OaaApp")
         }
     }
 
@@ -308,10 +308,10 @@ class AssistantService : Service() {
         lastScreenOffLogged = source
         Log.d(TAG, "sleep signal: $source")
         val app = applicationContext
-        if (app is OcaApp) {
+        if (app is OaaApp) {
             app.runtime.notifyScreenOff(source)
         } else {
-            Log.w(TAG, "sleep signal dropped — app not OcaApp")
+            Log.w(TAG, "sleep signal dropped — app not OaaApp")
         }
     }
 

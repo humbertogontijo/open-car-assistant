@@ -1,0 +1,8 @@
+{
+  "id": "phev",
+  "label": "PHEV / EM-i",
+  "extraCapabilities": [
+    "HYBRID_ENERGY"
+  ],
+  "detect": "fuel_or_hybrid_soc"
+}

@@ -309,7 +309,7 @@ class ExtrasCatalog(private val context: Context) {
     companion object {
         private const val TAG = "ExtrasCatalog"
         private const val ASSET = "store/extras.json"
-        private const val USER_AGENT = "OpenCarAssistant/0.1"
+        private const val USER_AGENT = "OpenAutomotiveAssistant/0.1"
         private const val APTOIDE_META = "https://ws75.aptoide.com/api/7/app/getMeta"
         private const val TIMEOUT_MS = 20_000
         private const val DOWNLOAD_TIMEOUT_MS = 120_000

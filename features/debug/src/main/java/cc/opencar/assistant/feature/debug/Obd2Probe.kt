@@ -3,6 +3,7 @@ package cc.opencar.assistant.feature.debug
 import android.util.Log
 import cc.opencar.assistant.api.PropertyValue
 import cc.opencar.assistant.api.ReadOutcome
+import cc.opencar.assistant.api.EntityRegistry
 import cc.opencar.assistant.api.VehicleProperty
 import cc.opencar.assistant.api.VehicleSession
 import java.util.concurrent.atomic.AtomicReference
@@ -64,7 +65,7 @@ class Obd2Probe(
     }
 
     private suspend fun probeFrame(frame: FrameDef): FrameRow {
-        val prop = VehicleProperty("oca", frame.key, nativeId = frame.nativeId)
+        val prop = VehicleProperty(EntityRegistry.NS, frame.key, nativeId = frame.nativeId)
         return when (val out = session.diagnose(prop)) {
             is ReadOutcome.Ok -> {
                 val bytes = (out.value as? PropertyValue.BytesVal)?.value
@@ -117,7 +118,7 @@ class Obd2Probe(
     private data class FrameDef(val key: String, val name: String, val nativeId: Long)
 
     companion object {
-        private const val TAG = "OcaObd2"
+        private const val TAG = "OaaObd2"
 
         /** Observed on Antora EX5 EM-i car_service dump. */
         private val FRAMES = listOf(

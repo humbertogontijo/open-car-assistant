@@ -1,9 +1,9 @@
 package cc.opencar.assistant.integrations.antora1000
 
 import android.util.Log
-import cc.opencar.assistant.integrations.common.PropertyAccessMode
-import cc.opencar.assistant.integrations.common.PropertyUpdate
-import cc.opencar.assistant.integrations.common.VehiclePropertyBackend
+import cc.opencar.assistant.integrations.aaos.PropertyAccessMode
+import cc.opencar.assistant.integrations.aaos.PropertyUpdate
+import cc.opencar.assistant.integrations.aaos.VehiclePropertyBackend
 import io.grpc.CallOptions
 import io.grpc.ManagedChannel
 import io.grpc.Metadata
@@ -229,7 +229,7 @@ class GrpcVhalBackend(
     }
 
     companion object {
-        private const val TAG = "OcaGrpcVhal"
+        private const val TAG = "OaaGrpcVhal"
         const val DEFAULT_HOST = "127.0.0.1"
         const val DEFAULT_PORT = 40004
 

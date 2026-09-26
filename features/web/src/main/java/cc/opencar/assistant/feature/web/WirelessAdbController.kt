@@ -4,7 +4,7 @@ import android.content.Context
 import android.os.Build
 import android.provider.Settings
 import cc.opencar.assistant.feature.debug.ContributorDebugState
-import cc.opencar.assistant.feature.debug.OcaLog
+import cc.opencar.assistant.feature.debug.OaaLog
 
 /**
  * Toggle wireless (TCP) ADB on userdebug HUs.
@@ -17,7 +17,7 @@ class WirelessAdbController(
     private val context: Context,
     private val debug: ContributorDebugState,
     private val defaultPort: Int = 5566,
-    private val log: OcaLog = OcaLog(),
+    private val log: OaaLog = OaaLog(),
 ) {
     fun status(): Map<String, Any?> {
         val portProp = getProp("service.adb.tcp.port")

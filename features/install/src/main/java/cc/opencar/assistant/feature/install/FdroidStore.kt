@@ -364,7 +364,7 @@ class FdroidStore(
         const val REPO_BASE = "https://f-droid.org/repo"
         const val SEARCH_API = "https://search.f-droid.org/api/search_apps"
         const val PACKAGES_API = "https://f-droid.org/api/v1/packages"
-        private const val USER_AGENT = "OpenCarAssistant/0.1 (FdroidStore)"
+        private const val USER_AGENT = "OpenAutomotiveAssistant/0.1 (FdroidStore)"
         private const val TIMEOUT_MS = 20_000
         private const val DOWNLOAD_TIMEOUT_MS = 120_000
         private val INDEX_TTL_MS = TimeUnit.HOURS.toMillis(6)

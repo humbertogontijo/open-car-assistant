@@ -1,0 +1,8 @@
+{
+  "id": "default",
+  "label": "Demo",
+  "matchDevice": [
+    "demo",
+    "oca-demo"
+  ]
+}

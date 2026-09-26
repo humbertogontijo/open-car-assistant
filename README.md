@@ -1,66 +1,62 @@
-# Open Car Assistant
+# Open Automotive Assistant
 
-Capability-based AAOS platform for Flyme Auto head units (Antora 1000 / SE1000, IHU629G, and future integrations).
+Local-first, capability-based companion for **Android Automotive** head units. Vehicle platforms are plugins; the product surface is HA-shaped entities (`climate.cabin`, `sensor.soc`, …).
 
-**Canonical repository name:** `open-car-assistant`  
-Package: `cc.opencar.assistant` · Web UI: `http://CAR_IP:8787` (LAN) or `http://127.0.0.1:8787` on the HU
+**Canonical repository name:** `open-automotive-assistant`  
+Web UI: `http://CAR_IP:8787` (LAN) or `http://127.0.0.1:8787` on the HU  
 
-License: [Apache-2.0](LICENSE) · See [NOTICE](NOTICE) for community testkey disclosure · [Disclaimer](docs/disclaimer.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Security](SECURITY.md)
+Short name: **OAA**. Host tool: `./tools/oaa-setup` (env `OAA_*`). Android package id remains `cc.opencar.assistant` for install continuity.
+
+First shipping platforms: Antora 1000 / SE1000 and IHU629G (Flyme Auto family), plus **`demo`** for CI without a head unit. More SoCs welcome via [docs/adding-an-integration.md](docs/adding-an-integration.md).
+
+License: [Apache-2.0](LICENSE) · [NOTICE](NOTICE) (community testkey) · [Disclaimer](docs/disclaimer.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Security](SECURITY.md)
 
 ## Build without a head unit
 
-Requires **JDK 17** and an **Android SDK** (`ANDROID_HOME`, or `sdk.dir` in a local `local.properties` — never commit that file).
+Requires **JDK 17** and an **Android SDK** (`ANDROID_HOME`, or `sdk.dir` in `local.properties` — never commit that file).
 
 ```bash
 ./gradlew :app:assembleDebug
 ```
 
-This compiles against `libs/car-stubs`. Live vehicle property reads/writes need a real AAOS head unit.
+Compiles against `libs/car-stubs`. Use Lab → integration override **`demo`**, or match fingerprint `demo`, for an in-memory vehicle. Live VHAL needs real AAOS hardware.
 
 ## Install on a head unit (optional)
 
-From a computer on the same LAN as an unlocked / userdebug HU you own:
+Owned userdebug HU on the same LAN:
 
 ```bash
-# Antora / SE1000 (EX5 family) — VenusVehicleServer gRPC
-./tools/oca-setup -i antora1000 -H CAR_IP setup
+# Antora / SE1000 — VenusVehicleServer gRPC
+./tools/oaa-setup -i antora1000 -H CAR_IP setup
 
-# IHU629G (BR/CN EX2) — CarPropertyManager; simpler reference for new platforms
-./tools/oca-setup -i ihu629g -H CAR_IP setup
+# IHU629G — CarPropertyManager (simple hardware reference)
+./tools/oaa-setup -i ihu629g -H CAR_IP setup
 ```
 
-This builds, signs with the [community testkey](libs/signing/README.md), installs under **`/data`** (user-space, uninstallable), grants runtime car/camera permissions, and prints a permission report.
-
-`CAR_IP` and ADB port/user come from `-H` / `OCA_HOST` (required) and each integration’s `host.sh` defaults for port and Android user. See [docs/safety.md](docs/safety.md).
+Builds, signs with the [community testkey](libs/signing/README.md), installs under **`/data`**, grants runtime permissions. See [docs/safety.md](docs/safety.md).
 
 Other commands: `connect` · `build` · `sign` · `install` · `grant` · `check` · `start` · `uninstall`
 
 ## Contributor paths
 
-| Goal | How | Locality |
-|------|-----|----------|
-| New **vehicle platform** | [docs/adding-an-integration.md](docs/adding-an-integration.md) — copy `integrations/<id>/`; use **ihu629g** as the simple reference | One folder tree (auto Gradle + ServiceLoader) |
-| New **external plugin** | [docs/plugins.md](docs/plugins.md) — `plugins/<id>/` + `OcaPlugin` | One folder tree (auto-discovered) |
-| New **shell feature** | [docs/adding-a-feature.md](docs/adding-a-feature.md) — curated `features/<id>/` | Multi-file (Gradle + `AssistantRuntime` + often web) |
-| Install / debug on HU | [docs/contributor-debug.md](docs/contributor-debug.md) — Lab tab + `oca-setup` | — |
+| Goal | Doc |
+|------|-----|
+| New **vehicle platform** | [adding-an-integration.md](docs/adding-an-integration.md) — **`demo`** (no HU) or **`ihu629g`** (hardware) |
+| New **external plugin** | [plugins.md](docs/plugins.md) |
+| New **shell feature** | [adding-a-feature.md](docs/adding-a-feature.md) (curated) |
+| Install / debug on HU | [contributor-debug.md](docs/contributor-debug.md) |
 
-**Design:** integrations and plugins are plug-and-play. First-party features and the product control catalog are curated on purpose.
+Integrations and plugins are plug-and-play. First-party features and the product entity catalog are curated on purpose.
 
 ## Threat model (short)
 
-- The in-car Ktor server listens on **cleartext** `0.0.0.0:8787` for HU WebView and same-LAN browsers. Do **not** expose that port to the public internet.
-- Contributor debug mode can show a short token in Lab / `/debug` HTML when enabled.
-- Host tools target user-space `/data` installs on **owned userdebug** head units (wireless ADB / optional `su` helpers only where needed).
+- Ktor listens cleartext on `0.0.0.0:8787` — do **not** expose to the public internet.
+- Contributor debug can show a short Lab / `/debug` token when enabled.
+- Host tools target user-space `/data` on **owned** userdebug HUs.
 - Details: [docs/safety.md](docs/safety.md) · [docs/disclaimer.md](docs/disclaimer.md).
 
 ## Docs
 
-- [Architecture](docs/architecture.md)
-- [Contributing](CONTRIBUTING.md)
-- [Contributor debug](docs/contributor-debug.md)
-- [Adding an integration](docs/adding-an-integration.md)
-- [Adding a feature](docs/adding-a-feature.md)
-- [Plugins](docs/plugins.md)
-- [Safety / install model](docs/safety.md)
-- [Disclaimer](docs/disclaimer.md)
-- [App store catalog](docs/store.md)
+Full index (by audience): **[docs/README.md](docs/README.md)**
+
+Highlights: [Architecture](docs/architecture.md) · [ADR-0001](docs/adr/0001-architecture-north-star.md) · [ADR-0002 models](docs/adr/0002-model-variant-bindings.md) · [Protocol OpenAPI](docs/openapi/open-automotive-assistant-v1.yaml) · [Domains](docs/domains.md) · [Contributing](CONTRIBUTING.md)

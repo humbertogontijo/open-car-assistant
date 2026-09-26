@@ -154,14 +154,20 @@ export function entitiesByType(type) {
   });
 }
 
-export function groupByEntity(list) {
+/** Bucket by product subsection (`section`), falling back to domain. */
+export function groupBySection(list) {
   const map = {};
   list.forEach(function (e) {
-    const k = e.entity || "extra";
+    const k = e.section || e.entity || "other";
     if (!map[k]) map[k] = [];
     map[k].push(e);
   });
   return map;
+}
+
+/** @deprecated Prefer groupBySection — domain is the card widget family, not page layout. */
+export function groupByEntity(list) {
+  return groupBySection(list);
 }
 
 export function findControl(id) {

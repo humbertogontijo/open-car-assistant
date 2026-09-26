@@ -1,6 +1,6 @@
 /* light.css — HA-style light domain (matches climate chip + fan slider) */
-.light-card.is-on {
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+.light-card.is-on .ctrl-icon {
+  color: var(--accent);
 }
 .light-card .light-state {
   margin: 0.15rem 0 0;
@@ -9,12 +9,7 @@
   text-transform: capitalize;
 }
 .light-body {
-  display: flex;
-  flex-direction: column;
   gap: 0.75rem;
-  flex: 1;
-  justify-content: flex-end;
-  min-height: 0;
 }
 .light-modes {
   display: flex;

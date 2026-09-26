@@ -180,7 +180,7 @@ class DvrController(
         )
         val primary = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES)
         runCatching {
-            val dir = File(primary, "OpenCarAssistant").also { it.mkdirs() }
+            val dir = File(primary, "OpenAutomotiveAssistant").also { it.mkdirs() }
             out += targetMap(
                 id = STORAGE_PRIMARY,
                 labelKey = "cameras.storage.primary",
@@ -198,7 +198,7 @@ class DvrController(
                 val path = volumePath(vol)
                 val usb = looksLikeUsb(desc, vol)
                 if (path != null && state == Environment.MEDIA_MOUNTED) {
-                    val dir = File(path, "OpenCarAssistant")
+                    val dir = File(path, "OpenAutomotiveAssistant")
                     val created = runCatching { dir.mkdirs(); true }.getOrDefault(false)
                     val writable = created && dir.canWrite()
                     out += targetMap(
@@ -1022,7 +1022,7 @@ class DvrController(
     }
 
     companion object {
-        private const val TAG = "OcaDvr"
+        private const val TAG = "OaaDvr"
         private const val PREFS = "oca_dvr"
         private const val KEY_STORAGE = "dvr_storage_id"
         private const val KEY_MODE = "dvr_mode"

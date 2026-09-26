@@ -8,7 +8,7 @@ import android.util.Log
 import cc.opencar.assistant.api.PendingWake
 
 /**
- * Early process hook: ContentProviders run before [OcaApp.onCreate] finishes
+ * Early process hook: ContentProviders run before [OaaApp.onCreate] finishes
  * heavy work. When any component brings the process up (boot / vendor wake),
  * this starts the FGS so we stay alive even if later init races.
  */

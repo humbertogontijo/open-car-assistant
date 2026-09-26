@@ -1,13 +1,8 @@
-.cover-card.is-open {
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
-}
 .cover-card.is-open .ctrl-icon {
   color: var(--accent);
 }
 
 .cover-body {
-  display: flex;
-  flex-direction: column;
   gap: 0.75rem;
 }
 

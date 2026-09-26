@@ -65,7 +65,7 @@ class DvrTimelineMathTest {
 class DvrStorageMathTest {
     @Test
     fun dvrDirAppendsOnce() {
-        val root = File("/tmp/OpenCarAssistant")
+        val root = File("/tmp/OpenAutomotiveAssistant")
         assertEquals(File(root, "dvr"), DvrStorageMath.dvrDirUnder(root))
     }
 

@@ -1,4 +1,4 @@
-import { html } from "../lit.js";
+import { html, nothing } from "../lit.js";
 import {
   entitiesByGroup,
   hiddenEntitiesByGroup,
@@ -6,13 +6,22 @@ import {
   state,
 } from "../store.js";
 import { t } from "../i18n.js";
-import { pageHead } from "../ui/cards.js";
+import { entityGrid, pageHead } from "../ui/cards.js";
 import { familySections } from "./group.js";
 import { dashSummary, pickEntities, withoutIds } from "../ui/dashboard.js";
 
 var DRIVE_HERO_IDS = [
+  "PERF_VEHICLE_SPEED",
   "sensor.speed",
   "sensor.gear",
+  "GEAR_SELECTION",
+];
+
+/** Product composites lead the drive grid so packing stays aligned. */
+var DRIVE_COMPOSITE_IDS = [
+  "drivetrain.vehicle",
+  "chassis.vehicle",
+  "steering.vehicle",
 ];
 
 export function pageDrive() {
@@ -24,7 +33,10 @@ export function pageDrive() {
     ? items
     : (state.entities || []).filter(function (e) {
         return (
-          (e.id === "sensor.speed" || e.id === "sensor.gear") &&
+          (e.id === "PERF_VEHICLE_SPEED" ||
+            e.id === "sensor.speed" ||
+            e.id === "sensor.gear" ||
+            e.id === "GEAR_SELECTION") &&
           (e.status === "ok" || e.status === "cached")
         );
       });
@@ -36,6 +48,15 @@ export function pageDrive() {
       return e.id;
     }),
   );
+  const composites = pickEntities(rest, DRIVE_COMPOSITE_IDS);
+  const more = withoutIds(
+    rest,
+    composites.map(function (e) {
+      return e.id;
+    }),
+  );
+  // Composites first, then remaining drive entities — one labeled section.
+  const ordered = composites.concat(more);
 
   return html`
     ${pageHead(
@@ -47,10 +68,14 @@ export function pageDrive() {
       ? familySections(items, { restore: true })
       : html`
           ${dashSummary(strip, { className: "dash-drive" })}
-          <h2 class="page-label" style="margin:20px 0 10px">
-            ${t("dash.drive.controls", "Drive controls")}
-          </h2>
-          ${familySections(rest)}
+          ${ordered.length
+            ? html`
+                <h2 class="page-label" style="margin:20px 0 10px">
+                  ${t("dash.drive.controls", "Drive controls")}
+                </h2>
+                ${entityGrid(ordered)}
+              `
+            : nothing}
         `}
   `;
 }

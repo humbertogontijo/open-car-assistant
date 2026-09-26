@@ -12,14 +12,14 @@ import cc.opencar.assistant.api.TelemetrySnapshot
 import cc.opencar.assistant.api.VehicleEvent
 import cc.opencar.assistant.api.VehicleProperty
 import cc.opencar.assistant.api.VehicleSession
-import cc.opencar.assistant.api.WellKnownProperties
-import cc.opencar.assistant.integrations.common.AospVehicleIds
-import cc.opencar.assistant.integrations.common.PlatformConfig
-import cc.opencar.assistant.integrations.common.PropertyAccessMode
-import cc.opencar.assistant.integrations.common.SessionEventFanout
-import cc.opencar.assistant.integrations.common.VehiclePropertyBackend
-import cc.opencar.assistant.integrations.common.entityByProp
-import cc.opencar.assistant.integrations.common.toPropertyValue
+import cc.opencar.assistant.integrations.aaos.AospVehicleIds
+import cc.opencar.assistant.integrations.aaos.PlatformConfig
+import cc.opencar.assistant.integrations.aaos.PropertyAccessMode
+import cc.opencar.assistant.integrations.aaos.PropertyUpdate
+import cc.opencar.assistant.integrations.aaos.SessionEventFanout
+import cc.opencar.assistant.integrations.aaos.VehiclePropertyBackend
+import cc.opencar.assistant.integrations.aaos.entityByProp
+import cc.opencar.assistant.integrations.aaos.toPropertyValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -45,10 +45,13 @@ class AntoraVehicleSession(
 ) : VehicleSession {
     private val backend: VehiclePropertyBackend = AntoraBackendFactory.create(context)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val catalogEntries: List<CatalogEntry> = AntoraCatalog.loadFromAssets(context)
-    private val platform: PlatformConfig = AntoraCatalog.platformConfig(context)
-    private val bindings = AntoraCatalog.wellKnownBindings(context)
-    private val allowlist = platform.writableAllowlist
+    private val basePlatform: PlatformConfig = AntoraCatalog.platformConfig(context)
+    private var platform: PlatformConfig = basePlatform.forSelection(
+        initialVariant.skuId,
+        initialVariant.id,
+    )
+    private val catalogEntries: List<CatalogEntry> = basePlatform.catalogEntries()
+    private val allowlist = basePlatform.writableAllowlist
 
     private val _variant = MutableStateFlow(initialVariant)
     override val variant: StateFlow<PlatformVariant> = _variant.asStateFlow()
@@ -61,19 +64,44 @@ class AntoraVehicleSession(
     private var entityObserveJob: Job? = null
     private var wheelJob: Job? = null
 
-    /** propId → entityId for EntityValueChanged fan-out. */
-    private val entityByProp: Map<Int, String> = platform.entityByProp()
+    /** propId → entityId for EntityValueChanged fan-out (follows active model). */
+    private val entityByProp: Map<Int, String>
+        get() = platform.entityByProp()
+
+    private val bindings: Map<VehicleProperty, Pair<Int, Int>>
+        get() = platform.propertyBindings()
+
+    /** SWC hard keys from platform.json (`WHEEL_HARD_KEY_*`). */
+    private val wheelHardKeys: Map<String, Int> by lazy {
+        basePlatform.properties
+            .asSequence()
+            .filter { it.key.startsWith("WHEEL_HARD_KEY_") }
+            .associate { p ->
+                p.key.removePrefix("WHEEL_HARD_KEY_").lowercase() to p.id
+            }
+    }
 
     /** Props that affect [readSnapshot] — ignore unrelated Venus stream noise. */
-    private val telemetryPropIds: Set<Int> = buildSet {
-        bindings.values.forEach { add(it.first) }
-        add(AntoraVhalIds.INFO_EV_BATTERY_CAPACITY)
-        add(AntoraVhalIds.DRIVE_MODE_SELECTION_PURE)
-        add(AntoraVhalIds.DRIVE_MODE_SELECTION_HYBRID)
-        add(AntoraVhalIds.DRIVE_MODE_SELECTION_POWER)
-        add(AntoraVhalIds.HVAC_POWER_ON)
-        add(AntoraVhalIds.INFO_MODEL)
-        add(AntoraVhalIds.PARKING_BRAKE_ON)
+    private val telemetryPropIds: Set<Int>
+        get() = buildSet {
+            platform.bindings.values.forEach { add(it.nativeId) }
+            for (key in EXTRA_TELEMETRY_KEYS) {
+                catalogNativeId(key)?.let { add(it) }
+            }
+        }
+
+    private fun catalogNativeId(key: String): Int? =
+        platform.bindings[key]?.nativeId
+            ?: basePlatform.properties.firstOrNull { it.key == key }?.id
+
+    private fun catalogArea(key: String): Int =
+        platform.bindings[key]?.areaId
+            ?: basePlatform.properties.firstOrNull { it.key == key }?.areas?.firstOrNull()
+            ?: 0
+
+    private fun readCatalog(key: String): PropertyValue? {
+        val id = catalogNativeId(key) ?: return null
+        return toPropertyValue(backend.read(id, catalogArea(key)))
     }
 
     override val integrationId: String = Antora1000Integration.ID
@@ -89,10 +117,15 @@ class AntoraVehicleSession(
                 backend.observe(propIds.takeIf { it.isNotEmpty() })
         }
         if (observe != null) {
-            Log.i(TAG, "telemetry: observe (push) mode")
+            Log.i(TAG, "telemetry: observe (push) mode — no continuous poll")
+            // One-shot seed from cache / CarProperty so UI + edge detectors have a baseline
+            // before the first stream delta. Continuous refresh is observe-only.
             telemetryJob = scope.launch {
                 try {
                     fanout.publishTelemetry(readSnapshot())
+                    fanout.emitBoundSnapshots(platform.bindings) { id, area ->
+                        backend.read(id, area)
+                    }
                 } catch (_: Throwable) { /* best-effort */ }
                 observe
                     .filter { it.propId in telemetryPropIds }
@@ -106,8 +139,9 @@ class AntoraVehicleSession(
             entityObserveJob = scope.launch {
                 observe.collect { update -> fanout.onPropertyUpdate(update, entityByProp) }
             }
+            wheelJob = scope.launch { observeWheelKeys(observe) }
         } else {
-            Log.i(TAG, "telemetry: poll mode (1s)")
+            Log.i(TAG, "telemetry: poll mode (1s) — observe unavailable")
             telemetryJob = scope.launch {
                 while (isActive) {
                     try {
@@ -119,9 +153,8 @@ class AntoraVehicleSession(
                     delay(POLL_MS)
                 }
             }
+            wheelJob = scope.launch { pollWheelKeys() }
         }
-        // Wheel-key poll kept until those props are confirmed on the gRPC stream.
-        wheelJob = scope.launch { pollWheelKeys() }
     }
 
     override fun telemetry(): Flow<TelemetrySnapshot> = _telemetry
@@ -132,7 +165,7 @@ class AntoraVehicleSession(
         val (propId, areaId) = resolve(property) ?: return null
         val raw = backend.read(propId, areaId)
         val value = toPropertyValue(raw)
-        if (property.key == WellKnownProperties.INFO_VIN.key && value is PropertyValue.StringVal) {
+        if (property.key == "INFO_VIN" && value is PropertyValue.StringVal) {
             return PropertyValue.StringVal(redactVin(value.value))
         }
         return value
@@ -153,7 +186,7 @@ class AntoraVehicleSession(
             when (val d = backend.readDetailed(propId, a)) {
                 is VehiclePropertyBackend.DetailedRead.Ok -> {
                     var value = toPropertyValue(d.value)
-                    if (property.key == WellKnownProperties.INFO_VIN.key && value is PropertyValue.StringVal) {
+                    if (property.key == "INFO_VIN" && value is PropertyValue.StringVal) {
                         value = PropertyValue.StringVal(redactVin(value.value))
                     }
                     return ReadOutcome.Ok(value, a)
@@ -217,49 +250,86 @@ class AntoraVehicleSession(
     }
 
     fun updateVariant(variant: PlatformVariant) {
+        platform = basePlatform.forSelection(variant.skuId, variant.id)
         _variant.value = variant
     }
 
     /**
-     * Poll SWC hard-key VHAL props for press / long-press edges.
-     * Short press fires on release before [WHEEL_LONG_PRESS_MS]; long-press fires once while held.
+     * SWC hard-key edges from the property observe stream (reactive path).
+     * Short press = release before [WHEEL_LONG_PRESS_MS]; long-press = timer while held.
+     * If these props never appear on the stream, shortcuts will stay silent — intentional.
+     */
+    private suspend fun observeWheelKeys(observe: Flow<PropertyUpdate>) {
+        val propToKey = wheelHardKeys.entries.associate { (k, id) -> id to k }
+        val last = mutableMapOf<String, Int?>()
+        val longFired = mutableSetOf<String>()
+        val longJobs = mutableMapOf<String, Job>()
+        Log.i(TAG, "wheel keys: observe (push) mode props=${propToKey.size}")
+        for ((key, propId) in wheelHardKeys) {
+            last[key] = wheelLevel(backend.read(propId, 0))
+        }
+        observe.filter { it.propId in propToKey }.collect { update ->
+            val key = propToKey[update.propId] ?: return@collect
+            val value = wheelLevel(update.value) ?: return@collect
+            applyWheelEdge(key, value, last, longFired, longJobs)
+        }
+    }
+
+    /**
+     * Poll SWC hard-key VHAL props when observe is unavailable (CarProperty fallback).
      */
     private suspend fun pollWheelKeys() {
         val last = mutableMapOf<String, Int?>()
-        val downAt = mutableMapOf<String, Long>()
         val longFired = mutableSetOf<String>()
+        val longJobs = mutableMapOf<String, Job>()
+        Log.i(TAG, "wheel keys: poll mode (${WHEEL_POLL_MS}ms)")
         while (coroutineContext.isActive) {
-            val now = System.currentTimeMillis()
-            for ((key, propId) in AntoraVhalIds.WHEEL_HARD_KEYS) {
-                val raw = backend.read(propId, AntoraVhalIds.AREA_GLOBAL)
-                val value = when (raw) {
-                    is Number -> raw.toInt()
-                    is Boolean -> if (raw) 1 else 0
-                    else -> null
+            for ((key, propId) in wheelHardKeys) {
+                val value = wheelLevel(backend.read(propId, 0))
+                if (value != null) {
+                    applyWheelEdge(key, value, last, longFired, longJobs)
                 }
-                val prev = last[key]
-                if (value != null && value != 0) {
-                    if (prev == null || prev == 0) {
-                        downAt[key] = now
-                        longFired.remove(key)
-                    } else if (key !in longFired) {
-                        val started = downAt[key] ?: now
-                        if (now - started >= WHEEL_LONG_PRESS_MS) {
-                            longFired.add(key)
-                            _events.emit(VehicleEvent.WheelKeyLongPressed(key))
-                        }
-                    }
-                } else if (prev != null && prev != 0 && (value == null || value == 0)) {
-                    if (key !in longFired) {
-                        _events.emit(VehicleEvent.WheelKeyPressed(key))
-                    }
-                    downAt.remove(key)
-                    longFired.remove(key)
-                }
-                if (value != null) last[key] = value
             }
             delay(WHEEL_POLL_MS)
         }
+    }
+
+    private fun applyWheelEdge(
+        key: String,
+        value: Int,
+        last: MutableMap<String, Int?>,
+        longFired: MutableSet<String>,
+        longJobs: MutableMap<String, Job>,
+    ) {
+        val prev = last[key]
+        if (value != 0) {
+            if (prev == null || prev == 0) {
+                longFired.remove(key)
+                longJobs.remove(key)?.cancel()
+                longJobs[key] = scope.launch {
+                    delay(WHEEL_LONG_PRESS_MS)
+                    if (key !in longFired) {
+                        longFired.add(key)
+                        Log.i(TAG, "wheel long-press key=$key")
+                        _events.tryEmit(VehicleEvent.WheelKeyLongPressed(key))
+                    }
+                }
+            }
+        } else if (prev != null && prev != 0) {
+            longJobs.remove(key)?.cancel()
+            if (key !in longFired) {
+                Log.i(TAG, "wheel press key=$key")
+                _events.tryEmit(VehicleEvent.WheelKeyPressed(key))
+            }
+            longFired.remove(key)
+        }
+        last[key] = value
+    }
+
+    private fun wheelLevel(raw: Any?): Int? = when (raw) {
+        is Number -> raw.toInt()
+        is Boolean -> if (raw) 1 else 0
+        else -> null
     }
 
     private fun resolve(property: VehicleProperty): Pair<Int, Int>? {
@@ -283,56 +353,54 @@ class AntoraVehicleSession(
     }
 
     private fun readSnapshot(): TelemetrySnapshot {
-        fun intProp(p: VehicleProperty): Int? {
-            val binding = bindings[p] ?: return null
-            return toPropertyValue(backend.read(binding.first, binding.second))?.asInt()
+        fun intProp(key: String): Int? {
+            val b = platform.bindings[key] ?: return null
+            return toPropertyValue(backend.read(b.nativeId, b.areaId))?.asInt()
         }
 
-        fun floatProp(p: VehicleProperty): Float? {
-            val binding = bindings[p] ?: return null
-            return toPropertyValue(backend.read(binding.first, binding.second))?.asFloat()
+        fun floatProp(key: String): Float? {
+            val b = platform.bindings[key] ?: return null
+            return toPropertyValue(backend.read(b.nativeId, b.areaId))?.asFloat()
         }
 
-        val speedMs = floatProp(WellKnownProperties.SPEED_KMH)
+        val speedMs = floatProp("PERF_VEHICLE_SPEED")
         val speedKmh = speedMs?.let { AospVehicleIds.speedMsToKmh(it) }
         // Prefer vendor display % (matches cluster). Fall back to Wh-level / capacity,
         // then hybrid SOC (charge-target band on EM-i — often ≠ dashboard %).
-        val evPercentDirect = floatProp(WellKnownProperties.EV_BATTERY_PERCENT)
-        val evRaw = floatProp(WellKnownProperties.EV_BATTERY_LEVEL_RAW)
-        val battCap = toPropertyValue(
-            backend.read(AntoraVhalIds.INFO_EV_BATTERY_CAPACITY, 0),
-        )?.asFloat()
+        val evPercentDirect = floatProp("TYPE_EV_BATTERY_PERCENTAGE")
+        val evRaw = floatProp("EV_BATTERY_LEVEL")
+        val battCap = readCatalog("INFO_EV_BATTERY_CAPACITY")?.asFloat()
         val evPercentFromWh = if (evRaw != null && battCap != null && battCap > 0f) {
             (evRaw / battCap) * 100f
         } else {
             null
         }
-        val hybridSoc = floatProp(WellKnownProperties.HYBRID_SOC)
+        val hybridSoc = floatProp("HYBRID_FUNC_BATTERY_SOC")
         val evPercent = evPercentDirect ?: evPercentFromWh ?: hybridSoc
-        val rangeM = floatProp(WellKnownProperties.RANGE_KM)
-        val rangeEv = floatProp(WellKnownProperties.RANGE_EV_KM)
-        val rangeFuel = floatProp(WellKnownProperties.RANGE_FUEL_KM)
-        val fuelPercent = floatProp(WellKnownProperties.FUEL_PERCENT)
-        val odometer = floatProp(WellKnownProperties.ODOMETER_KM)
-        val tempAmbient = floatProp(WellKnownProperties.TEMP_AMBIENT_C)
-        val tempIndoor = floatProp(WellKnownProperties.TEMP_INDOOR_C)
-        val batteryTemp = floatProp(WellKnownProperties.BATTERY_TEMP_C)
-        val chargeEta = floatProp(WellKnownProperties.CHARGE_ESTIMATED_TIME)
-        val chargeEnergy = floatProp(WellKnownProperties.CHARGE_ENERGY)
-        val chargeWorkA = floatProp(WellKnownProperties.CHARGE_WORK_CURRENT)
-        val chargeWorkV = floatProp(WellKnownProperties.CHARGE_WORK_VOLTAGE)
-        val dischargeSoc = floatProp(WellKnownProperties.CHARGE_DISCHARGE_SOC)
-        val avgEnergy = floatProp(WellKnownProperties.AVG_ENERGY_KWH_100KM)
-        val avgFuel = floatProp(WellKnownProperties.AVG_FUEL_L_100KM)
-        val flowDriving = floatProp(WellKnownProperties.ENERGY_FLOW_DRIVING)
-        val flowBattery = floatProp(WellKnownProperties.ENERGY_FLOW_BATTERY)
-        val flowClimate = floatProp(WellKnownProperties.ENERGY_FLOW_CLIMATE)
-        val maintKm = floatProp(WellKnownProperties.MAINTENANCE_MILEAGE_KM)
-        val sinceMaintKm = floatProp(WellKnownProperties.SINCE_MAINTENANCE_KM)
-        val driveModeRaw = intProp(WellKnownProperties.DRIVE_MODE)
-        val pure = toPropertyValue(backend.read(AntoraVhalIds.DRIVE_MODE_SELECTION_PURE, 0))?.asInt()
-        val hybrid = toPropertyValue(backend.read(AntoraVhalIds.DRIVE_MODE_SELECTION_HYBRID, 0))?.asInt()
-        val power = toPropertyValue(backend.read(AntoraVhalIds.DRIVE_MODE_SELECTION_POWER, 0))?.asInt()
+        val rangeM = floatProp("RANGE_REMAINING")
+        val rangeEv = floatProp("SENSOR_TYPE_ENDURANCE_MILEAGE_EV")
+        val rangeFuel = floatProp("SENSOR_TYPE_ENDURANCE_MILEAGE_FUEL")
+        val fuelPercent = floatProp("TYPE_FUEL_PERCENTAGE")
+        val odometer = floatProp("PERF_ODOMETER")
+        val tempAmbient = floatProp("SENSOR_TYPE_TEMPERATURE_AMBIENT")
+        val tempIndoor = floatProp("SENSOR_TYPE_TEMPERATURE_INDOOR")
+        val batteryTemp = floatProp("SENSOR_TYPE_EV_BATTERY_TEMP")
+        val chargeEta = floatProp("CHARGE_FUNC_CHARGING_ESTIMATED_TIME")
+        val chargeEnergy = floatProp("CHARGE_FUNC_CHARGING_ENERGY")
+        val chargeWorkA = floatProp("CHARGE_FUNC_CHARGING_WORK_CURRENT")
+        val chargeWorkV = floatProp("CHARGE_FUNC_CHARGING_WORK_VOLTAGE")
+        val dischargeSoc = floatProp("CHARGE_FUNC_DISCHARGING_SOC")
+        val avgEnergy = floatProp("TRIP_DI_AVG_ELC_CONSUMPTION")
+        val avgFuel = floatProp("TRIP_DI_AVG_FUEL_CONSUMPTION")
+        val flowDriving = floatProp("TRIP_ED_DRIVING_ENERGY_FLOW")
+        val flowBattery = floatProp("TRIP_ED_BATTERY_ENERGY_FLOW")
+        val flowClimate = floatProp("TRIP_ED_CLIMATE_ENERGY_FLOW")
+        val maintKm = floatProp("TYPE_MAINTENANCE_MILEAGE")
+        val sinceMaintKm = floatProp("TYPE_SINCE_MAINTENANCE_TOTAL_MILEAGE")
+        val driveModeRaw = intProp("DM_FUNC_DRIVE_MODE_SELECT")
+        val pure = readCatalog("DRIVE_MODE_SELECTION_PURE")?.asInt()
+        val hybrid = readCatalog("DRIVE_MODE_SELECTION_HYBRID")?.asInt()
+        val power = readCatalog("DRIVE_MODE_SELECTION_POWER")?.asInt()
         val driveLabel = driveModeRaw?.let { platform.driveModeEnum[it] ?: "mode:$it" }
         val energyLabel = when {
             pure == 1 -> "opt.drive_mode.1"
@@ -340,16 +408,10 @@ class AntoraVehicleSession(
             power == 1 -> "opt.drive_mode.3"
             else -> null
         }
-        val plug = intProp(WellKnownProperties.CHARGE_PLUG)
-        val hvacPower = toPropertyValue(
-            backend.read(AntoraVhalIds.HVAC_POWER_ON, AntoraVhalIds.AREA_HVAC_PRIMARY),
-        )?.asInt()?.let { it != 0 }
-        val model = toPropertyValue(
-            backend.read(AntoraVhalIds.INFO_MODEL, AntoraVhalIds.AREA_GLOBAL),
-        )?.display()
-        val parkingBrake = toPropertyValue(
-            backend.read(AntoraVhalIds.PARKING_BRAKE_ON, AntoraVhalIds.AREA_GLOBAL),
-        )
+        val plug = intProp("CHARGE_FUNC_CHARGING_PLUG_STATE")
+        val hvacPower = readCatalog("HVAC_POWER_ON")?.asInt()?.let { it != 0 }
+        val model = readCatalog("INFO_MODEL")?.display()
+        val parkingBrake = readCatalog("PARKING_BRAKE_ON")
         val parkingLabel = when (parkingBrake) {
             is PropertyValue.BoolVal -> if (parkingBrake.value) "on" else "off"
             is PropertyValue.IntVal -> if (parkingBrake.value != 0) "on" else "off"
@@ -362,23 +424,23 @@ class AntoraVehicleSession(
         }
 
         return TelemetrySnapshot(
-            gear = intProp(WellKnownProperties.GEAR),
+            gear = intProp("GEAR_SELECTION"),
             speedKmh = speedKmh,
             evBatteryPercent = evPercent,
-            fuelCapacityMl = floatProp(WellKnownProperties.FUEL_CAPACITY),
+            fuelCapacityMl = floatProp("INFO_FUEL_CAPACITY"),
             fuelPercent = fuelPercent,
             rangeKm = rangeKm,
             rangeEvKm = rangeEv,
             rangeFuelKm = rangeFuel,
             odometerKm = odometer,
             hvacPower = hvacPower,
-            hvacTempC = floatProp(WellKnownProperties.HVAC_TEMP_C),
-            hvacFan = intProp(WellKnownProperties.HVAC_FAN),
+            hvacTempC = floatProp("HVAC_TEMPERATURE_SET"),
+            hvacFan = intProp("HVAC_FAN_SPEED"),
             tempAmbientC = tempAmbient,
             tempIndoorC = tempIndoor,
             batteryTempC = batteryTemp,
             hybridSocPercent = hybridSoc,
-            chargeCurrentA = floatProp(WellKnownProperties.CHARGE_CURRENT),
+            chargeCurrentA = floatProp("CHARGE_FUNC_CHARGING_CURRENT"),
             chargePlugConnected = plug?.let { it != 0 },
             chargeEstimatedTimeMin = chargeEta?.takeIf { it >= 0f },
             chargeEnergyKwh = chargeEnergy?.takeIf { it >= 0f },
@@ -393,12 +455,13 @@ class AntoraVehicleSession(
             maintenanceMileageKm = maintKm,
             sinceMaintenanceKm = sinceMaintKm,
             driveMode = driveLabel,
-            regenLevel = intProp(WellKnownProperties.REGEN),
-            ignitionState = intProp(WellKnownProperties.IGNITION),
+            regenLevel = intProp("SETTING_FUNC_ENERGY_REGENERATION"),
+            ignitionState = intProp("IGNITION_STATE"),
             extras = buildMap {
                 put("bridge", if (backend.available) "ok" else "unavailable")
                 put("accessMode", backend.mode.wireName)
                 put("catalogSize", catalogEntries.size.toString())
+                if (driveModeRaw != null) put("driveModeRaw", driveModeRaw.toString())
                 if (model != null) put("model", model)
                 if (parkingLabel != null) put("parkingBrake", parkingLabel)
                 if (energyLabel != null) put("energyMode", energyLabel)
@@ -415,6 +478,17 @@ class AntoraVehicleSession(
         private const val POLL_MS = 1000L
         private const val WHEEL_POLL_MS = 100L
         private const val WHEEL_LONG_PRESS_MS = 700L
+
+        /** Catalog keys read in [readSnapshot] that may sit outside the SKU allowlist. */
+        private val EXTRA_TELEMETRY_KEYS = listOf(
+            "INFO_EV_BATTERY_CAPACITY",
+            "DRIVE_MODE_SELECTION_PURE",
+            "DRIVE_MODE_SELECTION_HYBRID",
+            "DRIVE_MODE_SELECTION_POWER",
+            "HVAC_POWER_ON",
+            "INFO_MODEL",
+            "PARKING_BRAKE_ON",
+        )
 
         fun redactVin(vin: String): String =
             if (vin.length < 8) "[redacted]" else vin.take(3) + "****" + vin.takeLast(4)

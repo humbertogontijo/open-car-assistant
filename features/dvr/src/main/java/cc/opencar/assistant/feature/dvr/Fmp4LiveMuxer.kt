@@ -436,7 +436,7 @@ class Fmp4LiveMuxer(
     }
 
     companion object {
-        private const val TAG = "OcaFmp4"
+        private const val TAG = "OaaFmp4"
         private const val WINDOW_SEGMENTS = 6
         /** Apple LL-HLS: hold blocking reloads up to ~3× target duration. */
         private const val BLOCK_TIMEOUT_MS = 3_000L

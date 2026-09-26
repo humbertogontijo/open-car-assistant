@@ -12,7 +12,7 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import kotlinx.coroutines.flow.first
 
-internal fun Routing.registerCoreRoutes(deps: OcaWebDeps) {
+internal fun Routing.registerCoreRoutes(deps: OaaWebDeps) {
     val context = deps.context
     val session = deps.session
     val debug = deps.debug

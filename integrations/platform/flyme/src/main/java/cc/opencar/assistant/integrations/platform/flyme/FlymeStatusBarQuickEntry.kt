@@ -16,7 +16,7 @@ import cc.opencar.assistant.api.QuickEntry
  */
 class FlymeStatusBarQuickEntry(
     private val iconRes: Int = R.drawable.ic_status_bar_entry,
-    private val describe: String = "OCA",
+    private val describe: String = "OAA",
 ) : QuickEntry {
     override val style: String = STYLE
 

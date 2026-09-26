@@ -25,7 +25,7 @@ import cc.opencar.assistant.feature.telemetry.TelemetryRepository
 import cc.opencar.assistant.feature.web.AndroidSettingsController
 import cc.opencar.assistant.feature.web.ControlCatalog
 import cc.opencar.assistant.feature.web.LocationTrackerController
-import cc.opencar.assistant.feature.web.OcaWebServer
+import cc.opencar.assistant.feature.web.OaaWebServer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -38,7 +38,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicReference
 
-class AssistantRuntime(private val app: OcaApp) {
+class AssistantRuntime(private val app: OaaApp) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val startMutex = Mutex()
     private val registry: IntegrationRegistry = ServiceLoaderIntegrationRegistry(app.classLoader)
@@ -59,7 +59,7 @@ class AssistantRuntime(private val app: OcaApp) {
         private set
     var telemetry: TelemetryRepository? = null
         private set
-    var web: OcaWebServer? = null
+    var web: OaaWebServer? = null
         private set
     var installer: ApkInstaller? = null
         private set
@@ -104,7 +104,7 @@ class AssistantRuntime(private val app: OcaApp) {
     }
 
     private suspend fun startInternal() {
-        val fp = OcaApp.deviceFingerprint()
+        val fp = OaaApp.deviceFingerprint()
         registry.all().forEach { it.warm(app) }
         val overrideId = integrationOverride()
         val matched = if (overrideId != null) {
@@ -205,7 +205,7 @@ class AssistantRuntime(private val app: OcaApp) {
             }
         }
 
-        web = OcaWebServer(
+        web = OaaWebServer(
             context = app,
             session = sess,
             debug = debug,
@@ -324,6 +324,6 @@ class AssistantRuntime(private val app: OcaApp) {
     private val queuedScreen = AtomicReference<QueuedScreen?>(null)
 
     companion object {
-        private const val TAG = "OcaRuntime"
+        private const val TAG = "OaaRuntime"
     }
 }

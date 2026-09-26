@@ -3,8 +3,7 @@
   "displayName": "IHU629G (EX2 / Geometry E)",
   "backend": "vhal",
   "extends": [
-    "aosp",
-    "android"
+    "aaos"
   ],
   "match": [
     "ihu629",
@@ -21,13 +20,6 @@
     "GEAR_EVENTS",
     "IGNITION_EVENTS"
   ],
-  "variants": [
-    {
-      "id": "default",
-      "label": "EX2 / Geometry E",
-      "extraCapabilities": []
-    }
-  ],
   "driveModeEnum": {
     "570491137": "drive_mode.eco",
     "570491138": "drive_mode.comfort",
@@ -40,8 +32,7 @@
       "access": "r",
       "areas": [
         0
-      ],
-      "entity": "gear"
+      ]
     },
     {
       "id": "0x11600207",
@@ -49,8 +40,7 @@
       "access": "r",
       "areas": [
         0
-      ],
-      "entity": "speed_kmh"
+      ]
     },
     {
       "id": 557885165,
@@ -58,8 +48,7 @@
       "access": "r",
       "areas": [
         0
-      ],
-      "entity": "ev_battery_percent"
+      ]
     },
     {
       "id": 289407752,
@@ -67,8 +56,7 @@
       "access": "r",
       "areas": [
         0
-      ],
-      "entity": "range_km"
+      ]
     },
     {
       "id": 570491136,
@@ -76,8 +64,7 @@
       "access": "rw",
       "areas": [
         0
-      ],
-      "entity": "drive_mode"
+      ]
     },
     {
       "id": 537003264,
@@ -85,8 +72,7 @@
       "access": "rw",
       "areas": [
         0
-      ],
-      "entity": "regen"
+      ]
     },
     {
       "id": "0x11400409",
@@ -94,8 +80,7 @@
       "access": "r",
       "areas": [
         0
-      ],
-      "entity": "ignition"
+      ]
     },
     {
       "id": 557887621,
@@ -103,8 +88,7 @@
       "access": "r",
       "areas": [
         0
-      ],
-      "entity": "charge_plug"
+      ]
     },
     {
       "id": 605291008,
@@ -112,8 +96,7 @@
       "access": "r",
       "areas": [
         0
-      ],
-      "entity": "charge_current"
+      ]
     },
     {
       "id": 605029888,
@@ -121,8 +104,7 @@
       "access": "rw",
       "areas": [
         0
-      ],
-      "entity": "charge_limit"
+      ]
     },
     {
       "id": 605028608,
@@ -130,8 +112,7 @@
       "access": "rw",
       "areas": [
         0
-      ],
-      "entity": "charge_switch"
+      ]
     },
     {
       "id": "0x15200510",
@@ -139,8 +120,7 @@
       "access": "rw",
       "areas": [
         0
-      ],
-      "entity": "hvac_power"
+      ]
     },
     {
       "id": "0x15200505",
@@ -148,8 +128,7 @@
       "access": "rw",
       "areas": [
         0
-      ],
-      "entity": "hvac_ac"
+      ]
     },
     {
       "id": "0x15600503",
@@ -157,8 +136,7 @@
       "access": "rw",
       "areas": [
         1
-      ],
-      "entity": "hvac_temp_c"
+      ]
     },
     {
       "id": 356517120,
@@ -166,8 +144,7 @@
       "access": "rw",
       "areas": [
         75
-      ],
-      "entity": "hvac_fan"
+      ]
     },
     {
       "id": 557846560,
@@ -175,8 +152,7 @@
       "access": "rw",
       "areas": [
         0
-      ],
-      "entity": "hvac_fan_direction"
+      ]
     },
     {
       "id": "0x15200508",
@@ -184,8 +160,7 @@
       "access": "rw",
       "areas": [
         0
-      ],
-      "entity": "hvac_recirc"
+      ]
     },
     {
       "id": 557885463,
@@ -193,8 +168,7 @@
       "access": "rw",
       "areas": [
         0
-      ],
-      "entity": "parking_comfort"
+      ]
     },
     {
       "id": 537528576,
@@ -202,8 +176,7 @@
       "access": "rw",
       "areas": [
         5
-      ],
-      "entity": "ambience_main_color"
+      ]
     },
     {
       "id": 704708864,
@@ -211,8 +184,13 @@
       "access": "rw",
       "areas": [
         0
-      ],
-      "entity": "ambience_intensity"
+      ]
     }
+  ],
+  "models": [
+    "default"
+  ],
+  "profiles": [
+    "default"
   ]
 }

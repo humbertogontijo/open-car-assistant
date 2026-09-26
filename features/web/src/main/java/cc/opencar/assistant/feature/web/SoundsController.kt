@@ -154,7 +154,7 @@ class SoundsController(
     private fun prefKey(kind: Kind) = "active_${kind.id}"
 
     companion object {
-        private const val TAG = "OcaSounds"
+        private const val TAG = "OaaSounds"
         private const val MAX_BYTES = 8 * 1024 * 1024
         private val ALLOWED_EXT = listOf(".wav", ".mp3", ".ogg", ".m4a")
     }

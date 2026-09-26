@@ -28,9 +28,9 @@ class QuickEntryMenu(
     context: Context,
     private val store: ShortcutStore,
     private val onRunShortcut: suspend (id: String) -> Unit,
-    private val onOpenOca: (section: String?) -> Unit,
-    private val onExitOca: () -> Unit,
-    private val onBackgroundOca: () -> Unit,
+    private val onOpenOaa: (section: String?) -> Unit,
+    private val onExitOaa: () -> Unit,
+    private val onBackgroundOaa: () -> Unit,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val appContext = context.applicationContext
@@ -187,11 +187,11 @@ class QuickEntryMenu(
 
     private fun rebuildMenuInto(panel: LinearLayout) {
         panel.removeAllViews()
-        addMenuItem(panel, "Open") { collapseAnd { onOpenOca(null) } }
-        addMenuItem(panel, "Cameras") { collapseAnd { onOpenOca("cameras") } }
-        addMenuItem(panel, "Shortcuts") { collapseAnd { onOpenOca("shortcuts") } }
-        addMenuItem(panel, "Background") { collapseAnd { onBackgroundOca() } }
-        addMenuItem(panel, "Exit") { collapseAnd { onExitOca() } }
+        addMenuItem(panel, "Open") { collapseAnd { onOpenOaa(null) } }
+        addMenuItem(panel, "Cameras") { collapseAnd { onOpenOaa("cameras") } }
+        addMenuItem(panel, "Shortcuts") { collapseAnd { onOpenOaa("shortcuts") } }
+        addMenuItem(panel, "Background") { collapseAnd { onBackgroundOaa() } }
+        addMenuItem(panel, "Exit") { collapseAnd { onExitOaa() } }
         if (pinned.isNotEmpty()) {
             addDivider(panel)
             for (s in pinned.take(8)) {

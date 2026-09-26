@@ -218,7 +218,7 @@ class CameraPreviewSession(private val context: Context) : AutoCloseable {
     }
 
     companion object {
-        private const val TAG = "OcaCamPreview"
+        private const val TAG = "OaaCamPreview"
         private const val MODE_IDLE = "idle"
         private const val MODE_CONCURRENT = "concurrent"
     }

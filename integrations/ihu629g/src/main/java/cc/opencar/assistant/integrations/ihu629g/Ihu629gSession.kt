@@ -12,15 +12,13 @@ import cc.opencar.assistant.api.TelemetrySnapshot
 import cc.opencar.assistant.api.VehicleEvent
 import cc.opencar.assistant.api.VehicleProperty
 import cc.opencar.assistant.api.VehicleSession
-import cc.opencar.assistant.api.WellKnownProperties
-import cc.opencar.assistant.integrations.common.AospVehicleIds
-import cc.opencar.assistant.integrations.common.CarPropertyBackend
-import cc.opencar.assistant.integrations.common.PlatformConfig
-import cc.opencar.assistant.integrations.common.SessionEventFanout
-import cc.opencar.assistant.integrations.common.VehiclePropertyBackend
-import cc.opencar.assistant.integrations.common.entityByProp
-import cc.opencar.assistant.integrations.common.toPropertyValue
-import cc.opencar.assistant.integrations.common.wellKnownByKey
+import cc.opencar.assistant.integrations.aaos.AospVehicleIds
+import cc.opencar.assistant.integrations.aaos.CarPropertyBackend
+import cc.opencar.assistant.integrations.aaos.PlatformConfig
+import cc.opencar.assistant.integrations.aaos.SessionEventFanout
+import cc.opencar.assistant.integrations.aaos.VehiclePropertyBackend
+import cc.opencar.assistant.integrations.aaos.entityByProp
+import cc.opencar.assistant.integrations.aaos.toPropertyValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -49,7 +47,7 @@ class Ihu629gSession(
 ) : VehicleSession {
     private val backend: VehiclePropertyBackend = CarPropertyBackend(context)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val bindings = wellKnownBindings(platform)
+    private val bindings = platform.propertyBindings()
     private val allowlist = platform.writableAllowlist
 
     private val _variant = MutableStateFlow(initialVariant)
@@ -69,10 +67,13 @@ class Ihu629gSession(
         val propIds = platform.bindings.values.map { it.nativeId }.distinct().toIntArray()
         val observe = backend.observe(propIds.takeIf { it.isNotEmpty() })
         if (observe != null) {
-            Log.i(TAG, "telemetry: observe (push) mode")
+            Log.i(TAG, "telemetry: observe (push) mode — no continuous poll")
             telemetryJob = scope.launch {
                 try {
                     fanout.publishTelemetry(readSnapshot())
+                    fanout.emitBoundSnapshots(platform.bindings) { id, area ->
+                        backend.read(id, area)
+                    }
                 } catch (_: Throwable) { /* best-effort */ }
                 observe.debounce(150).collect {
                     try {
@@ -84,7 +85,7 @@ class Ihu629gSession(
                 observe.collect { update -> fanout.onPropertyUpdate(update, entityByProp) }
             }
         } else {
-            Log.i(TAG, "telemetry: poll mode (1s)")
+            Log.i(TAG, "telemetry: poll mode (1s) — observe unavailable")
             telemetryJob = scope.launch {
                 while (isActive) {
                     try {
@@ -193,15 +194,15 @@ class Ihu629gSession(
     private fun decode(property: VehicleProperty, raw: Any?): PropertyValue? {
         if (raw == null) return null
         when (property.key) {
-            WellKnownProperties.HVAC_TEMP_C.key -> {
+            "HVAC_TEMPERATURE_SET" -> {
                 val f = (raw as? Number)?.toFloat() ?: return toValue(raw)
                 return PropertyValue.FloatVal(Ihu629gCodecs.tempRawToC(f))
             }
-            WellKnownProperties.CHARGE_PLUG.key -> {
+            "charge_plug" -> {
                 val i = (raw as? Number)?.toInt() ?: return toValue(raw)
                 return PropertyValue.IntVal(if (Ihu629gCodecs.plugConnected(i) == true) 1 else 0)
             }
-            WellKnownProperties.PARKING_COMFORT.key -> {
+            "parking_comfort" -> {
                 val i = (raw as? Number)?.toInt() ?: return toValue(raw)
                 return PropertyValue.IntVal(if (Ihu629gCodecs.parkModeIsOn(i)) 1 else 0)
             }
@@ -211,7 +212,7 @@ class Ihu629gSession(
 
     private fun encode(property: VehicleProperty, value: PropertyValue): PropertyValue {
         when (property.key) {
-            WellKnownProperties.HVAC_TEMP_C.key -> {
+            "HVAC_TEMPERATURE_SET" -> {
                 val c = when (value) {
                     is PropertyValue.FloatVal -> value.value
                     is PropertyValue.IntVal -> value.value.toFloat()
@@ -219,7 +220,7 @@ class Ihu629gSession(
                 }
                 return PropertyValue.FloatVal(Ihu629gCodecs.tempCToRaw(c))
             }
-            WellKnownProperties.PARKING_COMFORT.key -> {
+            "parking_comfort" -> {
                 val on = when (value) {
                     is PropertyValue.BoolVal -> value.value
                     is PropertyValue.IntVal -> value.value != 0
@@ -240,49 +241,41 @@ class Ihu629gSession(
             val b = platform.bindings[key] ?: return null
             val raw = backend.read(b.nativeId, b.areaId) as? Number ?: return null
             return when (key) {
-                "hvac_temp_c" -> Ihu629gCodecs.tempRawToC(raw.toFloat())
-                "speed_kmh" -> AospVehicleIds.speedMsToKmh(raw.toFloat())
+                "HVAC_TEMPERATURE_SET" -> Ihu629gCodecs.tempRawToC(raw.toFloat())
+                "PERF_VEHICLE_SPEED" -> AospVehicleIds.speedMsToKmh(raw.toFloat())
                 else -> raw.toFloat()
             }
         }
         val mode = intOf("drive_mode")
         val plug = intOf("charge_plug")
         return TelemetrySnapshot(
-            gear = intOf("gear"),
-            speedKmh = floatOf("speed_kmh"),
+            gear = intOf("CURRENT_GEAR"),
+            speedKmh = floatOf("PERF_VEHICLE_SPEED"),
             evBatteryPercent = floatOf("ev_battery_percent"),
             rangeKm = floatOf("range_km"),
             driveMode = mode?.let { platform.driveModeEnum[it] ?: "mode:$it" },
             regenLevel = intOf("regen"),
-            ignitionState = intOf("ignition"),
-            hvacPower = intOf("hvac_power")?.let { it != 0 && it != 2 },
-            hvacTempC = floatOf("hvac_temp_c"),
-            hvacFan = intOf("hvac_fan"),
+            ignitionState = intOf("IGNITION_STATE"),
+            hvacPower = intOf("HVAC_POWER_ON")?.let { it != 0 && it != 2 },
+            hvacTempC = floatOf("HVAC_TEMPERATURE_SET"),
+            hvacFan = intOf("HVAC_FAN_SPEED"),
             chargeCurrentA = floatOf("charge_current"),
             chargePlugConnected = Ihu629gCodecs.plugConnected(plug),
-            extras = mapOf(
-                "bridge" to if (backend.available) "ok" else "unavailable",
-                "backend" to "vhal",
-                "accessMode" to backend.mode.wireName,
-                "family" to "flyme",
-            ),
+            extras = buildMap {
+                put("bridge", if (backend.available) "ok" else "unavailable")
+                put("backend", "vhal")
+                put("accessMode", backend.mode.wireName)
+                put("family", "flyme")
+                if (mode != null) put("driveModeRaw", mode.toString())
+            },
         )
     }
 
     private fun toValue(raw: Any?): PropertyValue? =
-        cc.opencar.assistant.integrations.common.toPropertyValue(raw)
+        cc.opencar.assistant.integrations.aaos.toPropertyValue(raw)
 
     companion object {
         private const val TAG = "Ihu629gSession"
         private const val POLL_MS = 1000L
-
-        private fun wellKnownBindings(platform: PlatformConfig): Map<VehicleProperty, Pair<Int, Int>> {
-            val out = mutableMapOf<VehicleProperty, Pair<Int, Int>>()
-            for ((key, binding) in platform.bindings) {
-                val prop = wellKnownByKey(key) ?: continue
-                out[prop] = binding.nativeId to binding.areaId
-            }
-            return out
-        }
     }
 }

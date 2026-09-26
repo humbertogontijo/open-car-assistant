@@ -8,7 +8,7 @@ import cc.opencar.assistant.api.QuickEntry
 import cc.opencar.assistant.api.VehicleIntegration
 import cc.opencar.assistant.api.VehicleSession
 import cc.opencar.assistant.api.WakeSignals
-import cc.opencar.assistant.integrations.common.PlatformConfig
+import cc.opencar.assistant.integrations.aaos.PlatformConfig
 import cc.opencar.assistant.integrations.platform.flyme.FlymePlatform
 
 class Ihu629gIntegration : VehicleIntegration {
@@ -58,13 +58,7 @@ class Ihu629gIntegration : VehicleIntegration {
                 Capability.IGNITION_EVENTS,
             ),
             variants = emptyList(),
-            properties = IHU629G_WRITABLE_ALLOWLIST.map { id ->
-                PlatformConfig.PropertyDef(
-                    id = id,
-                    key = "0x${Integer.toHexString(id)}",
-                    access = "rw",
-                )
-            },
+            properties = emptyList(),
         )
     }
 }

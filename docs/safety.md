@@ -24,7 +24,7 @@ Product tooling and the shell assume a normal **`/data`** install with the commu
 | **antora1000** | gRPC → VenusVehicleServer `127.0.0.1:40004` | No `CAR_VENDOR_EXTENSION` needed. |
 | **ihu629g** | `CarPropertyManager` via shared `CarPropertyBackend` | Uses runtime/install car permissions available to a user app. |
 
-Platforms that need formal `signature\|privileged` grants (priv-app whitelist, OEM platform key, etc.) own that in their integration — shared means such as `CarPropertyBackend` remain available. Core `oca-setup` and the in-app setup UI do **not** elevate to `/system/priv-app`.
+Platforms that need formal `signature\|privileged` grants (priv-app whitelist, OEM platform key, etc.) own that in their integration — shared means such as `CarPropertyBackend` remain available. Core `oaa-setup` and the in-app setup UI do **not** elevate to `/system/priv-app`.
 
 ### Host setup
 
@@ -32,7 +32,7 @@ Replace `CAR_IP` with the HU address (required — there is no default LAN IP).
 
 ```bash
 # /data install + runtime grants (uninstallable)
-./tools/oca-setup -i antora1000 -H CAR_IP setup
+./tools/oaa-setup -i antora1000 -H CAR_IP setup
 ```
 
 Web UI setup (`/api/setup/actions/*`): request runtime permissions and show host install hints.
@@ -52,7 +52,7 @@ DVR runs in the foreground `AssistantService` (`camera` FGS type). Modes:
 - **Off** — not writing (live mosaic preview still available in the Cameras UI)
 - **DVR** — continuous rotate (~5 min / 100 MB per file under `dvr/`); **auto-starts on ACC/boot wake** and **stops on screen-off / vendor sleep** (Parking Comfort–safe; wake/sleep debounced ~5 s). Retention prunes oldest unlocked files by max total size and optional max age. Locked files and segment `.meta` (wall-clock `startUtcMs` / `durationMs`) live under app `files/dvr-meta/` because public `Movies/` volumes reject non-media sidecars. The cameras UI shows a **day-scoped wall-clock timeline** over segments; scrub seeks via `/api/dvr/play?atMs=`, and **Cut** remuxes a wall-clock range (possibly multi-file, sealing the active segment when needed) via `/api/dvr/cut` and **downloads** the clip to the client (not stored on the HU).
 
-Save targets: app files, internal Movies/`OpenCarAssistant`, and mounted SD/USB volumes under `OpenCarAssistant/` (continuous files always in a `dvr/` subdir).
+Save targets: app files, internal Movies/`OpenAutomotiveAssistant`, and mounted SD/USB volumes under `OpenAutomotiveAssistant/` (continuous files always in a `dvr/` subdir).
 
 **Shared mosaic stream:** GPU path only — camera `SurfaceTexture` → GLES → HW `MediaCodec` → H.264. Mosaic output size is computed from each camera’s native preview size and the grid layout (no platform `dvr.fps` / `mosaicHeight`). Live UI: **HLS** (`/api/dvr/live.m3u8` + CMAF) via **hls.js** on one `<video>`. DVR: `MediaMuxer` `.mp4`. Status: measured `stream.size` / `fps`, `h264.*`, `camera2Probe`. Role entities (`camera.front`, …) come from `platform.json` → `cameras[]`.
 

@@ -1,0 +1,140 @@
+{
+  "pack": "standard-pilot",
+  "entities": [
+    {
+      "id": "climate.cabin",
+      "domain": "climate",
+      "group": "controls",
+      "section": "climate",
+      "input": "climate",
+      "attributes": {
+        "power": "HVAC_POWER_ON",
+        "temperature": "HVAC_TEMPERATURE_SET",
+        "fan_mode": "HVAC_FAN_SPEED",
+        "fan_direction": "HVAC_FAN_DIRECTION",
+        "ac": "HVAC_AC_ON",
+        "auto": "HVAC_AUTO_ON",
+        "recirc": "HVAC_RECIRC_ON",
+        "current_temperature": "SENSOR_TYPE_TEMPERATURE_INDOOR"
+      },
+      "aliases": [
+        "climate",
+        "hvac_power",
+        "hvac_ac",
+        "hvac_auto",
+        "hvac_recirc",
+        "hvac_temp",
+        "hvac_fan",
+        "hvac_fan_direction"
+      ],
+      "min": 16,
+      "max": 32,
+      "step": 0.5,
+      "deviceClass": "temperature",
+      "unitOfMeasurement": "celsius",
+      "icon": "climate",
+      "history": true,
+      "lastKnown": true
+    },
+    {
+      "id": "PERF_VEHICLE_SPEED",
+      "domain": "sensor",
+      "group": "home",
+      "section": "telemetry",
+      "bindingKey": "PERF_VEHICLE_SPEED",
+      "input": "sensor",
+      "writable": false,
+      "deviceClass": "speed",
+      "unitOfMeasurement": "km_h",
+      "icon": "sensor",
+      "history": true,
+      "aliases": [
+        "sensor.speed",
+        "speed",
+        "speed_kmh"
+      ],
+      "labelKey": "control.PERF_VEHICLE_SPEED",
+      "hintKey": "control.PERF_VEHICLE_SPEED.hint"
+    },
+    {
+      "id": "TYPE_EV_BATTERY_PERCENTAGE",
+      "domain": "sensor",
+      "group": "home",
+      "section": "telemetry",
+      "bindingKey": "TYPE_EV_BATTERY_PERCENTAGE",
+      "input": "sensor",
+      "writable": false,
+      "deviceClass": "battery",
+      "unitOfMeasurement": "percent",
+      "icon": "battery",
+      "history": true,
+      "aliases": [
+        "ev_battery_percent",
+        "sensor.soc",
+        "soc"
+      ],
+      "labelKey": "control.TYPE_EV_BATTERY_PERCENTAGE",
+      "hintKey": "control.TYPE_EV_BATTERY_PERCENTAGE.hint"
+    },
+    {
+      "id": "RANGE_REMAINING",
+      "domain": "sensor",
+      "group": "home",
+      "section": "telemetry",
+      "bindingKey": "RANGE_REMAINING",
+      "input": "sensor",
+      "writable": false,
+      "deviceClass": "distance",
+      "unitOfMeasurement": "km",
+      "icon": "energy",
+      "history": true,
+      "aliases": [
+        "range",
+        "range_km",
+        "sensor.range"
+      ],
+      "labelKey": "control.RANGE_REMAINING",
+      "hintKey": "control.RANGE_REMAINING.hint"
+    },
+    {
+      "id": "SENSOR_TYPE_TEMPERATURE_AMBIENT",
+      "domain": "sensor",
+      "group": "controls",
+      "section": "climate",
+      "bindingKey": "SENSOR_TYPE_TEMPERATURE_AMBIENT",
+      "input": "sensor",
+      "writable": false,
+      "deviceClass": "temperature",
+      "unitOfMeasurement": "celsius",
+      "icon": "temp",
+      "history": true,
+      "aliases": [
+        "sensor.temp_ambient",
+        "temp_ambient",
+        "temp_ambient_c"
+      ],
+      "labelKey": "control.SENSOR_TYPE_TEMPERATURE_AMBIENT",
+      "hintKey": "control.SENSOR_TYPE_TEMPERATURE_AMBIENT.hint"
+    },
+    {
+      "id": "PERF_ODOMETER",
+      "domain": "sensor",
+      "group": "vehicle",
+      "section": "telemetry",
+      "bindingKey": "PERF_ODOMETER",
+      "input": "sensor",
+      "writable": false,
+      "deviceClass": "distance",
+      "unitOfMeasurement": "km",
+      "icon": "sensor",
+      "history": true,
+      "aliases": [
+        "odometer",
+        "odometer_km",
+        "sensor.odometer"
+      ],
+      "labelKey": "control.PERF_ODOMETER",
+      "hintKey": "control.PERF_ODOMETER.hint"
+    }
+  ]
+}

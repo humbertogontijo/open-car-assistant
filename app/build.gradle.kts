@@ -51,7 +51,7 @@ android {
 
 dependencies {
     implementation(project(":integration-api"))
-    implementation(project(":oca-support"))
+    implementation(project(":oaa-support"))
     implementation(project(":feature-memory"))
     implementation(project(":feature-telemetry"))
     implementation(project(":feature-web"))

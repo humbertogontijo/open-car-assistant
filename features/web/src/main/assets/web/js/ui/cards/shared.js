@@ -13,6 +13,9 @@ export const DOMAIN_SPAN = {
   media_player: { cols: 1, rows: 2 },
   charger: { cols: 1, rows: 2 },
   light: { cols: 1, rows: 2 },
+  drivetrain: { cols: 1, rows: 2 },
+  chassis: { cols: 1, rows: 2 },
+  steering: { cols: 1, rows: 2 },
   cover: { cols: 1, rows: 1 },
 };
 

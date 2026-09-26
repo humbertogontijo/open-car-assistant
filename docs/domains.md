@@ -15,21 +15,18 @@ flowchart TB
     AAOS["AAOS managers + VehiclePropertyIds + VehicleArea"]
     CPU["CarPlay Ultra vehicle state categories WWDC24"]
   end
-  subgraph ocaDomains [OCA domains]
+  subgraph productDomains [Product domains]
     Domains["info sensor climate cover seat lock light drivetrain chassis steering energy adas camera media"]
   end
   AAOS --> Domains
   CPU -->|"cross-check / zone patterns"| Domains
 ```
 
-## CarPlay Ultra access limits
+## CarPlay Ultra → product domains
 
-- Full Vehicle Resources / AutomakerInputStreams schemas require Apple **MFi**.
-- Public sources: WWDC24 “Meet the next generation of CarPlay architecture” (vehicle state categories + climate configuration), WWDC24 design-system talk, [CarPlay Developer Guide](https://developer.apple.com/download/files/CarPlay-Developer-Guide.pdf) (third-party app templates only).
+Ultra is a **taxonomy cross-check**, not a second runtime. Full Vehicle Resources need Apple **MFi**; public WWDC24 categories are enough for domain shape.
 
-## CarPlay Ultra → OCA
-
-| CarPlay Ultra category | OCA domain(s) | Notes |
+| CarPlay Ultra category | Product domain(s) | Notes |
 |------------------------|---------------|--------|
 | Climate control | `climate` (+ `fan` for seat vent) | Zones via layout keys; per-zone temp/fan/vents; cabin-wide AC / recirc / SYNC |
 | Closures | `cover` + `lock` | Openings vs lock actuators |
@@ -62,7 +59,7 @@ flowchart TB
 
 ## Domain field inventories
 
-For each domain: **AAOS source**, **Include**, **Exclude**, **OCA today**.
+For each domain: **AAOS source**, **Include**, **Exclude**, **Today**.
 
 ### `info` — static vehicle identity
 
@@ -76,7 +73,7 @@ For each domain: **AAOS source**, **Include**, **Exclude**, **OCA today**.
 
 **Exclude:** live levels → `ev_battery` / `fuel` / `sensor`; HVAC setpoints → `climate`.
 
-**OCA today:** `sensor.info_*` / extras. Prefer read-only sensors or a thin `info.vehicle` composite — never writable controls.
+**Today:** `sensor.info_*` / extras. Prefer read-only sensors or a thin `info.vehicle` composite — never writable controls.
 
 ### `sensor` — telemetry
 
@@ -85,7 +82,7 @@ For each domain: **AAOS source**, **Include**, **Exclude**, **OCA today**.
 **Include:** speed, odometer, temps, tires @ `VehicleAreaWheel`, range, instantaneous economy, unit prefs.  
 **Exclude:** gear/ignition controls → `drivetrain`; charge limits → `charger`; ADAS enables → ADAS atomics.
 
-**OCA today:** `sensor.*` via ControlCatalog + telemetry. Keep atomic; use `deviceClass` + UoM.
+**Today:** `sensor.*` via ControlCatalog + telemetry. Keep atomic; use `deviceClass` + UoM.
 
 ### `climate` — cabin HVAC
 
@@ -103,7 +100,7 @@ For each domain: **AAOS source**, **Include**, **Exclude**, **OCA today**.
 
 Modes: `off` / `manual` / `auto` from power+auto (no house HVAC heat/cool/fan_only).
 
-**OCA today:** `climate.cabin`.
+**Today:** `climate.cabin`.
 
 ### `cover` — openings
 
@@ -112,7 +109,7 @@ Modes: `off` / `manual` / `auto` from power+auto (no house HVAC heat/cool/fan_on
 **Include:** position + move; `device_class` window/door/shade/garage.  
 **Exclude:** locks → `lock`.
 
-**OCA today:** `cover.window_*`, sunroof, sunshade, trunk.
+**Today:** `cover.window_*`, sunroof, sunshade, trunk.
 
 ### `lock` — lock actuators
 
@@ -121,7 +118,7 @@ Modes: `off` / `manual` / `auto` from power+auto (no house HVAC heat/cool/fan_on
 **Include:** central / per-door / window switch lock.  
 **Exclude:** approach/away/keyless *policy* → `switch`.
 
-**OCA today:** `lock.central`, `lock.windows`.
+**Today:** `lock.central`, `lock.windows`.
 
 ### `mirror` — fold / aim (optional)
 
@@ -137,7 +134,7 @@ Keep atomics (`switch.mirror_fold`, …) until aim POS/MOVE needs a card; then `
 | `seat` | Position / memory / occupancy / belts / easy access / lumbar / … | `SEAT_*` |
 | climate sibling | Seat *heat* | `HVAC_SEAT_TEMPERATURE` |
 
-**OCA today:** `fan.seat_*`. **`seat` is a planned domain** (`EntityType.SEAT`) — promote when binding position/memory.
+**Today:** `fan.seat_*`. **`seat` is a planned domain** (`EntityType.SEAT`) — promote when binding position/memory.
 
 ### `light`
 
@@ -152,7 +149,7 @@ Keep atomics (`switch.mirror_fold`, …) until aim POS/MOVE needs a card; then `
 **Include:** gear, ignition, drive mode, regen, hybrid hold/save/mode.  
 **Exclude:** speed → `sensor`; EPB → `chassis`; charge → `charger`.
 
-**OCA today:** `drivetrain.vehicle`.
+**Today:** `drivetrain.vehicle`.
 
 ### `chassis`
 
@@ -160,7 +157,7 @@ Keep atomics (`switch.mirror_fold`, …) until aim POS/MOVE needs a card; then `
 
 **Exclude:** steering wheel → `steering`; tire pressure → `sensor`.
 
-**OCA today:** `chassis.vehicle`.
+**Today:** `chassis.vehicle`.
 
 ### `steering`
 
@@ -168,7 +165,7 @@ Keep atomics (`switch.mirror_fold`, …) until aim POS/MOVE needs a card; then `
 
 **Exclude:** `HVAC_STEERING_WHEEL_HEAT` → `climate`.
 
-**OCA today:** `steering.vehicle`.
+**Today:** `steering.vehicle`.
 
 ### Energy: `ev_battery` + `charger` (+ `fuel`)
 
@@ -206,7 +203,7 @@ Now playing + transport + primary volume. Cabin volume *buses* are separate `num
 | Cabin volumes | `number.vol_*` | `number` | `sound` |
 | Now playing | `media_player.vehicle` | `media_player` | `sound` |
 
-**Keep** `platform/android.json` + `"extends": ["android"]` as the **AAOS HU settings transport fragment** (like `aosp.json`) — not a product domain.
+**Keep** the `android` block inside `platform/aaos/platform.json` (pulled in via `"extends": ["aaos"]`) as the **AAOS HU settings transport** — not a product domain.
 
 ### Vendor-only
 
@@ -221,7 +218,7 @@ Do **not** invent domains named `SETTING_FUNC`, `BCM`, `CHARGE_FUNC`.
 
 ## Vendor AdaptAPI prefixes → domains
 
-Geely / Flyme catalog keys fold into AAOS-shaped domains by **meaning**:
+Flyme/ECARX-style catalog keys (and similar OEM prefixes) fold into AAOS-shaped domains by **meaning**:
 
 | Prefix / family | Typical landing |
 |-----------------|-----------------|
